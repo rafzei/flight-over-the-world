@@ -16,6 +16,15 @@ if (el) {
   window.__bgm = el;
   if (enabled) el.play().catch(() => {});
   else el.pause();
+  const lock = document.getElementById("map-lock");
+  if (lock && !lock.classList.contains("hidden")) el.pause();
+}
+
+let suspended = false;
+
+export function setMusicSuspended(on) {
+  suspended = !!on;
+  updateMusic();
 }
 
 export function musicEnabled() {
@@ -30,13 +39,13 @@ export function setMusicEnabled(on) {
     /* ignore */
   }
   if (!el) return;
-  if (enabled) el.play().catch(() => {});
+  if (enabled && !suspended) el.play().catch(() => {});
   else el.pause();
 }
 
 export function updateMusic() {
   if (!el) return;
-  if (!enabled) {
+  if (!enabled || suspended) {
     if (!el.paused) el.pause();
     return;
   }
@@ -44,7 +53,7 @@ export function updateMusic() {
 }
 
 export function primeMusic() {
-  if (el && enabled) el.play().catch(() => {});
+  if (el && enabled && !suspended) el.play().catch(() => {});
 }
 
 export function musicDebug() {

@@ -52,12 +52,15 @@ import {
   primeAudio,
 } from "./game/explosion.js";
 import { updateEngineSound, engineDebug } from "./game/engineSound.js";
-import { updateMusic, primeMusic, musicDebug, musicEnabled, setMusicEnabled } from "./game/music.js";
+import { updateMusic, primeMusic, musicDebug, musicEnabled, setMusicEnabled, setMusicSuspended } from "./game/music.js";
 import {
   TileKeyPool,
   loadTileSlots,
   syncTileAuth,
   applyTileQuality,
+  PUBLIC_MAP_LOCKED,
+  getUserIonKey,
+  setUserIonKey,
 } from "./game/tileAuth.js";
 import { createHoldParentTilesPlugin } from "./game/holdParentTiles.js";
 import { createFreeMap, createMiniMap, paintTrailMap } from "./game/freeMap.js";
@@ -620,6 +623,10 @@ const el = {
   lobbyScopes: document.getElementById("lobby-scopes"),
   lobbyModeDesc: document.getElementById("lobby-mode-desc"),
   lobbyCity: document.getElementById("lobby-city"),
+  mapLock: document.getElementById("map-lock"),
+  ionKeyInput: document.getElementById("ion-key-input"),
+  ionKeySave: document.getElementById("ion-key-save"),
+  ionKeyStatus: document.getElementById("ion-key-status"),
   voiceInd: document.getElementById("voice-ind"),
   mpOnline: document.getElementById("mp-online"),
   mpOnlineCount: document.getElementById("mp-online-count"),
@@ -951,7 +958,6 @@ function showLanding() {
   closeRoom();
   mp.active = false;
   menuOpen = true;
-  el.landing.classList.remove("hidden");
   el.menu.classList.add("hidden");
   el.lobby.classList.add("hidden");
   el.nick?.classList.add("hidden");
@@ -959,6 +965,7 @@ function showLanding() {
   carousel.setActive(false);
   lobbyCarousel.setActive(false);
   rememberHost("");
+  syncMapLockUi();
   setRoomUrl("");
 }
 
@@ -2258,15 +2265,58 @@ el.lobbyCity.addEventListener("input", () => {
   if (mp.host && mp.net) mp.net.send({ t: "city", city: el.lobbyCity.value });
 });
 
-async function init() {
-  if (!tilePool.slots.length) {
-    setLoader("Missing map keys – add VITE_CESIUM_ION_KEYS to .env", 0);
+function hasPlayableMap() {
+  return !PUBLIC_MAP_LOCKED || !!getUserIonKey();
+}
+
+function syncMapLockUi() {
+  const locked = PUBLIC_MAP_LOCKED && !getUserIonKey();
+  el.mapLock?.classList.toggle("hidden", !locked);
+  el.landing?.classList.toggle("hidden", locked);
+  setMusicSuspended(locked);
+}
+
+function saveUserIonKey() {
+  const raw = el.ionKeyInput?.value || "";
+  const token = raw.trim();
+  if (token.length < 16) {
+    if (el.ionKeyStatus) el.ionKeyStatus.textContent = "That token looks too short.";
     return;
   }
-  setLoader("Connecting to map…", 0.4);
-  const ready = await tilePool.warmup();
-  if (!ready) {
-    loadError = "Map servers are busy — starting anyway, terrain will retry";
+  setUserIonKey(token);
+  location.reload();
+}
+
+function needOwnMapKey() {
+  if (hasPlayableMap()) return false;
+  syncMapLockUi();
+  el.ionKeyInput?.focus();
+  return true;
+}
+
+syncMapLockUi();
+el.ionKeySave?.addEventListener("click", saveUserIonKey);
+el.ionKeyInput?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    saveUserIonKey();
+  }
+});
+
+async function init() {
+  if (tilePool.slots.length) {
+    setLoader("Connecting to map…", 0.4);
+    const ready = await tilePool.warmup();
+    if (!ready) {
+      loadError = PUBLIC_MAP_LOCKED
+        ? "Could not open terrain with that token — check My Assets and the token"
+        : "Map servers are busy — starting anyway, terrain will retry";
+    }
+  } else if (PUBLIC_MAP_LOCKED) {
+    setLoader("Start…", 0.5);
+  } else {
+    setLoader("Missing map keys – add VITE_CESIUM_ION_KEYS to .env", 0);
+    return;
   }
   setLoader("Start…", 0.4);
 
@@ -2834,6 +2884,7 @@ function placeBeaconAt(latDeg, lonDeg) {
 
 // --- start gry ---
 async function startGame() {
+  if (needOwnMapKey()) return;
   if (!gameReady || !tiles || !plane) {
     return menuFail("Still loading – tap Start again in a moment");
   }
@@ -2961,10 +3012,12 @@ el.city.addEventListener("keydown", (e) => {
 });
 
 el.btnSolo.addEventListener("click", () => {
+  if (needOwnMapKey()) return;
   unlockAudio();
   showSoloMenu();
 });
 el.btnMulti.addEventListener("click", () => {
+  if (needOwnMapKey()) return;
   unlockAudio();
   const nick = savedNick();
   if (nick) {

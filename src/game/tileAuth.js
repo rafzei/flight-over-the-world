@@ -2,8 +2,31 @@ const ION_ASSET = "2275207";
 const GOOGLE_ROOT = "https://tile.googleapis.com/v1/3dtiles/root.json";
 const ION_ENDPOINT = `https://api.cesium.com/v1/assets/${ION_ASSET}/endpoint`;
 const SLOT_KEY = "foe-tile-slot";
+const USER_ION_KEY = "foe-user-ion-key";
 const DEAD_MS = 24 * 60 * 60 * 1000;
 const COOL_MS = 90 * 1000;
+
+/** Shared Cesium ion quota is exhausted — public tiles stay off until this is false. */
+export const PUBLIC_MAP_LOCKED = true;
+
+export function getUserIonKey() {
+  try {
+    return String(localStorage.getItem(USER_ION_KEY) || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+export function setUserIonKey(raw) {
+  const token = String(raw || "").trim();
+  try {
+    if (token) localStorage.setItem(USER_ION_KEY, token);
+    else localStorage.removeItem(USER_ION_KEY);
+  } catch {
+    /* ignore */
+  }
+  return token;
+}
 
 /** Always-on photorealistic budget. Do not lower these when a key is throttled. */
 export const TILE_QUALITY = {
@@ -53,14 +76,22 @@ function statusOf(err) {
 }
 
 export function loadTileSlots() {
+  const user = getUserIonKey();
   const ion = unique([
-    ...splitKeys(import.meta.env.VITE_CESIUM_ION_KEYS),
-    ...splitKeys(import.meta.env.VITE_CESIUM_ION_KEY),
-  ]);
-  const google = unique([
-    ...splitKeys(import.meta.env.VITE_GOOGLE_TILES_KEYS),
-    ...splitKeys(import.meta.env.VITE_GOOGLE_MAPS_KEY),
-  ]);
+    user,
+    ...(PUBLIC_MAP_LOCKED
+      ? []
+      : [
+          ...splitKeys(import.meta.env.VITE_CESIUM_ION_KEYS),
+          ...splitKeys(import.meta.env.VITE_CESIUM_ION_KEY),
+        ]),
+  ].filter(Boolean));
+  const google = PUBLIC_MAP_LOCKED
+    ? []
+    : unique([
+        ...splitKeys(import.meta.env.VITE_GOOGLE_TILES_KEYS),
+        ...splitKeys(import.meta.env.VITE_GOOGLE_MAPS_KEY),
+      ]);
   return [
     ...ion.map((token) => ({ kind: "ion", token })),
     ...google.map((token) => ({ kind: "google", token })),

@@ -34,7 +34,24 @@
       </div>
     </div>
 
-    <div id="landing">
+    <div id="map-lock">
+      <div class="map-lock-copy">
+        <h1>Public map is unavailable :(</h1>
+        <p>The shared quota for this site is used up, so the public game cannot load Earth. Play with your own free token – it stays in this browser only.</p>
+        <ul>
+          <li>Create an account at <a href="https://ion.cesium.com/" target="_blank" rel="noopener">ion.cesium.com</a></li>
+          <li>Create a new token under Access Tokens and paste it below</li>
+        </ul>
+        <div class="map-lock-row">
+          <input id="ion-key-input" type="password" autocomplete="off" spellcheck="false" placeholder="Cesium ion token" />
+          <button id="ion-key-save" type="button">Save</button>
+        </div>
+        <p id="ion-key-status" class="map-lock-status"></p>
+        <p class="map-lock-repo">Or <a href="https://github.com/bartosz-ciesielski/flight-over-the-world" target="_blank" rel="noopener">clone the repo</a> and set up your own environment.</p>
+      </div>
+    </div>
+
+    <div id="landing" class="hidden">
       <div class="menu-card landing-card">
         <h1>Flight Over the Earth</h1>
         <p class="landing-sub">Choose a game mode</p>
