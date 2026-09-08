@@ -41,6 +41,7 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { loadVehicleModel, disposeModelResources } from "./game/vehicleModels.js";
 import { createCombatDrone, updateCombatDrone } from "./game/combatDrone.js";
 import { createFighterMissiles } from "./game/fighterMissiles.js";
+import { createDroneCannons } from "./game/droneCannons.js";
 import { setLoader, hideLoader } from "./game/hud.js";
 import { createPlaneMesh } from "./game/plane.js";
 import { createVehicleController } from "./game/vehicleControllers.js";
@@ -55,6 +56,7 @@ import {
 import { attachContrails, updateContrails, disposeContrails } from "./game/contrails.js";
 import { finishVehicleMaterials, prepareFighterSurfaces, updateFighterSurfaces, disposeVehicleVisuals } from "./game/vehicleVisuals.js";
 import { createVehicleGroundShadows } from "./game/vehicleGroundShadows.js";
+import { createVehicleCollisionDetector, raycastTerrain } from "./game/vehicleCollision.js";
 import { createCarousel } from "./game/menuPreview.js";
 import { createSky, SUN_DIR } from "./game/sky.js";
 import {
@@ -278,8 +280,11 @@ const HOME_BEACON_M = 1000;
 let camera, scene, renderer, tiles, sun, sky;
 let vehicleGroundShadows;
 let fighterMissiles;
+let droneCannons;
 let missileShotSeq = 0;
 const lastMissileShotSeq = new Map();
+let droneBurstSeq = 0;
+const lastDroneBurstSeq = new Map();
 const shadowUp = new Vector3();
 const shadowSunDirection = new Vector3();
 let tile429Count = 0;
@@ -328,7 +333,6 @@ function updateTilesSafe() {
 }
 let planeMesh, plane, beacon;
 let groundAlt = TERRAIN_ALT;
-let lastSafeAgl = 200;
 let crashed = false;
 let finished = false;
 let loaderDismissed = false;
@@ -384,8 +388,6 @@ let paused = false;
 let leaveOpen = false;
 let pendingSnap = false; // po teleporcie: jednorazowe dosadzenie na właściwą wysokość
 let crashGraceUntil = 0;
-let crashStreak = 0;
-const groundSamples = [];
 let startLat = 52.38871,
   startLon = 16.60069; // Niepruszewo
 let camOffset = PLANES.pa28.cam;
@@ -405,7 +407,6 @@ let snapLastGh = null; // dosadzenie dopiero gdy pomiar terenu się ustabilizuje
 let snapBestGh = null; // najwyższa zmierzona powierzchnia — nie wracamy pod LOD-parent
 let snapStableCount = 0;
 let snapFirstAt = 0;
-let snapLiftUntil = 0; // po locku jeszcze chwilę podnoś, jeśli dzieci kafelków wskoczą wyżej
 let lastSurf = null;
 let geoCache = null;
 let geoCacheScope = null;
@@ -789,6 +790,7 @@ const el = {
   mapNote: document.getElementById("map-note"),
   dragonRelease: document.getElementById("dragon-release"),
   missileFire: document.getElementById("missile-fire"),
+  droneFire: document.getElementById("drone-fire"),
   lobbyCarCanvas: document.getElementById("lobby-carousel-canvas"),
   lobbyCarPrev: document.getElementById("lobby-car-prev"),
   lobbyCarNext: document.getElementById("lobby-car-next"),
@@ -1797,6 +1799,8 @@ function handleNetData(data, fromId) {
     loadMate(id, data.plane || "pa28");
   } else if (data.t === "missile") {
     receiveFighterMissile(data);
+  } else if (data.t === "drone-burst") {
+    receiveDroneBurst(data);
   } else if (data.t === "guess") {
     const id = data.from;
     if (!id || id === mp.myId) return;
@@ -2567,6 +2571,7 @@ async function init() {
     renderer.domElement.id = "game-canvas";
     document.body.appendChild(renderer.domElement);
     vehicleGroundShadows = createVehicleGroundShadows(renderer, { mobile: isMobile });
+    droneCannons = createDroneCannons(scene);
     fighterMissiles = createFighterMissiles(scene, {
       onImpact(position, up) {
         explosions.push(createExplosion(scene, position.clone().addScaledVector(up, .3), { up }));
@@ -2764,6 +2769,7 @@ function loadPlane(key) {
   const spec = PLANES[key];
   camOffset = spec.cam;
   if (planeMesh) {
+    droneCannons?.removeVehicle(planeMesh);
     fighterMissiles?.removeVehicle(planeMesh);
     vehicleGroundShadows?.removeVehicle(planeMesh);
     disposeRocketExhaust(planeMesh);
@@ -2810,6 +2816,8 @@ function loadPlane(key) {
 
 function disposeMate(id) {
   const mate = mp.mates.get(id);
+  droneCannons?.removeVehicle(mate?.mesh);
+  lastDroneBurstSeq.delete(id);
   fighterMissiles?.removeVehicle(mate?.mesh);
   lastMissileShotSeq.delete(id);
   vehicleGroundShadows?.removeVehicle(mate?.mesh);
@@ -2895,6 +2903,8 @@ function loadMate(id, key) {
 
 function resetFlight(latDeg, lonDeg) {
   const spec = PLANES[selectedPlane];
+  droneCannons?.reset();
+  lastDroneBurstSeq.clear();
   fighterMissiles?.reset();
   lastMissileShotSeq.clear();
   for (const explosion of explosions) explosion.dispose();
@@ -2914,13 +2924,9 @@ function resetFlight(latDeg, lonDeg) {
   snapBestGh = null;
   snapStableCount = 0;
   snapFirstAt = 0;
-  snapLiftUntil = 0;
   lastSurf = null;
   crashed = false;
-  crashStreak = 0;
   crashGraceUntil = 0;
-  lastSafeAgl = 200;
-  groundSamples.length = 0;
   finished = false;
   shake = 0;
   ctrl.roll = 0;
@@ -3005,12 +3011,13 @@ function collectProbeHits(lat, lon, refHeight) {
     _probeOrigin
   );
   _probeOrigin.applyMatrix4(tiles.group.matrixWorld);
-  _probeDir.copy(_probeOrigin).normalize().negate();
+  WGS84_ELLIPSOID.getCartographicToNormal(lat, lon, _probeDir);
+  _probeDir.transformDirection(tiles.group.matrixWorld).negate();
   raycaster.set(_probeOrigin, _probeDir);
   raycaster.far = refHeight + 2500;
   const prevFirst = raycaster.firstHitOnly;
   raycaster.firstHitOnly = false;
-  const hits = raycaster.intersectObject(tiles.group, true);
+  const hits = raycastTerrain(raycaster, tiles.group);
   raycaster.firstHitOnly = prevFirst;
   return hits;
 }
@@ -3058,51 +3065,77 @@ function tilesBusy() {
 }
 
 function adoptGround(gh) {
-  if (pendingSnap || awaitingSnap) {
-    groundAlt = gh;
-    groundSamples.length = 0;
-    return;
-  }
-  const floor = groundSamples.length ? Math.min(...groundSamples) : gh;
-  // LOD parent / roof pops the mesh up — that is not the street
-  if (gh > floor + 24) {
-    armCrashGrace(900);
-    return;
-  }
-  groundSamples.push(gh);
-  if (groundSamples.length > 8) groundSamples.shift();
-  groundAlt = Math.min(...groundSamples);
+  groundAlt = gh;
 }
 
 function armCrashGrace(ms = 2500) {
   crashGraceUntil = performance.now() + ms;
-  crashStreak = 0;
 }
 
-const _rayOrigin = new Vector3();
-const _rayDown = new Vector3();
-function bodyHit(radius = 5) {
-  if (!tiles) return false;
-  _rayDown.copy(planePos).normalize().negate();
-  _rayOrigin.copy(planePos).addScaledVector(_rayDown, -radius * 2);
-  const prevFirst = raycaster.firstHitOnly;
-  raycaster.firstHitOnly = false;
-  raycaster.far = radius * 4;
-  raycaster.set(_rayOrigin, _rayDown);
-  const hits = raycaster.intersectObject(tiles.group, true);
-  raycaster.firstHitOnly = prevFirst;
-  const n = Math.min(hits.length, 8);
-  for (let i = 0; i < n; i++) {
-    if (hits[i].point.distanceTo(planePos) <= radius) return true;
+const vehicleCollision = createVehicleCollisionDetector();
+const _flightFrom = new Vector3();
+const _flightTo = new Vector3();
+const _flightUp = new Vector3();
+const _flightInv = new Matrix4();
+const _flightLla = {};
+
+function flightPosition(target) {
+  return WGS84_ELLIPSOID.getCartographicToPosition(plane.lat, plane.lon, plane.height, target)
+    .applyMatrix4(tiles.group.matrixWorld);
+}
+
+function stopAtImpact(hit) {
+  _flightInv.copy(tiles.group.matrixWorld).invert();
+  _flightTo.copy(hit.position).applyMatrix4(_flightInv);
+  WGS84_ELLIPSOID.getPositionToCartographic(_flightTo, _flightLla);
+  plane.lat = _flightLla.lat;
+  plane.lon = _flightLla.lon;
+  plane.height = _flightLla.height;
+  planePos.copy(hit.position);
+  crash(hit.point);
+}
+
+function updateFlightPhysics(dt) {
+  const canCrash = !pendingSnap && !awaitingSnap && performance.now() > crashGraceUntil;
+  const radius = PLANES[selectedPlane].vertical ? 18 : 4.5;
+  let left = dt;
+  while (left > 0) {
+    const step = Math.min(1 / 60, left);
+    if (canCrash) flightPosition(_flightFrom);
+    plane.update(step, ctrl);
+    left -= step;
+    if (canCrash) {
+      flightPosition(_flightTo);
+      WGS84_ELLIPSOID.getCartographicToNormal(plane.lat, plane.lon, _flightUp);
+      _flightUp.transformDirection(tiles.group.matrixWorld);
+      const hit = vehicleCollision.sweep(tiles.group, _flightFrom, _flightTo, _flightUp, radius);
+      if (hit) {
+        stopAtImpact(hit);
+        return;
+      }
+    }
   }
-  return false;
+  if (!canCrash) return;
+  // Recheck this location, not an old altitude from another tile. This also
+  // catches penetration when terrain arrives during the brief spawn grace.
+  const col = probeColumn(plane.lat, plane.lon, Math.max(plane.height, 2500));
+  if (col.ground === null) return;
+  adoptGround(col.ground);
+  if (plane.height - col.ground <= radius) {
+    plane.height = col.ground + radius;
+    flightPosition(planePos);
+    WGS84_ELLIPSOID.getCartographicToNormal(plane.lat, plane.lon, _flightUp);
+    _flightUp.transformDirection(tiles.group.matrixWorld);
+    crash(planePos.clone().addScaledVector(_flightUp, -radius));
+  }
 }
 
-function crash() {
+function crash(point = planePos) {
   if (crashed) return;
   crashed = true;
-  crashStreak = 0;
-  explosions.push(createExplosion(scene, planePos.clone()));
+  const up = WGS84_ELLIPSOID.getCartographicToNormal(plane.lat, plane.lon, new Vector3())
+    .transformDirection(tiles.group.matrixWorld);
+  explosions.push(createExplosion(scene, point.clone(), { up }));
   playExplosionSound();
   shake = 1;
   if (planeMesh) planeMesh.visible = false;
@@ -3878,6 +3911,11 @@ window.addEventListener("keydown", (e) => {
       fireFighterMissile();
       return;
     }
+    if (k === "enter" && selectedPlane === "drone") {
+      e.preventDefault();
+      fireDroneCannons();
+      return;
+    }
   }
   if (menuOpen || paused || guessOpen) return;
   keys.add(k);
@@ -3921,6 +3959,26 @@ function fireFighterMissile() {
   });
 }
 el.missileFire?.addEventListener("click", fireFighterMissile);
+
+function fireDroneCannons() {
+  if (selectedPlane !== "drone" || menuOpen || paused || guessOpen || leaveOpen || crashed || finished ||
+      pendingSnap || awaitingSnap || freeMap.open) return;
+  const up = new Vector3().setFromMatrixColumn(frameAt(plane.lat, plane.lon, plane.height, 0, 0, 0), 1).normalize();
+  if (droneCannons?.fire(planeMesh, { speed: plane.speed, up }) && mp.active) {
+    mp.net?.send({ t: "drone-burst", from: mp.myId, seq: ++droneBurstSeq });
+  }
+}
+el.droneFire?.addEventListener("click", fireDroneCannons);
+
+function receiveDroneBurst(data) {
+  if (!mp.active || menuOpen || guessOpen || !data.from || data.from === mp.myId) return;
+  const mate = mp.mates.get(data.from);
+  if (mate?.key !== "drone" || !mate.mesh || !Number.isSafeInteger(data.seq) ||
+      data.seq <= (lastDroneBurstSeq.get(data.from) ?? 0)) return;
+  lastDroneBurstSeq.set(data.from, data.seq);
+  // The burst follows the interpolated peer model; one event drives all 96 rounds.
+  droneCannons?.fire(mate.mesh, { speed: (mate.kmh ?? 0) / 3.6, up: mate.mesh.position.clone().normalize() });
+}
 
 function receiveFighterMissile(data) {
   if (!mp.active || menuOpen || guessOpen || !data.from || data.from === mp.myId) return;
@@ -4219,7 +4277,7 @@ function tickFrame() {
   frameCount += 1;
   scene.updateMatrixWorld();
 
-  const flying = !menuOpen && !paused && !guessOpen && !crashed && !finished;
+  let flying = !menuOpen && !paused && !guessOpen && !crashed && !finished;
 
   // sterowanie lotnicze: W / góra = drążek od siebie = nos w dół
   const keyRoll =
@@ -4241,14 +4299,8 @@ function tickFrame() {
   ctrl.throttle = throttleShown;
 
   if (flying) {
-    // równe kroki — duży dt przy ładowaniu kafelków nie robi „przeskoku” przy nitro
-    let left = dt;
-    const step = 1 / 60;
-    while (left > 0) {
-      const s = Math.min(step, left);
-      plane.update(s, ctrl);
-      left -= s;
-    }
+    updateFlightPhysics(dt);
+    flying = !crashed;
   }
 
   // dźwięk silnika — obroty z przepustnicy i prędkości, opływ z prędkości
@@ -4289,6 +4341,12 @@ function tickFrame() {
     el.missileFire.hidden = selectedPlane !== "jet" || !flying || leaveOpen || pendingSnap || awaitingSnap || freeMap.open;
     el.missileFire.disabled = !status?.canFire;
     el.missileFire.textContent = status?.available ? `Enter · Fire missile (${status.available}/${status.total})` : "Missiles reloading…";
+  }
+  if (el.droneFire) {
+    const status = droneCannons?.status(planeMesh);
+    el.droneFire.hidden = selectedPlane !== "drone" || !flying || leaveOpen || pendingSnap || awaitingSnap || freeMap.open;
+    el.droneFire.disabled = !status?.canFire;
+    el.droneFire.textContent = status?.firing ? "Firing 360° burst…" : status?.canFire ? "Enter · Fire 360° burst" : "Cannons readying…";
   }
   for (const mate of mp.mates.values()) {
     if (mate.mesh) spinRotors(mate.mesh, dt, plane.speed);
@@ -4462,12 +4520,12 @@ function tickFrame() {
     if (
       surf !== null &&
       !pendingSnap &&
-      snapLiftUntil > performance.now() &&
+      !crashed &&
+      performance.now() < crashGraceUntil &&
       plane.height < surf + 80
     ) {
       plane.height = surf + snapAgl();
       adoptGround(surf);
-      armCrashGrace(1200);
     } else if (gh !== null) {
       adoptGround(gh);
     }
@@ -4486,7 +4544,6 @@ function tickFrame() {
       const waited = performance.now() - snapFirstAt > (busy ? 2800 : 1800);
       if (snapStableCount >= need && waited) {
         pendingSnap = false;
-        snapLiftUntil = performance.now() + 12000;
         armCrashGrace();
         if (awaitingSnap) {
           awaitingSnap = false;
@@ -4499,7 +4556,6 @@ function tickFrame() {
   if (awaitingSnap && performance.now() - awaitingSnapSince > 20000) {
     awaitingSnap = false;
     pendingSnap = false;
-    snapLiftUntil = performance.now() + 15000;
     armCrashGrace();
     const gh = Number.isFinite(snapBestGh)
       ? snapBestGh
@@ -4514,22 +4570,13 @@ function tickFrame() {
     else finishSnapStart();
   }
   const agl = plane.height - groundAlt;
-  if (agl > 22) lastSafeAgl = agl;
-  if (lastSafeAgl > 28 && lastSafeAgl - agl > 22) {
-    armCrashGrace(1400);
-  }
-  const canCrash =
-    flying && !pendingSnap && performance.now() > crashGraceUntil;
-  const bodyRadius = verticalRocket ? 18 : 4.5;
-  const hitGround = canCrash && agl < (verticalRocket ? 18 : 3);
-  const hitBuilding = canCrash && agl < 80 && bodyHit(bodyRadius);
-  if (hitGround || hitBuilding) crashStreak += 1;
-  else crashStreak = 0;
-  if (crashStreak >= 8) crash();
-
   // aktywne wybuchy
   const weaponsActive = !menuOpen && !paused && !guessOpen && !leaveOpen;
   fighterMissiles?.update(dt, { terrain: tiles.group, active: weaponsActive, visible: !menuOpen && !guessOpen });
+  if (menuOpen || guessOpen || leaveOpen || crashed || finished || pendingSnap || awaitingSnap || freeMap.open) {
+    droneCannons?.cancelBurst(planeMesh);
+  }
+  droneCannons?.update(dt, { terrain: tiles.group, active: weaponsActive, visible: !menuOpen && !guessOpen });
   for (let i = explosions.length - 1; i >= 0; i--) {
     if (!explosions[i].update(weaponsActive ? dt : 0)) explosions.splice(i, 1);
   }

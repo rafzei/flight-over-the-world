@@ -46,7 +46,7 @@ Seven vehicles are available in single player and multiplayer:
 | **Cessna Citation** | ~330 / 900 km/h | Business jet. |
 | **Fighter** | ~540 / 1510 km/h | Combat jet with moving control surfaces, navigation lights, launchable missiles and wingtip contrails above 1000 km/h. |
 | **Rocket** | ~790 / 5000 km/h | Forward-flying rocket with trails from four fins; engine fire appears above 5000 km/h. |
-| **Combat Drone** | 120 / 320 km/h | Armed quadrotor replacing Rocket 1, with four spinning rotors, two gun pods, a camera and red lights. Independent lift and automatic braking; cutting throttle makes it descend under gravity. |
+| **Combat Drone** | 120 / 320 km/h | Armed quadrotor replacing Rocket 1, with four spinning rotors, two rotating cannons firing 360° bursts, a camera and red lights. Independent lift and automatic braking; cutting throttle makes it descend under gravity. |
 | **SpaceX Falcon 9** | Thrust-controlled / 8000 km/h | Upright rocket with nine engine nozzles, steering, gravity and inertia. Press `Enter` to release the Dragon capsule; its red-and-white parachute opens after separation. |
 
 Speeds are game settings, not real-world specifications. Aircraft and the original Rocket can exceed their nominal maximum in a dive. Falcon 9 starts upright with zero speed and accelerates under engine thrust.
@@ -62,6 +62,7 @@ The drone uses `A` / `D` to turn, even at zero forward speed, and `W` / `S` to d
 - Mouse-wheel throttle control anywhere in flight, plus a draggable throttle and touch flight stick.
 - Contrails that follow the flight path, spread, drift and fade over time.
 - Fighter missiles: press `Enter` to launch from alternating wing stations. Aim with the aircraft; missiles explode on terrain or building impact, with fire, smoke and sound. Each of the four stations reloads after 4 seconds. Launches are shared in multiplayer; a **Fire missile** button is available for touch controls.
+- Drone cannons: press `Enter` or tap **Fire 360° burst** for a two-second burst. Both gun pods sweep a full circle in opposite directions while their barrels spin, firing bullets from the muzzles with flashes, golden tracers and sparks on terrain/building impacts. The cannons return forward and can fire again after a short cooldown. Bursts are visible in multiplayer.
 - Multiplayer vehicle selection, player list and push-to-talk voice chat.
 
 ## Controls
@@ -77,7 +78,7 @@ The drone uses `A` / `D` to turn, even at zero forward speed, and `W` / `S` to d
 | `C` | Cycle camera: chase → 3× farther → 5× farther → nose view → fixed tracking → front |
 | `M` | Open / close the map in free flight |
 | Mouse wheel / `+` / `−` / pinch over the map | Zoom the map |
-| `Enter` | Fighter: launch a missile; Falcon 9: release Dragon once per flight |
+| `Enter` | Drone: fire a 360° cannon burst; Fighter: launch a missile; Falcon 9: release Dragon once per flight |
 | `Tab` | Show multiplayer player list (hold) |
 | `T` | Talk (hold) |
 | `Esc` | Close map, pause single player, or open the multiplayer leave menu |

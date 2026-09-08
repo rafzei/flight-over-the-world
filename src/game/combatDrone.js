@@ -52,6 +52,7 @@ function mergeBody(body) {
 export function createCombatDrone() {
   const drone = new Group(); drone.name = "combat-drone";
   const body = new Group(); drone.add(body);
+  let buildParent = body;
   const mat = (name, color, metalness = 0.35, roughness = 0.4, extra = {}) =>
     new MeshStandardMaterial({ name, color, metalness, roughness, ...extra });
   const frame = mat("drone-frame", 0x454d4d);
@@ -65,7 +66,7 @@ export function createCombatDrone() {
   const red = mat("drone-red-lamps", 0xff5353, 0.1, 0.25, { emissive: 0xff1218, emissiveIntensity: 2 });
   const cable = mat("rubber-cables", 0x14191d, 0.05, 0.8);
 
-  function part(geometry, material, x, y, z, parent = body) {
+  function part(geometry, material, x, y, z, parent = buildParent) {
     const mesh = new Mesh(geometry, material); mesh.position.set(x, y, z);
     mesh.castShadow = mesh.receiveShadow = true; parent.add(mesh); return mesh;
   }
@@ -130,10 +131,13 @@ export function createCombatDrone() {
     block(.25,.38,.28,dark,x*.83,-.05,z*.84,.045);
   }
 
+  const cannons = [];
   for(const s of [-1,1]) {
     const x=s*1.35;
     block(.25,.53,.45,steel,s*.98,-.51,.2,.05);
     const mount=cylinder(.24,.24,.27,frame,x,-.71,.13);mount.rotation.z=Math.PI/2;
+    // Merge each gun pod separately, so the whole assembly can turn below its mount.
+    const pod = new Group(); drone.add(pod); buildParent = pod;
     block(.96,.7,1.35,frame,x,-1.03,.12,.16);
     block(1.08,.28,.8,panel,x,-.78,.37,.15);
     block(.77,.34,.74,panel,x,-1.12,.86,.12);
@@ -143,12 +147,16 @@ export function createCombatDrone() {
     for(let i=0;i<4;i++) block(.055,.32,.64,frame,x-s*.49+i*s*.062,-.93,-.25,.012);
     const jacket=cylinder(.39,.42,.75,gunMetal,x,-1.04,-.81);jacket.rotation.x=Math.PI/2;
     const rearCollar=cylinder(.43,.43,.15,steel,x,-1.04,-1.13);rearCollar.rotation.x=Math.PI/2;
-    const guns=new Group();guns.name="drone-rotary-barrels";guns.position.set(x,-1.04,-1.18);drone.add(guns);
+    const turret = new Group(); turret.name = "drone-cannon-turret";
+    const guns=new Group();guns.name="drone-rotary-barrels";guns.position.set(0,0,-1.31);turret.add(guns);
+    const muzzles = [];
     for(let i=0;i<6;i++) {
       const a=i*Math.PI/3,bx=Math.cos(a)*.265,by=Math.sin(a)*.265;
       const tube=part(new CylinderGeometry(.073,.073,1.6,12,1,true),gunMetal,bx,by,-.79,guns);tube.rotation.x=Math.PI/2;
       const bore=part(new CircleGeometry(.058,12),black,bx,by,-1.596,guns);bore.rotation.y=Math.PI;
       const rim=part(new RingGeometry(.057,.08,16),steel,bx,by,-1.606,guns);rim.rotation.y=Math.PI;
+      const muzzle = new Group(); muzzle.name = "drone-cannon-muzzle";
+      muzzle.position.set(bx,by,-1.61); guns.add(muzzle); muzzles.push(muzzle);
     }
     for(const z of [-.22,-1.04,-1.51]) {
       const collar=part(new CylinderGeometry(.36,.36,.075,20,1,true),steel,0,0,z,guns);collar.rotation.x=Math.PI/2;
@@ -156,11 +164,16 @@ export function createCombatDrone() {
     }
     block(.55,.15,.5,panel,x,-.65,-.94,.08);
     part(new SphereGeometry(.063,12,8),red,x+s*.18,-.66,-1.22);
+    mergeBody(pod);
+    pod.position.set(-x,1.04,-.13); turret.add(pod);
+    turret.position.set(x,-1.04,.13); drone.add(turret);
+    cannons.push({ turret, barrels: guns, muzzles, direction: s });
+    buildParent = body;
     for(let i=0;i<3;i++) wire([[s*.75,-.3,-.3],[s*(.92+i*.075),-.65,-.48],[x-s*.15,-.78,-.67]]);
     wire([[s*.88,-.2,.47],[s*1.02,-.69,.67],[x,-.73,.6]]);
   }
   mergeBody(body);
-  drone.userData.combatDrone = {rotors, bladeMaterial};
+  drone.userData.combatDrone = {rotors, bladeMaterial, cannons};
   return drone;
 }
 
