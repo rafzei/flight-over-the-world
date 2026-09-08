@@ -3,7 +3,7 @@ import { getAudioCtx } from "./explosion.js";
 // Proceduralne dźwięki napędu + opływ powietrza (WebAudio).
 // Zapętlone bezszwowo, wysokość i głośność podążają za obrotami i prędkością.
 // Style: "plane" (tłokowy bulgot), "jet" (świst turbiny), "rocket" (niski ryk),
-// "wind" (tylko powietrze).
+// "drone" (elektryczne wirniki), "wind" (tylko powietrze).
 
 let built = false;
 let master, lp, exhaustGain, subGain, noiseGain, bp, am, amDepth;
@@ -83,6 +83,7 @@ const STYLES = {
   plane:  { fBase: 46,  fRange: 64,   subDiv: 2, am: 0.16, lpBase: 240,  lpRange: 640,  exG: 0.5,  exR: 0.5,  subG: 0.32, subR: 0.3,  noiseMul: 1 },
   jet:    { fBase: 480, fRange: 1150, subDiv: 4, am: 0,    lpBase: 1500, lpRange: 2600, exG: 0.10, exR: 0.14, subG: 0.10, subR: 0.12, noiseMul: 2.3 },
   rocket: { fBase: 26,  fRange: 40,   subDiv: 1, am: 0,    lpBase: 130,  lpRange: 380,  exG: 0.85, exR: 0.55, subG: 0.5,  subR: 0.35, noiseMul: 3.1 },
+  drone:  { fBase: 150, fRange: 220,  subDiv: 3, am: 0.04, lpBase: 650,  lpRange: 1500, exG: 0.22, exR: 0.18, subG: 0.06, subR: 0.04, noiseMul: 1.1 },
   wind:   { fBase: 46,  fRange: 64,   subDiv: 2, am: 0,    lpBase: 240,  lpRange: 640,  exG: 0,    exR: 0,    subG: 0,    subR: 0,    noiseMul: 1.5 },
 };
 

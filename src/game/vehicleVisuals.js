@@ -11,12 +11,13 @@ import {
   Vector3,
 } from "three";
 import { prepareFighterDetails, updateFighterLights } from "./fighterDetails.js";
+import { disposeCombatDrone } from "./combatDrone.js";
 
 export function finishVehicleMaterials(model) {
   const finished = new Set();
   model.traverse((mesh) => {
     if (!mesh.isMesh) return;
-    mesh.castShadow = true;
+    mesh.castShadow = !mesh.userData.noVehicleShadow;
     mesh.receiveShadow = true;
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     for (const material of materials) {
@@ -163,6 +164,7 @@ export function updateFighterSurfaces(root, dt, roll, pitch) {
 }
 
 export function disposeVehicleVisuals(root) {
+  disposeCombatDrone(root);
   root?.traverse((node) => {
     for (const resource of node.userData.fighterResources ?? []) resource.dispose();
     delete node.userData.fighterResources;

@@ -160,6 +160,7 @@ export class PlaneController {
     this.cruise = spec.cruise ?? 48;
     this.boost = spec.boost ?? 85;
     this.brake = spec.brake ?? 30;
+    this.hover = !!spec.hover;
     this.speed = this.cruise; // m/s
     const span = Math.max(1, this.boost - this.brake);
     this.cruiseT = Math.max(0, Math.min(1, (this.cruise - this.brake) / span));
@@ -182,22 +183,24 @@ export class PlaneController {
     const throttleSpeed = this.brake + this.throttle * span;
     // nos w dół = ujemny pitch: więcej i szybciej prędkości niż przy wznoszeniu
     const incline = Math.sin(this.pitch);
-    const slopeTarget = throttleSpeed - incline * span * 0.55;
-    const settle = incline < 0 ? 3.1 : 1.45;
+    const slopeTarget = this.hover ? throttleSpeed : throttleSpeed - incline * span * 0.55;
+    const settle = this.hover ? 3.4 : incline < 0 ? 3.1 : 1.45;
     this.speed += (slopeTarget - this.speed) * Math.min(1, settle * dt);
     this.speed = Math.max(
       this.brake * 0.55,
-      Math.min(this.boost * 1.18, this.speed)
+      Math.min(this.boost * (this.hover ? 1 : 1.18), this.speed)
     );
+    if (this.hover && lever === 0 && this.speed < 0.02) this.speed = 0;
 
-    const turnSpeed = Math.min(this.speed, TURN_SPEED_LIMIT);
+    const turnSpeed = Math.min(this.hover ? Math.max(30, this.speed) : this.speed, TURN_SPEED_LIMIT);
     this.heading += -Math.sin(this.roll) * (turnSpeed / 55) * dt * 0.85;
 
     // przeciągnięcie przy małej prędkości
     const stallSpeed = this.brake + 4;
     const stallSink =
-      this.speed < stallSpeed ? (stallSpeed - this.speed) * 1.1 : 0;
-    const climb = Math.sin(this.pitch) * this.speed - stallSink;
+      !this.hover && this.speed < stallSpeed ? (stallSpeed - this.speed) * 1.1 : 0;
+    // Quadrotor lift holds altitude at idle; pitch commands still climb/descend in a hover.
+    const climb = Math.sin(this.pitch) * (this.hover ? Math.max(18, this.speed) : this.speed) - stallSink;
     const vH = Math.cos(this.pitch) * this.speed;
 
     const vN = Math.cos(this.heading) * vH;

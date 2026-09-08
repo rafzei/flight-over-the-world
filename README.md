@@ -48,6 +48,13 @@ Fly over photorealistic Earth – guess the region, find your way home, or just 
 | `T` | Talk (hold) |
 | `Esc` | Pause |
 
+Contrails appear above 1000 km/h. In `src/game/contrails.js`,
+`CONTRAIL_DEFAULTS.lifetimeSeconds` controls their total lifetime (15 seconds),
+and `fadeSeconds` controls the final fade (5 seconds). Both can also be passed
+as options to `attachContrails(root, scene, { lifetimeSeconds: 15, fadeSeconds: 5 })`.
+Both rocket variants emit from four fins (`wingAxes: ["x", "y"]`); aircraft
+emit from the left and right wing tips by default.
+
 ## Run it locally
 
 Node.js 18+ and a free [Cesium ion](https://ion.cesium.com/) token.

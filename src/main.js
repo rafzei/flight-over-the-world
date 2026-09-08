@@ -38,7 +38,8 @@ import {
   CylinderGeometry,
 } from "three";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { loadVehicleModel, disposeModelResources } from "./game/vehicleModels.js";
+import { createCombatDrone, updateCombatDrone } from "./game/combatDrone.js";
 import { setLoader, hideLoader } from "./game/hud.js";
 import { createPlaneMesh, PlaneController } from "./game/plane.js";
 import { FlightCamera, FLIGHT_CAMERAS } from "./game/flightCamera.js";
@@ -230,24 +231,24 @@ const PLANES = {
     name: "Rocket",
     desc: "Space rocket – cruise 790, max 5000 km/h",
     sound: "rocket",
+    contrailOptions: { wingAxes: ["x", "y"] },
     exhaust: true,
     prepare: prepareRocket,
   },
-  rocket1: {
-    file: asset("models/rocket.glb"),
-    wingspan: 12,
-    cruise: 220,
-    boost: 21060 / 3.6,
-    brake: 120,
-    cam: [0, 6, 20],
-    name: "Rocket 1",
-    desc: "Space rocket – cruise 790, max 21060 km/h",
-    sound: "rocket",
-    exhaust: true,
-    prepare: prepareRocket,
+  drone: {
+    create: createCombatDrone,
+    wingspan: 8,
+    cruise: 120 / 3.6,
+    boost: 320 / 3.6,
+    brake: 0,
+    cam: [0, 4, 12],
+    name: "Combat Drone",
+    desc: "Armed quadrotor – hover, cruise 120, max 320 km/h",
+    sound: "drone",
+    hover: true,
   },
 };
-const PLANE_ORDER = ["pa28", "q400", "citation", "jet", "rocket", "rocket1"];
+const PLANE_ORDER = ["pa28", "q400", "citation", "jet", "rocket", "drone"];
 
 const HOME_TIME = 600; // 10 min na dolot do domu
 const GUESS_TIME = 60; // 1 min na rozpoznanie terenu
@@ -867,6 +868,7 @@ function toggleFreeMap() {
 const planePreviewItems = PLANE_ORDER.map((k) => ({
   key: k,
   file: PLANES[k].file,
+  create: PLANES[k].create,
   wingspan: PLANES[k].wingspan,
   prepare: PLANES[k].prepare,
 }));
@@ -2737,9 +2739,13 @@ function loadPlane(key) {
   planeMesh.userData.key = key;
   applyRotorState(planeMesh, true);
   scene.add(planeMesh);
+  const placeholder = planeMesh;
 
-  new GLTFLoader().load(spec.file, (gltf) => {
-    const model = gltf.scene;
+  loadVehicleModel(spec).then((model) => {
+    if (planeMesh !== placeholder) {
+      disposeModelResources(model);
+      return;
+    }
     if (spec.prepare) spec.prepare(model); // np. poza czarownicy + miotła
     const box = new Box3().setFromObject(model);
     const size = box.getSize(new Vector3());
@@ -2754,11 +2760,14 @@ function loadPlane(key) {
     wrapper.userData.key = key;
     applyRotorState(wrapper, true);
     if (spec.exhaust) attachRocketExhaust(wrapper);
-    attachContrails(wrapper, scene);
+    attachContrails(wrapper, scene, spec.contrailOptions);
     vehicleGroundShadows?.addVehicle(wrapper);
     scene.remove(planeMesh);
+    disposeModelResources(placeholder);
     planeMesh = wrapper;
     scene.add(planeMesh);
+  }).catch((err) => {
+    console.error(`Could not load vehicle ${key}`, err);
   });
 }
 
@@ -2815,10 +2824,12 @@ function loadMate(id, key) {
   placeholder.visible = false;
   scene.add(placeholder);
   mp.mates.set(id, { mesh: placeholder, key });
-  new GLTFLoader().load(spec.file, (gltf) => {
+  loadVehicleModel(spec).then((model) => {
     const cur = mp.mates.get(id);
-    if (!cur || cur.key !== key) return;
-    const model = gltf.scene;
+    if (!cur || cur.mesh !== placeholder) {
+      disposeModelResources(model);
+      return;
+    }
     if (spec.prepare) spec.prepare(model);
     const box = new Box3().setFromObject(model);
     const size = box.getSize(new Vector3());
@@ -2832,11 +2843,14 @@ function loadMate(id, key) {
     wrapper.visible = cur.mesh.visible;
     applyRotorState(wrapper, true);
     if (spec.exhaust) attachRocketExhaust(wrapper);
-    attachContrails(wrapper, scene);
+    attachContrails(wrapper, scene, spec.contrailOptions);
     vehicleGroundShadows?.addVehicle(wrapper);
     scene.remove(cur.mesh);
+    disposeModelResources(placeholder);
     scene.add(wrapper);
     mp.mates.set(id, { mesh: wrapper, key, marker: cur.marker });
+  }).catch((err) => {
+    console.error(`Could not load peer vehicle ${key}`, err);
   });
 }
 
@@ -4169,6 +4183,7 @@ function tickFrame() {
     planeMesh.userData.prop.rotation.z += plane.speed * dt * 1.6;
   }
   spinRotors(planeMesh, dt, plane.speed);
+  updateCombatDrone(planeMesh, flying ? dt : 0, plane.throttle, flying);
   updateFighterSurfaces(planeMesh, paused ? 0 : dt, flying ? ctrl.roll : 0, flying ? ctrl.pitch : 0);
   updateRocketExhaust(planeMesh, dt, plane.kmh, flying);
   for (const mate of mp.mates.values()) {
@@ -4243,6 +4258,7 @@ function tickFrame() {
       const matePitch = (from.controlPitch ?? 0) + ((to.controlPitch ?? 0) - (from.controlPitch ?? 0)) * u;
       updateFighterSurfaces(mate.mesh, paused ? 0 : dt, mateRoll, matePitch);
       const kmh = (from.kmh ?? 0) + ((to.kmh ?? 0) - (from.kmh ?? 0)) * u;
+      updateCombatDrone(mate.mesh, paused ? 0 : dt, kmh / (PLANES[mate.key].boost * 3.6), true);
       updateRocketExhaust(mate.mesh, dt, kmh);
       mate.kmh = kmh;
       const marker = ensureMateMarker(mate);

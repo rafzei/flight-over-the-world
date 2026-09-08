@@ -14,11 +14,15 @@ import {
 } from "three";
 
 const START_KMH = 1000;
-const LIFE = 2.5;
 const SAMPLE_INTERVAL = 1 / 40;
-const CAPACITY = 128;
 
-function wingTips(root) {
+// Seconds from emission to disappearance; fading occupies the end of that time.
+export const CONTRAIL_DEFAULTS = {
+  lifetimeSeconds: 15,
+  fadeSeconds: 5,
+};
+
+function wingTips(root, wingAxes) {
   root.updateWorldMatrix(true, true);
   const inverse = root.matrixWorld.clone().invert();
   const point = new Vector3();
@@ -36,14 +40,22 @@ function wingTips(root) {
   });
   // Use the same mesh vertices and aircraft-local frame for bounds and tips.
   // Sprite halos extend beyond the wings but cannot emit a contrail.
-  const margin = (box.max.x - box.min.x) * 0.02;
-  const tips = [new Vector3(0, 0, -Infinity), new Vector3(0, 0, -Infinity)];
+  const wings = wingAxes.flatMap((axis) => {
+    const margin = (box.max[axis] - box.min[axis]) * 0.02;
+    return [
+      { axis, edge: box.min[axis] + margin, side: -1 },
+      { axis, edge: box.max[axis] - margin, side: 1 },
+    ];
+  });
+  const tips = wings.map(() => new Vector3(0, 0, -Infinity));
   for (const { positions, transform } of meshes) {
     for (let i = 0; i < positions.count; i++) {
       point.fromBufferAttribute(positions, i).applyMatrix4(transform);
       // Trailing edge of each outer wing, after model normalization.
-      if (point.x <= box.min.x + margin && point.z > tips[0].z) tips[0].copy(point);
-      if (point.x >= box.max.x - margin && point.z > tips[1].z) tips[1].copy(point);
+      for (let wing = 0; wing < wings.length; wing++) {
+        const { axis, edge, side } = wings[wing];
+        if (side * (point[axis] - edge) >= 0 && point.z > tips[wing].z) tips[wing].copy(point);
+      }
     }
   }
   return tips;
@@ -63,9 +75,18 @@ function trailTexture() {
 }
 
 // Call on the centered model before its first placement in the world.
-export function attachContrails(root, scene) {
+export function attachContrails(root, scene, options = {}) {
   if (root.userData.contrails) return;
-  const tips = wingTips(root);
+  const lifetimeSeconds = options.lifetimeSeconds ?? CONTRAIL_DEFAULTS.lifetimeSeconds;
+  const fadeSeconds = Math.min(lifetimeSeconds, options.fadeSeconds ?? CONTRAIL_DEFAULTS.fadeSeconds);
+  if (!Number.isFinite(lifetimeSeconds) || lifetimeSeconds <= 0 ||
+      !Number.isFinite(fadeSeconds) || fadeSeconds < 0) {
+    throw new RangeError("Contrail lifetime must be positive and fade time non-negative.");
+  }
+  // Retain a full lifetime even at the highest sampling rate, plus the live tip.
+  const capacity = Math.ceil(lifetimeSeconds / SAMPLE_INTERVAL) + 2;
+  // Aircraft use left/right wings; rockets also have lower/upper fins.
+  const tips = wingTips(root, options.wingAxes ?? ["x"]);
   if (tips.some((tip) => !Number.isFinite(tip.z))) return;
   const group = new Group();
   group.name = "wing-contrails";
@@ -84,16 +105,16 @@ export function attachContrails(root, scene) {
   });
   const ribbons = tips.map(() => {
     const geometry = new BufferGeometry();
-    const positions = new Float32BufferAttribute(new Float32Array(CAPACITY * 6), 3);
-    const colors = new Float32BufferAttribute(new Float32Array(CAPACITY * 8), 4);
-    const uvs = new Float32Array(CAPACITY * 4);
-    for (let i = 0; i < CAPACITY; i++) uvs[i * 4 + 2] = 1;
+    const positions = new Float32BufferAttribute(new Float32Array(capacity * 6), 3);
+    const colors = new Float32BufferAttribute(new Float32Array(capacity * 8), 4);
+    const uvs = new Float32Array(capacity * 4);
+    for (let i = 0; i < capacity; i++) uvs[i * 4 + 2] = 1;
     positions.setUsage(DynamicDrawUsage);
     colors.setUsage(DynamicDrawUsage);
     geometry.setAttribute("position", positions);
     geometry.setAttribute("color", colors);
     geometry.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
-    geometry.setIndex(Array((CAPACITY - 1) * 6).fill(0));
+    geometry.setIndex(Array((capacity - 1) * 6).fill(0));
     geometry.index.setUsage(DynamicDrawUsage);
     geometry.setDrawRange(0, 0);
     const mesh = new Mesh(geometry, material);
@@ -103,12 +124,12 @@ export function attachContrails(root, scene) {
   });
   // World positions remain doubles. GPU vertices are relative to the aircraft
   // to avoid jitter at Earth-sized coordinates.
-  const samples = Array.from({ length: CAPACITY }, () => ({
-    points: [new Vector3(), new Vector3()],
+  const samples = Array.from({ length: capacity }, () => ({
+    points: tips.map(() => new Vector3()),
     at: 0,
     start: false,
   }));
-  const current = [new Vector3(), new Vector3()];
+  const current = tips.map(() => new Vector3());
   const cameraPos = new Vector3();
   const origin = new Vector3();
   const tangent = new Vector3();
@@ -135,39 +156,39 @@ export function attachContrails(root, scene) {
         return;
       }
       time += dt;
-      while (count && time - samples[first].at >= LIFE) {
-        first = (first + 1) % CAPACITY;
+      while (count && time - samples[first].at >= lifetimeSeconds) {
+        first = (first + 1) % capacity;
         count--;
       }
       root.updateWorldMatrix(true, false);
       root.getWorldPosition(origin);
-      for (let wing = 0; wing < 2; wing++) current[wing].copy(tips[wing]).applyMatrix4(root.matrixWorld);
-      const last = count ? samples[(first + count - 1) % CAPACITY] : null;
+      for (let wing = 0; wing < tips.length; wing++) current[wing].copy(tips[wing]).applyMatrix4(root.matrixWorld);
+      const last = count ? samples[(first + count - 1) % capacity] : null;
       if (emitting && last && current[0].distanceTo(last.points[0]) > Math.max(100, kmh / 3.6 * dt * 5)) reset();
       const fast = Number.isFinite(kmh) && kmh > START_KMH;
       if (fast) {
         let head;
         if (!emitting || !count || time >= nextSampleAt) {
-          if (count === CAPACITY) { first = (first + 1) % CAPACITY; count--; }
-          head = samples[(first + count++) % CAPACITY];
+          if (count === capacity) { first = (first + 1) % capacity; count--; }
+          head = samples[(first + count++) % capacity];
           head.start = !emitting;
           nextSampleAt = time + SAMPLE_INTERVAL;
-        } else head = samples[(first + count - 1) % CAPACITY];
+        } else head = samples[(first + count - 1) % capacity];
         head.at = time;
-        for (let wing = 0; wing < 2; wing++) head.points[wing].copy(current[wing]);
+        for (let wing = 0; wing < tips.length; wing++) head.points[wing].copy(current[wing]);
       }
       emitting = fast;
       group.visible = count >= 2;
       if (!group.visible) return;
       group.position.copy(origin);
       camera.getWorldPosition(cameraPos);
-      for (let wing = 0; wing < 2; wing++) {
+      for (let wing = 0; wing < tips.length; wing++) {
         const { geometry, positions, colors } = ribbons[wing];
         let indexCount = 0;
         for (let i = 0; i < count; i++) {
-          const sample = samples[(first + i) % CAPACITY];
-          const prev = i > 0 ? samples[(first + i - 1) % CAPACITY] : null;
-          const next = i + 1 < count ? samples[(first + i + 1) % CAPACITY] : null;
+          const sample = samples[(first + i) % capacity];
+          const prev = i > 0 ? samples[(first + i - 1) % capacity] : null;
+          const next = i + 1 < count ? samples[(first + i + 1) % capacity] : null;
           const point = sample.points[wing];
           if (next && !next.start) tangent.subVectors(next.points[wing], point);
           else if (prev && !sample.start) tangent.subVectors(point, prev.points[wing]);
@@ -175,9 +196,14 @@ export function attachContrails(root, scene) {
           view.subVectors(cameraPos, point);
           side.crossVectors(tangent, view);
           if (side.lengthSq() < 1e-10) side.setFromMatrixColumn(camera.matrixWorld, 0);
-          const age = Math.min(1, (time - sample.at) / LIFE);
+          const ageSeconds = time - sample.at;
+          const age = Math.min(1, ageSeconds / lifetimeSeconds);
           side.normalize().multiplyScalar(0.07 + age * 0.55);
-          const alpha = (1 - age) ** 1.5;
+          const fade = fadeSeconds > 0
+            ? Math.max(0, Math.min(1, (ageSeconds - (lifetimeSeconds - fadeSeconds)) / fadeSeconds))
+            : 0;
+          // Smoothstep reaches zero gently, so expiring samples do not pop out.
+          const alpha = 1 - fade * fade * (3 - 2 * fade);
           vertex.copy(point).sub(origin).sub(side);
           positions.setXYZ(i * 2, vertex.x, vertex.y, vertex.z);
           vertex.copy(point).sub(origin).add(side);

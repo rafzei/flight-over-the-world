@@ -8,7 +8,8 @@ import {
   Vector3,
   Group,
 } from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { loadVehicleModel, disposeModelResources } from "./vehicleModels.js";
+import { updateCombatDrone } from "./combatDrone.js";
 import { applyRotorState } from "./rotors.js";
 import { finishVehicleMaterials, updateFighterSurfaces, disposeVehicleVisuals } from "./vehicleVisuals.js";
 
@@ -46,7 +47,7 @@ export function createCarousel(canvas, items, opts = {}) {
 
   const camera = new PerspectiveCamera(30, 2, 0.1, 300);
 
-  const loader = new GLTFLoader();
+  let disposed = false;
   const models = new Map(); // key -> { group, wingspan }
   let current = null; // { group, wingspan, slideX }
   let currentKey = null;
@@ -78,8 +79,11 @@ export function createCarousel(canvas, items, opts = {}) {
   }
 
   for (const item of items) {
-    loader.load(item.file, (gltf) => {
-      const model = gltf.scene;
+    loadVehicleModel(item).then((model) => {
+      if (disposed) {
+        disposeModelResources(model);
+        return;
+      }
       if (item.prepare) item.prepare(model); // np. poza czarownicy + miotła
       const box = new Box3().setFromObject(model);
       const size = box.getSize(new Vector3());
@@ -92,13 +96,16 @@ export function createCarousel(canvas, items, opts = {}) {
       applyRotorState(group, false);
       models.set(item.key, { group, wingspan: item.wingspan });
       if (item.key === wantedKey && currentKey !== wantedKey) show(item.key);
+    }).catch((err) => {
+      console.error(`Could not load vehicle preview ${item.key}`, err);
     });
   }
 
   let active = true;
   let lastFrame = performance.now();
+  let frameId;
   function tick() {
-    requestAnimationFrame(tick);
+    frameId = requestAnimationFrame(tick);
     const now = performance.now();
     const dt = Math.min((now - lastFrame) * 0.001, 0.1);
     lastFrame = now;
@@ -110,6 +117,7 @@ export function createCarousel(canvas, items, opts = {}) {
     current.group.rotation.y = t * 0.45;
     current.group.rotation.z = Math.sin(t * 0.6) * 0.05;
     updateFighterSurfaces(current.group, dt, 0, 0);
+    updateCombatDrone(current.group, dt);
     renderer.render(scene, camera);
   }
   tick();
@@ -117,7 +125,10 @@ export function createCarousel(canvas, items, opts = {}) {
   window.addEventListener("resize", resize);
 
   function dispose() {
+    disposed = true;
     active = false;
+    cancelAnimationFrame(frameId);
+    window.removeEventListener("resize", resize);
     for (const entry of models.values()) disposeVehicleVisuals(entry.group);
     try {
       renderer.dispose();
