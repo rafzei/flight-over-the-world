@@ -41,6 +41,7 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { setLoader, hideLoader } from "./game/hud.js";
 import { createPlaneMesh, PlaneController } from "./game/plane.js";
+import { FlightCamera, FLIGHT_CAMERAS } from "./game/flightCamera.js";
 import { applyRotorState, spinRotors } from "./game/rotors.js";
 import {
   attachRocketExhaust,
@@ -49,6 +50,7 @@ import {
 } from "./game/rocketExhaust.js";
 import { attachContrails, updateContrails, disposeContrails } from "./game/contrails.js";
 import { finishVehicleMaterials, prepareFighterSurfaces, updateFighterSurfaces, disposeVehicleVisuals } from "./game/vehicleVisuals.js";
+import { createVehicleGroundShadows } from "./game/vehicleGroundShadows.js";
 import { createCarousel } from "./game/menuPreview.js";
 import { createSky, SUN_DIR } from "./game/sky.js";
 import {
@@ -256,6 +258,9 @@ const HOME_CAPTURE_M = 600;
 const HOME_BEACON_M = 1000;
 
 let camera, scene, renderer, tiles, sun, sky;
+let vehicleGroundShadows;
+const shadowUp = new Vector3();
+const shadowSunDirection = new Vector3();
 let tile429Count = 0;
 let lastFailedRetryAt = 0;
 let lastTileErr = "";
@@ -2531,6 +2536,7 @@ async function init() {
     renderer.shadowMap.type = 2; // PCFSoft
     renderer.domElement.id = "game-canvas";
     document.body.appendChild(renderer.domElement);
+    vehicleGroundShadows = createVehicleGroundShadows(renderer, { mobile: isMobile });
 
     scene.add(new HemisphereLight(0xbfd8ee, 0x5a7048, 1.15));
     sun = new DirectionalLight(0xfff2dd, 2.0);
@@ -2625,7 +2631,9 @@ async function init() {
     const maxAniso = Math.min(16, renderer.capabilities.getMaxAnisotropy());
     tiles.addEventListener("load-model", ({ scene }) => {
       sharpenTileTextures(scene, isMobile ? Math.min(8, maxAniso) : maxAniso);
+      vehicleGroundShadows.addTerrain(scene);
     });
+    tiles.addEventListener("dispose-model", ({ scene }) => vehicleGroundShadows.removeTerrain(scene));
     tiles.addEventListener("load-tileset", () => {
       applyTileQuality(tiles, isMobile);
       tilePool.rememberPluginSession(
@@ -2719,12 +2727,14 @@ function loadPlane(key) {
   const spec = PLANES[key];
   camOffset = spec.cam;
   if (planeMesh) {
+    vehicleGroundShadows?.removeVehicle(planeMesh);
     disposeRocketExhaust(planeMesh);
     disposeContrails(planeMesh);
     disposeVehicleVisuals(planeMesh);
     scene.remove(planeMesh);
   }
   planeMesh = createPlaneMesh(); // fallback na czas ładowania
+  flightCamera.setModel(planeMesh);
   planeMesh.userData.key = key;
   applyRotorState(planeMesh, true);
   scene.add(planeMesh);
@@ -2738,6 +2748,7 @@ function loadPlane(key) {
     box.setFromObject(model);
     model.position.sub(box.getCenter(new Vector3()));
     finishVehicleMaterials(model);
+    flightCamera.setModel(model);
     const wrapper = new Group();
     wrapper.add(model);
     wrapper.userData.prop = null;
@@ -2745,6 +2756,7 @@ function loadPlane(key) {
     applyRotorState(wrapper, true);
     if (spec.exhaust) attachRocketExhaust(wrapper);
     if (spec.contrails) attachContrails(wrapper, scene);
+    vehicleGroundShadows?.addVehicle(wrapper);
     scene.remove(planeMesh);
     planeMesh = wrapper;
     scene.add(planeMesh);
@@ -2753,6 +2765,7 @@ function loadPlane(key) {
 
 function disposeMate(id) {
   const mate = mp.mates.get(id);
+  vehicleGroundShadows?.removeVehicle(mate?.mesh);
   disposeRocketExhaust(mate?.mesh);
   disposeContrails(mate?.mesh);
   disposeVehicleVisuals(mate?.mesh);
@@ -2821,6 +2834,7 @@ function loadMate(id, key) {
     applyRotorState(wrapper, true);
     if (spec.exhaust) attachRocketExhaust(wrapper);
     if (spec.contrails) attachContrails(wrapper, scene);
+    vehicleGroundShadows?.addVehicle(wrapper);
     scene.remove(cur.mesh);
     scene.add(wrapper);
     mp.mates.set(id, { mesh: wrapper, key, marker: cur.marker });
@@ -3761,7 +3775,7 @@ window.addEventListener("keydown", (e) => {
     if (!guessOpen) setPaused(!paused);
     return;
   }
-  if (e.target && e.target.tagName === "INPUT") return;
+  if (e.target?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName)) return;
   const k = e.key.toLowerCase();
   if (k === "t" && voiceEnabled()) {
     if (!e.repeat) startTalk();
@@ -3773,15 +3787,21 @@ window.addEventListener("keydown", (e) => {
     else showMapUnavailable();
     return;
   }
-  if (!e.repeat && !menuOpen && !paused && !guessOpen) {
-    if (k === "f") {
+  if (!e.repeat && !menuOpen && !paused && !guessOpen && !leaveOpen &&
+      !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (k === "." || e.code === "Period") {
       e.preventDefault();
       setThrottleLever(1);
       return;
     }
-    if (k === "c") {
+    if (k === "," || e.code === "Comma") {
       e.preventDefault();
       setThrottleLever(0);
+      return;
+    }
+    if (k === "c") {
+      e.preventDefault();
+      flightCamera.cycle();
       return;
     }
   }
@@ -4003,8 +4023,9 @@ async function restartMode() {
   }
 }
 
-const camPos = new Vector3();
-const camTarget = new Vector3();
+const flightCamera = new FlightCamera();
+const camPos = flightCamera.position;
+const camTarget = flightCamera.target;
 const planePos = new Vector3();
 const planeQuat = new Quaternion();
 const offset = new Vector3();
@@ -4051,6 +4072,7 @@ window.__foeDebug = () => ({
   tileSlot: tilePool?.current?.slot || -1,
   tileMaxed: tile429Count,
   camPos: camera?.position?.toArray?.() || [],
+  cameraMode: FLIGHT_CAMERAS[flightCamera.mode].name,
 });
 const skyQuat = new Quaternion(); // lokalna ramka N/S (bez kursu) — dla kopuły nieba i słońca
 const skyFramePos = new Vector3();
@@ -4238,7 +4260,7 @@ function tickFrame() {
     hideAllMates();
   }
 
-  // sztywna kamera za samolotem — tylko kurs, bez przechyłu/pochylenia
+  // Zewnętrzne kamery trzymają poziom; widok z dzioba śledzi pełną orientację.
   const camFrame = frameAt(
     plane.lat,
     plane.lon,
@@ -4248,11 +4270,7 @@ function tickFrame() {
     0
   );
   camFrame.decompose(camFramePos, camFrameQuat, camFrameScale);
-  offset
-    .set(camOffset[0], camOffset[1], camOffset[2])
-    .applyQuaternion(camFrameQuat)
-    .add(planePos);
-  camPos.copy(offset);
+  flightCamera.update(camOffset, planePos, planeQuat, camFrameQuat);
   camInit = true;
   camera.position.copy(camPos);
   // trzęsienie kamery po wybuchu
@@ -4263,11 +4281,7 @@ function tickFrame() {
     camera.position.y += (Math.random() - 0.5) * s;
     camera.position.z += (Math.random() - 0.5) * s;
   }
-  camTarget
-    .set(0, 0.5, -camOffset[2] * 1.6)
-    .applyQuaternion(camFrameQuat)
-    .add(planePos);
-  camera.up.set(0, 1, 0).applyQuaternion(camFrameQuat); // lokalny pion, nie globalny Y
+  camera.up.copy(flightCamera.up);
   camera.lookAt(camTarget);
 
   // kopuła nieba i słońce w LOKALNEJ ramce północnej (bez kursu) —
@@ -4289,9 +4303,9 @@ function tickFrame() {
 
   if (!liteMode && !menuOpen && frameCount % 15 === 0) {
     tiles.group.traverse((o) => {
-      if (o.isMesh && !o.castShadow) {
+      if (o.isMesh && !o.castShadow && !o.userData.vehicleShadowReceiver) {
         o.castShadow = true;
-        o.receiveShadow = true;
+        o.receiveShadow = false;
       }
     });
   }
@@ -4500,6 +4514,15 @@ function tickFrame() {
     updateContrails(mate.mesh, dt, mate.kmh ?? 0,
       mp.active && !menuOpen && !paused && !guessOpen && !!mate.mesh?.visible, camera);
   }
+  shadowUp.set(0, 1, 0).applyQuaternion(skyQuat);
+  shadowSunDirection.copy(SUN_DIR).applyQuaternion(skyQuat);
+  vehicleGroundShadows?.update(dt, {
+    terrain: tiles.group,
+    camera,
+    up: shadowUp,
+    sunDirection: shadowSunDirection,
+    active: !menuOpen && !pendingSnap && !awaitingSnap,
+  });
   renderer.render(scene, camera);
 
   const mateDbg = [];
@@ -4555,6 +4578,7 @@ function tickFrame() {
     music: musicDebug(),
     camDist: camera.position.distanceTo(planePos),
     camOffset,
+    cameraMode: FLIGHT_CAMERAS[flightCamera.mode].name,
     mpActive: mp.active,
     inRound: mp.inRound,
     menuOpen,

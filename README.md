@@ -42,6 +42,9 @@ Fly over photorealistic Earth – guess the region, find your way home, or just 
 | `W` `A` `S` `D` | Fly |
 | `Shift` | Boost |
 | `Ctrl` | Brake |
+| `,` | Set minimum throttle |
+| `.` | Set maximum throttle |
+| `C` | Cycle camera: chase → 3× farther → 5× farther → nose view |
 | `T` | Talk (hold) |
 | `Esc` | Pause |
 

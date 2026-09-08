@@ -10,7 +10,7 @@ import {
 } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { applyRotorState } from "./rotors.js";
-import { finishVehicleMaterials, disposeVehicleVisuals } from "./vehicleVisuals.js";
+import { finishVehicleMaterials, updateFighterSurfaces, disposeVehicleVisuals } from "./vehicleVisuals.js";
 
 // karuzela pojazdów w menu — jeden duży podgląd, strzałki przełączają model
 export function createCarousel(canvas, items, opts = {}) {
@@ -96,15 +96,20 @@ export function createCarousel(canvas, items, opts = {}) {
   }
 
   let active = true;
+  let lastFrame = performance.now();
   function tick() {
     requestAnimationFrame(tick);
+    const now = performance.now();
+    const dt = Math.min((now - lastFrame) * 0.001, 0.1);
+    lastFrame = now;
     if (!active || !current) return;
-    const t = performance.now() * 0.001;
+    const t = now * 0.001;
     // wjazd z boku po przełączeniu + powolny obrót pokazowy
     current.slideX *= 0.86;
     current.group.position.x = current.slideX;
     current.group.rotation.y = t * 0.45;
     current.group.rotation.z = Math.sin(t * 0.6) * 0.05;
+    updateFighterSurfaces(current.group, dt, 0, 0);
     renderer.render(scene, camera);
   }
   tick();
