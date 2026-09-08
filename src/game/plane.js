@@ -14,6 +14,8 @@ import {
 } from "three";
 
 const R_EARTH = 6378137;
+const TURN_SPEED_LIMIT = 50; // m/s — dalsze rozpędzanie nie przyspiesza obrotu
+const HIGH_SPEED_HANDLING = 100; // m/s — od 540 km/h łagodniejsze sterowanie
 
 // Cessna 172 — stylizowany low-poly: górnopłat, stelarze, podwozie, śmigło
 export function createPlaneMesh() {
@@ -166,12 +168,15 @@ export class PlaneController {
   }
 
   update(dt, ctrl) {
-    const targetRoll = -ctrl.roll * 0.9;
-    const targetPitch = ctrl.pitch * 0.4;
-    this.roll += (targetRoll - this.roll) * Math.min(1, 6 * dt);
-    this.pitch += (targetPitch - this.pitch) * Math.min(1, 4 * dt);
+    const speedRatio = Math.max(1, this.speed / HIGH_SPEED_HANDLING);
+    const targetRoll = (-ctrl.roll * 0.9) / Math.sqrt(speedRatio);
+    const targetPitch = (ctrl.pitch * 0.4) / Math.pow(speedRatio, 0.75);
+    this.roll += (targetRoll - this.roll) * (1 - Math.exp(-6 * dt));
+    this.pitch += (targetPitch - this.pitch) * (1 - Math.exp(-4 * dt));
 
-    const lever = Number.isFinite(ctrl.throttle) ? MathUtils.clamp(ctrl.throttle, 0, 1) : this.cruiseT;
+    const lever = Number.isFinite(ctrl.throttle)
+      ? MathUtils.clamp(ctrl.throttle, 0, 1)
+      : this.cruiseT;
     this.throttle += (lever - this.throttle) * Math.min(1, 3.4 * dt);
     const span = this.boost - this.brake;
     const throttleSpeed = this.brake + this.throttle * span;
@@ -180,13 +185,18 @@ export class PlaneController {
     const slopeTarget = throttleSpeed - incline * span * 0.55;
     const settle = incline < 0 ? 3.1 : 1.45;
     this.speed += (slopeTarget - this.speed) * Math.min(1, settle * dt);
-    this.speed = Math.max(this.brake * 0.55, Math.min(this.boost * 1.18, this.speed));
+    this.speed = Math.max(
+      this.brake * 0.55,
+      Math.min(this.boost * 1.18, this.speed)
+    );
 
-    this.heading += -Math.sin(this.roll) * (this.speed / 55) * dt * 0.85;
+    const turnSpeed = Math.min(this.speed, TURN_SPEED_LIMIT);
+    this.heading += -Math.sin(this.roll) * (turnSpeed / 55) * dt * 0.85;
 
     // przeciągnięcie przy małej prędkości
     const stallSpeed = this.brake + 4;
-    const stallSink = this.speed < stallSpeed ? (stallSpeed - this.speed) * 1.1 : 0;
+    const stallSink =
+      this.speed < stallSpeed ? (stallSpeed - this.speed) * 1.1 : 0;
     const climb = Math.sin(this.pitch) * this.speed - stallSink;
     const vH = Math.cos(this.pitch) * this.speed;
 
@@ -205,7 +215,7 @@ export class PlaneController {
     return this.lon * MathUtils.RAD2DEG;
   }
   get headingDeg() {
-    return ((this.heading * MathUtils.RAD2DEG) % 360 + 360) % 360;
+    return (((this.heading * MathUtils.RAD2DEG) % 360) + 360) % 360;
   }
   get kmh() {
     return this.speed * 3.6;

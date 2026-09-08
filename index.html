@@ -157,7 +157,7 @@
           <button id="start-btn" type="button">Start</button>
         </div>
         <p id="menu-error"></p>
-          <p class="hint hint-desk"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> fly · drag the throttle or hold <kbd>Shift</kbd> / <kbd>Ctrl</kbd> · <kbd>F</kbd> / <kbd>C</kbd> full / idle · <kbd>M</kbd> map · <kbd>Esc</kbd> pause</p>
+          <p class="hint hint-desk"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> fly · scroll anywhere or drag the throttle · <kbd>Shift</kbd> / <kbd>Ctrl</kbd> boost / brake · <kbd>F</kbd> / <kbd>C</kbd> full / idle · <kbd>M</kbd> map · <kbd>Esc</kbd> pause</p>
           <p class="hint hint-touch">Drag the stick to fly · slide the throttle on the right · Map shows where you are</p>
       </div>
     </div>
@@ -186,8 +186,14 @@
           <h2 id="fm-place">–</h2>
           <button id="fm-close" type="button">Close</button>
         </div>
-        <canvas id="fm-canvas" width="720" height="480"></canvas>
-        <p class="fm-credit">M to close · © OpenStreetMap</p>
+        <div class="fm-map">
+          <canvas id="fm-canvas" width="720" height="480" aria-label="Map centered on your aircraft"></canvas>
+          <div class="fm-zoom" role="group" aria-label="Map zoom">
+            <button id="fm-zoom-in" type="button" aria-label="Zoom in" aria-controls="fm-canvas" title="Zoom in (+)">+</button>
+            <button id="fm-zoom-out" type="button" aria-label="Zoom out" aria-controls="fm-canvas" title="Zoom out (−)">−</button>
+          </div>
+        </div>
+        <p class="fm-credit">Scroll, pinch or + / − to zoom · M to close · © OpenStreetMap</p>
       </div>
     </div>
 

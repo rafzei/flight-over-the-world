@@ -1,5 +1,7 @@
 const TILE = 256;
 const ZOOM = 12;
+const MIN_ZOOM = 2;
+const MAX_ZOOM = 18;
 const tileCache = new Map();
 const tileReady = new Set();
 
@@ -12,7 +14,7 @@ function lon2x(lon, z) {
 }
 
 function lat2y(lat, z) {
-  const r = (lat * Math.PI) / 180;
+  const r = (Math.max(-85.05112878, Math.min(85.05112878, lat)) * Math.PI) / 180;
   return ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * 2 ** z;
 }
 
@@ -40,7 +42,7 @@ function loadTile(z, x, y) {
   return img;
 }
 
-function paintOsm(canvas, pose, markerScale = 1, clipCircle = false) {
+function paintOsm(canvas, pose, markerScale = 1, clipCircle = false, zoom = ZOOM) {
   const ctx = canvas.getContext("2d");
   const w = canvas.width;
   const h = canvas.height;
@@ -50,22 +52,24 @@ function paintOsm(canvas, pose, markerScale = 1, clipCircle = false) {
     ctx.arc(w / 2, h / 2, Math.min(w, h) / 2, 0, Math.PI * 2);
     ctx.clip();
   }
-  const cx = lon2x(pose.lon, ZOOM);
-  const cy = lat2y(pose.lat, ZOOM);
-  const originX = cx * TILE - w / 2;
-  const originY = cy * TILE - h / 2;
-  const x0 = Math.floor(originX / TILE);
-  const y0 = Math.floor(originY / TILE);
-  const x1 = Math.floor((originX + w) / TILE);
-  const y1 = Math.floor((originY + h) / TILE);
+  const tileZoom = Math.floor(zoom);
+  const tileSize = TILE * 2 ** (zoom - tileZoom);
+  const cx = lon2x(pose.lon, tileZoom);
+  const cy = lat2y(pose.lat, tileZoom);
+  const originX = cx * tileSize - w / 2;
+  const originY = cy * tileSize - h / 2;
+  const x0 = Math.floor(originX / tileSize);
+  const y0 = Math.max(0, Math.floor(originY / tileSize));
+  const x1 = Math.floor((originX + w) / tileSize);
+  const y1 = Math.min(2 ** tileZoom - 1, Math.floor((originY + h) / tileSize));
 
   ctx.fillStyle = "#c9d4c0";
   ctx.fillRect(0, 0, w, h);
   for (let ty = y0; ty <= y1; ty++) {
     for (let tx = x0; tx <= x1; tx++) {
-      const img = loadTile(ZOOM, tx, ty);
+      const img = loadTile(tileZoom, tx, ty);
       if (img.complete && img.naturalWidth) {
-        ctx.drawImage(img, tx * TILE - originX, ty * TILE - originY, TILE, TILE);
+        ctx.drawImage(img, tx * tileSize - originX, ty * tileSize - originY, tileSize, tileSize);
       }
     }
   }
@@ -214,19 +218,75 @@ tileReady.add(() => {
   if (trailJob) paintTrailMap(trailJob.canvas, trailJob);
 });
 
-export function createFreeMap({ root, canvas, place, close, onChange }) {
+export function createFreeMap({ root, canvas, place, close, zoomIn, zoomOut, onChange }) {
   let open = false;
+  let zoom = ZOOM;
   let pose = { lat: 0, lon: 0, heading: 0, name: "" };
+  const pointers = new Map();
+  let pinch = null;
 
   function paint() {
-    paintOsm(canvas, pose, 1);
+    paintOsm(canvas, pose, 1, false, zoom);
+  }
+
+  function setZoom(value) {
+    zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, value));
+    if (zoomIn) zoomIn.disabled = zoom >= MAX_ZOOM;
+    if (zoomOut) zoomOut.disabled = zoom <= MIN_ZOOM;
+    if (open) paint();
   }
 
   function setOpen(v) {
     open = !!v;
     root.classList.toggle("show", open);
+    pointers.clear();
+    pinch = null;
     if (open) paint();
   }
+
+  zoomIn?.addEventListener("click", () => setZoom(zoom + 1));
+  zoomOut?.addEventListener("click", () => setZoom(zoom - 1));
+  canvas.addEventListener("wheel", (e) => {
+    if (!open) return;
+    e.preventDefault();
+    const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? canvas.clientHeight : 1;
+    setZoom(zoom - e.deltaY * unit / 300);
+  }, { passive: false });
+  window.addEventListener("keydown", (e) => {
+    if (!open || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.target?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName)) return;
+    const direction = e.key === "+" || e.key === "=" ? 1 : e.key === "-" || e.key === "_" ? -1 : 0;
+    if (!direction) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    setZoom(zoom + direction);
+  }, true);
+
+  function pointerDistance() {
+    const [a, b] = pointers.values();
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
+
+  canvas.addEventListener("pointerdown", (e) => {
+    if (!open || e.pointerType !== "touch") return;
+    canvas.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    pinch = pointers.size === 2 ? { distance: pointerDistance(), zoom } : null;
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (!pinch || pinch.distance <= 0) return;
+    const distance = pointerDistance();
+    if (distance > 0) setZoom(pinch.zoom + Math.log2(distance / pinch.distance));
+  });
+  function releasePointer(e) {
+    pointers.delete(e.pointerId);
+    pinch = pointers.size === 2 ? { distance: pointerDistance(), zoom } : null;
+  }
+  canvas.addEventListener("pointerup", releasePointer);
+  canvas.addEventListener("pointercancel", releasePointer);
+  canvas.addEventListener("lostpointercapture", releasePointer);
 
   close?.addEventListener("click", () => {
     setOpen(false);

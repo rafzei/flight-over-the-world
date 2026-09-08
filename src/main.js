@@ -42,9 +42,20 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { setLoader, hideLoader } from "./game/hud.js";
 import { createPlaneMesh, PlaneController } from "./game/plane.js";
 import { applyRotorState, spinRotors } from "./game/rotors.js";
+import {
+  attachRocketExhaust,
+  updateRocketExhaust,
+  disposeRocketExhaust,
+} from "./game/rocketExhaust.js";
+import { attachContrails, updateContrails, disposeContrails } from "./game/contrails.js";
+import { finishVehicleMaterials, prepareFighterSurfaces, updateFighterSurfaces } from "./game/vehicleVisuals.js";
 import { createCarousel } from "./game/menuPreview.js";
 import { createSky, SUN_DIR } from "./game/sky.js";
-import { drawAirspeed, drawAltimeter, drawCompass } from "./game/instruments.js";
+import {
+  drawAirspeed,
+  drawAltimeter,
+  drawCompass,
+} from "./game/instruments.js";
 import { asset } from "./game/asset.js";
 import {
   createExplosion,
@@ -52,7 +63,14 @@ import {
   primeAudio,
 } from "./game/explosion.js";
 import { updateEngineSound, engineDebug } from "./game/engineSound.js";
-import { updateMusic, primeMusic, musicDebug, musicEnabled, setMusicEnabled, setMusicSuspended } from "./game/music.js";
+import {
+  updateMusic,
+  primeMusic,
+  musicDebug,
+  musicEnabled,
+  setMusicEnabled,
+  setMusicSuspended,
+} from "./game/music.js";
 import {
   TileKeyPool,
   loadTileSlots,
@@ -74,6 +92,7 @@ function prepareRocket(model) {
 // myśliwiec w GLB ma nos w +Z, a lot idzie w -Z
 function prepareJet(model) {
   model.rotation.y = Math.PI;
+  prepareFighterSurfaces(model);
   return model;
 }
 import {
@@ -157,7 +176,9 @@ const PLANES = {
   pa28: {
     file: asset("models/pa28.glb"),
     wingspan: 11,
-    cruise: 48, boost: 130, brake: 30,
+    cruise: 48,
+    boost: 130,
+    brake: 30,
     cam: [0, 5.5, 15],
     name: "Piper PA-28",
     desc: "Light propeller – cruise 170, max 470 km/h",
@@ -166,7 +187,9 @@ const PLANES = {
   q400: {
     file: asset("models/q400.glb"),
     wingspan: 28,
-    cruise: 75, boost: 185, brake: 45,
+    cruise: 75,
+    boost: 185,
+    brake: 45,
     cam: [0, 9, 32],
     name: "Dash 8 Q400",
     desc: "Regional turboprop – cruise 270, max 670 km/h",
@@ -175,7 +198,9 @@ const PLANES = {
   citation: {
     file: asset("models/citation.glb"),
     wingspan: 16,
-    cruise: 92, boost: 250, brake: 55,
+    cruise: 92,
+    boost: 250,
+    brake: 55,
     cam: [0, 7, 24],
     name: "Cessna Citation",
     desc: "Business jet – cruise 330, max 900 km/h",
@@ -184,25 +209,44 @@ const PLANES = {
   jet: {
     file: asset("models/jet.glb"),
     wingspan: 10,
-    cruise: 150, boost: 420, brake: 80,
+    cruise: 150,
+    boost: 420,
+    brake: 80,
     cam: [0, 6, 19],
     name: "Fighter",
     desc: "Combat jet – cruise 540, max 1510 km/h",
     sound: "jet",
+    contrails: true,
     prepare: prepareJet,
   },
   rocket: {
     file: asset("models/rocket.glb"),
     wingspan: 12,
-    cruise: 220, boost: 600, brake: 120,
+    cruise: 220,
+    boost: 5000 / 3.6,
+    brake: 120,
     cam: [0, 6, 20],
     name: "Rocket",
-    desc: "Space rocket – cruise 790, max 2160 km/h",
+    desc: "Space rocket – cruise 790, max 5000 km/h",
     sound: "rocket",
+    exhaust: true,
+    prepare: prepareRocket,
+  },
+  rocket1: {
+    file: asset("models/rocket.glb"),
+    wingspan: 12,
+    cruise: 220,
+    boost: 21060 / 3.6,
+    brake: 120,
+    cam: [0, 6, 20],
+    name: "Rocket 1",
+    desc: "Space rocket – cruise 790, max 21060 km/h",
+    sound: "rocket",
+    exhaust: true,
     prepare: prepareRocket,
   },
 };
-const PLANE_ORDER = ["pa28", "q400", "citation", "jet", "rocket"];
+const PLANE_ORDER = ["pa28", "q400", "citation", "jet", "rocket", "rocket1"];
 
 const HOME_TIME = 600; // 10 min na dolot do domu
 const GUESS_TIME = 60; // 1 min na rozpoznanie terenu
@@ -270,19 +314,39 @@ const isMobile =
 const START_FLAG = "fotw_starting";
 const LAST_ERR = "fotw_lasterr";
 function markStarting() {
-  try { sessionStorage.setItem(START_FLAG, String(Date.now())); } catch { /* ignore */ }
+  try {
+    sessionStorage.setItem(START_FLAG, String(Date.now()));
+  } catch {
+    /* ignore */
+  }
 }
 function clearStarting() {
-  try { sessionStorage.removeItem(START_FLAG); } catch { /* ignore */ }
+  try {
+    sessionStorage.removeItem(START_FLAG);
+  } catch {
+    /* ignore */
+  }
 }
 function rememberError(msg) {
-  try { sessionStorage.setItem(LAST_ERR, String(msg || "").slice(0, 280)); } catch { /* ignore */ }
+  try {
+    sessionStorage.setItem(LAST_ERR, String(msg || "").slice(0, 280));
+  } catch {
+    /* ignore */
+  }
 }
 function lastError() {
-  try { return sessionStorage.getItem(LAST_ERR) || ""; } catch { return ""; }
+  try {
+    return sessionStorage.getItem(LAST_ERR) || "";
+  } catch {
+    return "";
+  }
 }
 function clearError() {
-  try { sessionStorage.removeItem(LAST_ERR); } catch { /* ignore */ }
+  try {
+    sessionStorage.removeItem(LAST_ERR);
+  } catch {
+    /* ignore */
+  }
 }
 const liteMode = isMobile;
 if (liteMode) document.body.classList.add("lite");
@@ -296,7 +360,8 @@ let pendingSnap = false; // po teleporcie: jednorazowe dosadzenie na właściwą
 let crashGraceUntil = 0;
 let crashStreak = 0;
 const groundSamples = [];
-let startLat = 52.38871, startLon = 16.60069; // Niepruszewo
+let startLat = 52.38871,
+  startLon = 16.60069; // Niepruszewo
 let camOffset = PLANES.pa28.cam;
 
 // tryby gry
@@ -329,9 +394,42 @@ const mateUp = new Vector3();
 const MATE_MARKER_MS = 10000;
 const MATE_INTERP_MS = 130;
 const MATE_SEND_MS = 40;
-const PLAYER_COLORS = ["#7ec8e3", "#e37e7e", "#9dce6a", "#d4a5f5", "#f0c36e", "#6ec8c1"];
-const NAME_ADJ = ["Swift", "Silent", "Red", "Night", "Wild", "White", "Golden", "Sky", "Sharp", "Storm", "Keen", "Bold"];
-const NAME_NOUN = ["Eagle", "Falcon", "Wolf", "Fox", "Hawk", "Lynx", "Raven", "Badger", "Gnat", "Stag", "Puma", "Shark"];
+const PLAYER_COLORS = [
+  "#7ec8e3",
+  "#e37e7e",
+  "#9dce6a",
+  "#d4a5f5",
+  "#f0c36e",
+  "#6ec8c1",
+];
+const NAME_ADJ = [
+  "Swift",
+  "Silent",
+  "Red",
+  "Night",
+  "Wild",
+  "White",
+  "Golden",
+  "Sky",
+  "Sharp",
+  "Storm",
+  "Keen",
+  "Bold",
+];
+const NAME_NOUN = [
+  "Eagle",
+  "Falcon",
+  "Wolf",
+  "Fox",
+  "Hawk",
+  "Lynx",
+  "Raven",
+  "Badger",
+  "Gnat",
+  "Stag",
+  "Puma",
+  "Shark",
+];
 
 function randomUsername() {
   const a = NAME_ADJ[Math.floor(Math.random() * NAME_ADJ.length)];
@@ -408,10 +506,13 @@ function renderGuessStats() {
     if (el.gmStatsN) el.gmStatsN.textContent = "No guesses yet";
     return;
   }
-  if (el.gmAvg) el.gmAvg.textContent = fmtGuessKm(guessStats.sum / guessStats.n);
+  if (el.gmAvg)
+    el.gmAvg.textContent = fmtGuessKm(guessStats.sum / guessStats.n);
   if (el.gmMin) el.gmMin.textContent = fmtGuessKm(guessStats.min);
   if (el.gmMax) el.gmMax.textContent = fmtGuessKm(guessStats.max);
-  if (el.gmStatsN) el.gmStatsN.textContent = guessStats.n === 1 ? "1 guess" : `${guessStats.n} guesses`;
+  if (el.gmStatsN)
+    el.gmStatsN.textContent =
+      guessStats.n === 1 ? "1 guess" : `${guessStats.n} guesses`;
 }
 
 function syncGuessHud() {
@@ -484,17 +585,25 @@ function startHelloRetry() {
     sendHello();
     if (++n >= 15) {
       stopHelloRetry();
-      setLobbyStatus("Host not found – they should stay in the room, then open the link again", true);
+      setLobbyStatus(
+        "Host not found – they should stay in the room, then open the link again",
+        true
+      );
     }
   }, 800);
 }
 
 function normalizeNick(raw) {
-  return String(raw || "").replace(/\s+/g, " ").trim().slice(0, 20);
+  return String(raw || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 20);
 }
 
 function uniquePlayerName(base) {
-  const taken = new Set([mp.myName, ...[...mp.players.values()].map((p) => p.name)].filter(Boolean));
+  const taken = new Set(
+    [mp.myName, ...[...mp.players.values()].map((p) => p.name)].filter(Boolean)
+  );
   if (base && !taken.has(base)) return base;
   for (let i = 0; i < 40; i++) {
     const next = randomUsername();
@@ -647,6 +756,8 @@ const el = {
   fmCanvas: document.getElementById("fm-canvas"),
   fmPlace: document.getElementById("fm-place"),
   fmClose: document.getElementById("fm-close"),
+  fmZoomIn: document.getElementById("fm-zoom-in"),
+  fmZoomOut: document.getElementById("fm-zoom-out"),
   minimap: document.getElementById("minimap"),
   mmCanvas: document.getElementById("mm-canvas"),
   mapNote: document.getElementById("map-note"),
@@ -666,6 +777,8 @@ const freeMap = createFreeMap({
   canvas: el.fmCanvas,
   place: el.fmPlace,
   close: el.fmClose,
+  zoomIn: el.fmZoomIn,
+  zoomOut: el.fmZoomOut,
   onChange: () => updateLocationMaps(),
 });
 
@@ -678,7 +791,14 @@ const miniMap = createMiniMap({
 });
 
 function canOpenFreeMap() {
-  return mode === "free" && !menuOpen && !paused && !guessOpen && !crashed && !finished;
+  return (
+    mode === "free" &&
+    !menuOpen &&
+    !paused &&
+    !guessOpen &&
+    !crashed &&
+    !finished
+  );
 }
 
 function poseForMaps() {
@@ -746,7 +866,9 @@ const planePreviewItems = PLANE_ORDER.map((k) => ({
   wingspan: PLANES[k].wingspan,
   prepare: PLANES[k].prepare,
 }));
-const carousel = createCarousel(el.carCanvas, planePreviewItems, { mobile: isMobile });
+const carousel = createCarousel(el.carCanvas, planePreviewItems, {
+  mobile: isMobile,
+});
 let lobbyCarousel = createCarousel(el.lobbyCarCanvas, planePreviewItems, {
   lite: isMobile,
   mobile: isMobile,
@@ -756,7 +878,9 @@ let lobbyCarouselLive = !isMobile;
 function ensureLobbyCarousel() {
   if (lobbyCarouselLive) return;
   lobbyCarousel.dispose();
-  lobbyCarousel = createCarousel(el.lobbyCarCanvas, planePreviewItems, { mobile: true });
+  lobbyCarousel = createCarousel(el.lobbyCarCanvas, planePreviewItems, {
+    mobile: true,
+  });
   lobbyCarouselLive = true;
   lobbyCarousel.show(selectedPlane, 0);
 }
@@ -793,13 +917,14 @@ const MODE_PLACEHOLDERS = {
 const MODE_DESCS = {
   free: "Pick a starting city and fly with no time limit.",
   home: "We drop you ~30 km from home. You have 10 minutes to find your way back.",
-  guess: "You have one minute in the air to get your bearings, then mark on the map where you are.",
+  guess:
+    "You have one minute in the air to get your bearings, then mark on the map where you are.",
 };
 function selectMode(m) {
   mode = m;
-  document.querySelectorAll("#menu .mode-card").forEach((b) =>
-    b.classList.toggle("selected", b.dataset.mode === m)
-  );
+  document
+    .querySelectorAll("#menu .mode-card")
+    .forEach((b) => b.classList.toggle("selected", b.dataset.mode === m));
   el.modeDesc.textContent = MODE_DESCS[m];
   el.city.placeholder = MODE_PLACEHOLDERS[m];
   el.city.style.display = m === "guess" ? "none" : "";
@@ -816,9 +941,9 @@ document.querySelectorAll("#menu .scope-btn").forEach((btn) => {
     geoCache = null;
     geoCacheScope = null;
     GUESS_SCOPES[guessScope]?.load().catch(() => {});
-    document.querySelectorAll("#menu .scope-btn").forEach((b) =>
-      b.classList.toggle("selected", b === btn)
-    );
+    document
+      .querySelectorAll("#menu .scope-btn")
+      .forEach((b) => b.classList.toggle("selected", b === btn));
   });
 });
 selectMode("guess");
@@ -915,14 +1040,18 @@ function escapeHtml(s) {
 }
 
 function showNick(opts = {}) {
-  rememberJoin(opts.roomId || parseRoomFromUrl() || pendingJoinId || savedJoin() || "");
+  rememberJoin(
+    opts.roomId || parseRoomFromUrl() || pendingJoinId || savedJoin() || ""
+  );
   menuOpen = true;
   el.landing.classList.add("hidden");
   el.menu.classList.add("hidden");
   el.lobby.classList.add("hidden");
   el.nick.classList.remove("hidden");
   if (el.nickSub) {
-    el.nickSub.textContent = pendingJoinId ? "Choose a nickname to join" : "Choose a nickname";
+    el.nickSub.textContent = pendingJoinId
+      ? "Choose a nickname to join"
+      : "Choose a nickname";
   }
   if (el.nickInput) {
     el.nickInput.value = normalizeNick(el.nickInput.value) || savedNick();
@@ -1086,19 +1215,26 @@ function humansInRound() {
 
 function isRoundLive() {
   if (!mp.roundActive || mp.launching || !mp.truth) return false;
-  if (mp.phase === "mark" || mp.phase === "results") return humansInRound() || mp.goSent;
+  if (mp.phase === "mark" || mp.phase === "results")
+    return humansInRound() || mp.goSent;
   if (mp.phase === "fly") return humansInRound();
   return false;
 }
 
 function lobbyPhaseText() {
   const phase = mp.roundActive ? mp.phase : "lobby";
-  const left = Math.max(0, Math.ceil(
-    Number.isFinite(mp.phaseLeft) ? mp.phaseLeft
-      : phase === "fly" ? timeLeft
-        : phase === "mark" ? mp.markLeft
-          : mp.resultsLeft
-  ));
+  const left = Math.max(
+    0,
+    Math.ceil(
+      Number.isFinite(mp.phaseLeft)
+        ? mp.phaseLeft
+        : phase === "fly"
+        ? timeLeft
+        : phase === "mark"
+        ? mp.markLeft
+        : mp.resultsLeft
+    )
+  );
   if (phase === "fly" && mp.roundActive) return `In flight — ${left}s left`;
   if (phase === "mark") return `Marking the map — ${left}s left`;
   if (phase === "results") return `Results — next round in ${left}s`;
@@ -1127,11 +1263,17 @@ function renderTabList() {
       you: false,
     })),
   ].sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
-  el.mpTabList.innerHTML = people.map((p) => {
-    const pts = `${p.score} pt${p.score === 1 ? "" : "s"}`;
-    const you = p.you ? " (You)" : "";
-    return `<div class="mp-tab-row"><span class="p-name${p.you ? " p-you" : ""}"><i class="online-dot" aria-hidden="true"></i>${escapeHtml(p.name)}${you}</span><span class="p-score">${pts}</span></div>`;
-  }).join("");
+  el.mpTabList.innerHTML = people
+    .map((p) => {
+      const pts = `${p.score} pt${p.score === 1 ? "" : "s"}`;
+      const you = p.you ? " (You)" : "";
+      return `<div class="mp-tab-row"><span class="p-name${
+        p.you ? " p-you" : ""
+      }"><i class="online-dot" aria-hidden="true"></i>${escapeHtml(
+        p.name
+      )}${you}</span><span class="p-score">${pts}</span></div>`;
+    })
+    .join("");
   el.mpTab.classList.remove("hidden");
 }
 
@@ -1142,7 +1284,8 @@ function updateMpPresence() {
     setTabList(false);
     return;
   }
-  if (el.mpOnlineCount) el.mpOnlineCount.textContent = `${1 + mp.players.size} online`;
+  if (el.mpOnlineCount)
+    el.mpOnlineCount.textContent = `${1 + mp.players.size} online`;
   if (tabListOpen) renderTabList();
 }
 
@@ -1226,7 +1369,8 @@ function resumeHostDuties() {
     return;
   }
   if (mp.phase === "results") {
-    if (mp.resultsLeft <= 0 && !mp.launching && humansWantPlay()) launchMpRound();
+    if (mp.resultsLeft <= 0 && !mp.launching && humansWantPlay())
+      launchMpRound();
     else tryLaunchRematch();
   } else {
     if (mp.roundActive && !mp.goSent) tryReleaseGo();
@@ -1272,20 +1416,25 @@ function broadcastRoster() {
 
 function renderLobby() {
   const rows = [
-    playerRow({
-      name: mp.myName,
-      plane: selectedPlane,
-      ready: mp.myReady,
-      score: mp.myScore,
-      waiting: mp.waiting,
-      inRound: mp.inRound && mp.roundActive,
-    }, true),
+    playerRow(
+      {
+        name: mp.myName,
+        plane: selectedPlane,
+        ready: mp.myReady,
+        score: mp.myScore,
+        waiting: mp.waiting,
+        inRound: mp.inRound && mp.roundActive,
+      },
+      true
+    ),
   ];
   for (const p of otherPlayers()) rows.push(playerRow(p, false));
   if (mp.players.size === 0) {
-    rows.push(`<div class="player-row empty">${
-      mp.joining ? "Connecting…" : "Share the link to invite friends"
-    }</div>`);
+    rows.push(
+      `<div class="player-row empty">${
+        mp.joining ? "Connecting…" : "Share the link to invite friends"
+      }</div>`
+    );
   }
   el.lobbyPlayers.innerHTML = rows.join("");
   el.lobbyScopes.classList.toggle("locked", !mp.host);
@@ -1306,14 +1455,14 @@ function renderLobby() {
   el.lobbyStart.textContent = mp.joining
     ? "Joining room…"
     : flyingHere
-      ? "In match"
-      : queued
-        ? "Queued — next round"
-        : mp.launching
-          ? "Starting…"
-          : !mp.host || mp.roundActive
-            ? "Join"
-            : "Start match";
+    ? "In match"
+    : queued
+    ? "Queued — next round"
+    : mp.launching
+    ? "Starting…"
+    : !mp.host || mp.roundActive
+    ? "Join"
+    : "Start match";
 
   if (mp.joining) setLobbyStatus("Joining room…");
   else if (queued) setLobbyStatus("Next round.");
@@ -1335,13 +1484,18 @@ function playerRow(p, isSelf) {
     badge = "READY";
     cls = " ready";
   }
-  return `<div class="player-row${cls}"><div class="p-meta"><span class="p-name"><i class="online-dot" aria-hidden="true"></i>${escapeHtml(p.name)}${isSelf ? " (You)" : ""}</span><span class="p-plane">${plane}${pts}</span></div><span class="p-ready">${badge}</span></div>`;
+  return `<div class="player-row${cls}"><div class="p-meta"><span class="p-name"><i class="online-dot" aria-hidden="true"></i>${escapeHtml(
+    p.name
+  )}${
+    isSelf ? " (You)" : ""
+  }</span><span class="p-plane">${plane}${pts}</span></div><span class="p-ready">${badge}</span></div>`;
 }
 
 function applyLobbySetup() {
   mode = "guess";
   if (el.lobbyModeDesc) {
-    el.lobbyModeDesc.textContent = "One minute in the air, 10 seconds to mark the map, then scores and the next round.";
+    el.lobbyModeDesc.textContent =
+      "One minute in the air, 10 seconds to mark the map, then scores and the next round.";
   }
   el.lobbyScopes.style.display = "flex";
   if (el.lobbyCity) el.lobbyCity.style.display = "none";
@@ -1353,7 +1507,13 @@ function selectLobbyMode(m, broadcast = false) {
   if (broadcast && mp.host && mp.net) {
     mp.myReady = false;
     for (const p of mp.players.values()) p.ready = false;
-    mp.net.send({ t: "mode", mode: m, city: el.lobbyCity.value, scope: guessScope, ...regionPayload() });
+    mp.net.send({
+      t: "mode",
+      mode: m,
+      city: el.lobbyCity.value,
+      scope: guessScope,
+      ...regionPayload(),
+    });
     broadcastRoster();
   }
   renderLobby();
@@ -1541,7 +1701,8 @@ function handleNetData(data, fromId) {
     el.lobbyCity.value = data.city || "";
   } else if (data.t === "plane") {
     const id = data.from;
-    if (id && mp.players.has(id)) mp.players.get(id).plane = data.plane || "pa28";
+    if (id && mp.players.has(id))
+      mp.players.get(id).plane = data.plane || "pa28";
     renderLobby();
   } else if (data.t === "ready") {
     const id = data.from;
@@ -1617,7 +1778,8 @@ function handleNetData(data, fromId) {
     }
     renderLobby();
   } else if (data.t === "roundEnd") {
-    const waitingRematch = mp.rematch.has(mp.myId) || !el.mpWait.classList.contains("hidden");
+    const waitingRematch =
+      mp.rematch.has(mp.myId) || !el.mpWait.classList.contains("hidden");
     finishRoomRound();
     hideMpWait();
     if (waitingRematch || guessOpen) {
@@ -1664,7 +1826,8 @@ function handlePeerLeft(peerId) {
   if (guessOpen) maybeRevealGuesses();
   renderLobby();
   updateMpPresence();
-  if (wasHost && mp.host) setLobbyStatus("You are the host now — the room stays open");
+  if (wasHost && mp.host)
+    setLobbyStatus("You are the host now — the room stays open");
   else if (gone) setLobbyStatus(`${gone.name} left the room`);
 }
 
@@ -1674,11 +1837,12 @@ function handleNetError(err) {
     openGuestLobby(mp.roomId);
     return;
   }
-  const msg = err?.type === "timeout"
-    ? "Could not open the room – try again in a moment"
-    : err?.type === "peer-unavailable"
-    ? "Host not found – they should open Multiplayer and not refresh, then open the link again"
-    : err?.type === "unavailable-id"
+  const msg =
+    err?.type === "timeout"
+      ? "Could not open the room – try again in a moment"
+      : err?.type === "peer-unavailable"
+      ? "Host not found – they should open Multiplayer and not refresh, then open the link again"
+      : err?.type === "unavailable-id"
       ? "This room is taken – joining as a guest…"
       : "Connection error – check your network and open the link again";
   setLobbyStatus(msg, true);
@@ -1736,24 +1900,27 @@ function openHostLobby(existingId) {
   selectLobbyMode("guess");
   showLobby();
   setLobbyStatus("Creating room…");
-  const api = hostRoom({
-    onOpen(id, myId) {
-      if (gen !== hostGen) return;
-      mp.roomId = id;
-      mp.myId = myId || api.myPeerId || id;
-      mp.hostId = mp.myId;
-      rememberHost(id);
-      setRoomUrl(id);
-      el.lobbyLink.value = roomLink(id);
-      renderLobby();
-      setLobbyStatus("Share the link — friends join this room");
+  const api = hostRoom(
+    {
+      onOpen(id, myId) {
+        if (gen !== hostGen) return;
+        mp.roomId = id;
+        mp.myId = myId || api.myPeerId || id;
+        mp.hostId = mp.myId;
+        rememberHost(id);
+        setRoomUrl(id);
+        el.lobbyLink.value = roomLink(id);
+        renderLobby();
+        setLobbyStatus("Share the link — friends join this room");
+      },
+      onPeer: handlePeerJoined,
+      onData: handleNetData,
+      onCall: handleVoiceCall,
+      onLeft: handlePeerLeft,
+      onError: handleNetError,
     },
-    onPeer: handlePeerJoined,
-    onData: handleNetData,
-    onCall: handleVoiceCall,
-    onLeft: handlePeerLeft,
-    onError: handleNetError,
-  }, existingId);
+    existingId
+  );
   attachNet(api);
 }
 
@@ -1856,6 +2023,11 @@ function lerpAngle(a, b, t) {
   return a + d * t;
 }
 
+function poseControl(value, fallback) {
+  const input = Number.isFinite(value) ? value : Number.isFinite(fallback) ? fallback : 0;
+  return Math.max(-1, Math.min(1, input));
+}
+
 function pushMatePose(id, data) {
   const seq = data.seq ?? 0;
   let track = mp.poses.get(id);
@@ -1880,8 +2052,12 @@ function pushMatePose(id, data) {
     heading: data.heading,
     pitch: data.pitch,
     roll: data.roll,
+    kmh: Number.isFinite(data.kmh) ? Math.max(0, data.kmh) : 0,
+    controlRoll: poseControl(data.controlRoll, -data.roll / 0.9),
+    controlPitch: poseControl(data.controlPitch, data.pitch / 0.4),
   });
-  if (track.samples.length > 24) track.samples.splice(0, track.samples.length - 24);
+  if (track.samples.length > 24)
+    track.samples.splice(0, track.samples.length - 24);
 }
 
 function seedMatePose(id, lat, lon, h, planeKey) {
@@ -1889,7 +2065,9 @@ function seedMatePose(id, lat, lon, h, planeKey) {
   loadMate(id, planeKey || "pa28");
   mp.poses.set(id, {
     seq: -1,
-    samples: [{ at: performance.now(), lat, lon, h, heading: 0, pitch: 0, roll: 0 }],
+    samples: [
+      { at: performance.now(), lat, lon, h, heading: 0, pitch: 0, roll: 0 },
+    ],
     clockOff: null,
     plane: planeKey,
   });
@@ -1903,7 +2081,13 @@ function seedAllMates(h) {
   for (const [id, seat] of Object.entries(mp.seats)) {
     if (id === mp.myId) continue;
     const spawn = offsetByIndex(lat0, lon0, Number(seat), total);
-    seedMatePose(id, spawn.lat, spawn.lon, h, mp.players.get(id)?.plane || "pa28");
+    seedMatePose(
+      id,
+      spawn.lat,
+      spawn.lon,
+      h,
+      mp.players.get(id)?.plane || "pa28"
+    );
   }
 }
 
@@ -1977,7 +2161,8 @@ function armRoundState(msg) {
 
 async function startMpFlight(msg) {
   armRoundState(msg);
-  homeTarget = msg.homeLat != null ? { lat: msg.homeLat, lon: msg.homeLon } : null;
+  homeTarget =
+    msg.homeLat != null ? { lat: msg.homeLat, lon: msg.homeLon } : null;
   timerActive = false;
   menuOpen = true;
   guessOpen = false;
@@ -1995,7 +2180,8 @@ async function startMpFlight(msg) {
   if (selectedPlane !== planeMesh?.userData?.key) loadPlane(selectedPlane);
   beginFlight(spawn.lat, spawn.lon);
   seedAllMates(plane.height);
-  if (mode === "home" && homeTarget) placeBeaconAt(homeTarget.lat, homeTarget.lon);
+  if (mode === "home" && homeTarget)
+    placeBeaconAt(homeTarget.lat, homeTarget.lon);
 }
 
 function reportSnapped() {
@@ -2056,15 +2242,20 @@ function buildGoPayload() {
 }
 
 function applyGo(msg) {
-  const incoming = msg && Number.isFinite(Number(msg.h))
-    ? {
-      h: Number(msg.h),
-      gh: Number.isFinite(Number(msg.gh)) ? Number(msg.gh) : Number(msg.h) - snapAgl(),
-      heading: msg.heading ?? 0,
-    }
-    : null;
+  const incoming =
+    msg && Number.isFinite(Number(msg.h))
+      ? {
+          h: Number(msg.h),
+          gh: Number.isFinite(Number(msg.gh))
+            ? Number(msg.gh)
+            : Number(msg.h) - snapAgl(),
+          heading: msg.heading ?? 0,
+        }
+      : null;
   if (mp.goSent && !(mp.inRound && (menuOpen || awaitingSnap))) return;
-  const payload = incoming || mp.lastGo || buildGoPayload() || { h: 850, gh: 500, heading: 0 };
+  const payload = incoming ||
+    mp.lastGo ||
+    buildGoPayload() || { h: 850, gh: 500, heading: 0 };
   const alreadySent = mp.goSent;
   mp.goSent = true;
   mp.waitingGo = false;
@@ -2280,7 +2471,8 @@ function saveUserIonKey() {
   const raw = el.ionKeyInput?.value || "";
   const token = raw.trim();
   if (token.length < 16) {
-    if (el.ionKeyStatus) el.ionKeyStatus.textContent = "That token looks too short.";
+    if (el.ionKeyStatus)
+      el.ionKeyStatus.textContent = "That token looks too short.";
     return;
   }
   setUserIonKey(token);
@@ -2321,178 +2513,203 @@ async function init() {
   setLoader("Start…", 0.4);
 
   try {
-  scene = new Scene();
-  scene.background = new Color(0x8ec8e8);
-  scene.fog = new FogExp2(0x9dd0ea, 0.00007);
+    scene = new Scene();
+    scene.background = new Color(0x8ec8e8);
+    scene.fog = new FogExp2(0x9dd0ea, 0.00007);
 
-  renderer = new WebGLRenderer({
-    antialias: !isMobile,
-    powerPreference: isMobile ? "default" : "high-performance",
-    alpha: false,
-  });
-  renderer.setClearColor(0x8ec8e8);
-  applyPixelRatio();
-  renderer.setSize(innerWidth, innerHeight);
-  renderer.toneMapping = 4;
-  renderer.toneMappingExposure = 1.1;
-  renderer.shadowMap.enabled = !isMobile;
-  renderer.shadowMap.type = 2; // PCFSoft
-  renderer.domElement.id = "game-canvas";
-  document.body.appendChild(renderer.domElement);
-
-  scene.add(new HemisphereLight(0xbfd8ee, 0x5a7048, 1.15));
-  sun = new DirectionalLight(0xfff2dd, 2.0);
-  sun.castShadow = !isMobile;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 2500;
-  sun.shadow.camera.left = -450;
-  sun.shadow.camera.right = 450;
-  sun.shadow.camera.top = 450;
-  sun.shadow.camera.bottom = -450;
-  sun.shadow.bias = -0.0004;
-  sun.shadow.normalBias = 2.0;
-  scene.add(sun);
-  scene.add(sun.target);
-
-  camera = new PerspectiveCamera(70, innerWidth / innerHeight, 0.5, 1e8);
-
-  tiles = new TilesRenderer();
-  tiles.registerPlugin({
-    name: "TILE_KEY_POOL_PLUGIN",
-    priority: -100,
-    tiles: null,
-    init(t) {
-      this.tiles = t;
-    },
-    fetchData(url, options) {
-      const g = this.tiles.getPluginByName("GOOGLE_CLOUD_AUTH_PLUGIN");
-      if (g?.auth) g.auth.autoRefreshToken = false;
-      return tilePool.fetchData(url, options).then((res) => {
-        if (res && (res.status === 429 || res.status === 403 || res.status === 401)) {
-          onTileThrottle(res.status);
-        }
-        return res;
-      }).catch((err) => {
-        lastTileErr = String(err?.message || err).slice(0, 220);
-        pendingFailedRetry = true;
-        return new Response("", { status: 599, statusText: lastTileErr });
-      });
-    },
-  });
-  const startSlot = tilePool.current;
-  if (startSlot?.kind === "ion") {
-    tiles.registerPlugin(
-      new CesiumIonAuthPlugin({
-        apiToken: startSlot.token,
-        assetId: ION_GOOGLE_TILES_ASSET,
-        autoRefreshToken: false,
-        useRecommendedSettings: false,
-      })
-    );
-  } else {
-    tiles.registerPlugin(
-      new GoogleCloudAuthPlugin({
-        apiToken: startSlot?.token || tilePool.firstGoogleToken,
-        useRecommendedSettings: false,
-      })
-    );
-  }
-  tilePool.onSwitch = () => {
-    syncTileAuth(tiles, tilePool);
-    applyTileQuality(tiles, isMobile);
-    pendingFailedRetry = true;
-  };
-  tiles.registerPlugin(new TileCompressionPlugin({
-    disableMipmaps: isMobile,
-    compressIndex: true,
-  }));
-  tiles.registerPlugin(new UpdateOnChangePlugin());
-  tiles.registerPlugin(createHoldParentTilesPlugin());
-  tiles.registerPlugin(new UnloadTilesPlugin({ delay: 6000 }));
-  tiles.registerPlugin(new TilesFadePlugin());
-  const draco = new DRACOLoader();
-  draco.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
-  tiles.registerPlugin(new GLTFExtensionsPlugin({ dracoLoader: draco }));
-  tiles.group.rotation.x = -Math.PI / 2;
-  tiles.group.visible = false;
-  scene.add(tiles.group);
-  tiles.setResolutionFromRenderer(camera, renderer);
-  tiles.setCamera(camera);
-  applyTileQuality(tiles, isMobile);
-  const maxAniso = Math.min(16, renderer.capabilities.getMaxAnisotropy());
-  tiles.addEventListener("load-model", ({ scene }) => {
-    sharpenTileTextures(scene, isMobile ? Math.min(8, maxAniso) : maxAniso);
-  });
-  tiles.addEventListener("load-tileset", () => {
-    applyTileQuality(tiles, isMobile);
-    tilePool.rememberPluginSession(
-      tiles.getPluginByName("GOOGLE_CLOUD_AUTH_PLUGIN"),
-      tiles.rootURL
-    );
-    syncTileAuth(tiles, tilePool);
-  });
-
-  // czytelny komunikat zamiast wiecznego ładowania
-  tiles.addEventListener("load-error", (ev) => {
-    const msg = String(ev?.error?.message || ev?.error || "");
-    lastTileErr = msg.slice(0, 220);
-    pendingFailedRetry = true;
-    if (/429|403|502|503|quota|resource_exhausted|too many/i.test(msg)) {
-      const code = /403/.test(msg) ? 403 : 429;
-      onTileThrottle(code);
-    }
-    if (!loaderDismissed) {
-      loadError = tilePool.slots.length
-        ? "Map servers are busy – retrying on the next key"
-        : "Missing map keys – add VITE_CESIUM_ION_KEYS to .env";
-    }
-  });
-  setTimeout(() => {
-    if (!loaderDismissed && tiles.group.children.length === 0) {
-      loadError = "The map is not loading… check VITE_CESIUM_ION_KEYS";
-    }
-  }, 20000);
-
-  // niebo — proceduralna kopuła (gradient + słońce + chmury FBM),
-  // horyzont = dokładnie kolor mgły, więc nie ma przerwy ani poświaty
-  sky = createSky(0x9dd0ea);
-  scene.add(sky.mesh);
-
-  if (!isMobile) {
-    new TextureLoader().load(asset("textures/sky_day.jpg"), (tex) => {
-      tex.mapping = EquirectangularReflectionMapping;
-      tex.colorSpace = SRGBColorSpace;
-      scene.environment = tex;
+    renderer = new WebGLRenderer({
+      antialias: !isMobile,
+      powerPreference: isMobile ? "default" : "high-performance",
+      alpha: false,
     });
-  }
+    renderer.setClearColor(0x8ec8e8);
+    applyPixelRatio();
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.toneMapping = 4;
+    renderer.toneMappingExposure = 1.1;
+    renderer.shadowMap.enabled = !isMobile;
+    renderer.shadowMap.type = 2; // PCFSoft
+    renderer.domElement.id = "game-canvas";
+    document.body.appendChild(renderer.domElement);
 
-  beacon = createBeacon();
-  beacon.visible = false;
-  scene.add(beacon);
+    scene.add(new HemisphereLight(0xbfd8ee, 0x5a7048, 1.15));
+    sun = new DirectionalLight(0xfff2dd, 2.0);
+    sun.castShadow = !isMobile;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 2500;
+    sun.shadow.camera.left = -450;
+    sun.shadow.camera.right = 450;
+    sun.shadow.camera.top = 450;
+    sun.shadow.camera.bottom = -450;
+    sun.shadow.bias = -0.0004;
+    sun.shadow.normalBias = 2.0;
+    scene.add(sun);
+    scene.add(sun.target);
 
-  loadPlane(selectedPlane);
-  resetFlight(startLat, startLon);
-  if (planeMesh) planeMesh.visible = false;
-  loaderDismissed = true;
-  hideLoader();
+    camera = new PerspectiveCamera(70, innerWidth / innerHeight, 0.5, 1e8);
 
-  window.addEventListener("resize", onResize);
-  renderer.domElement.addEventListener("webglcontextlost", (e) => {
-    e.preventDefault();
-    window.__ctxLost = true;
-    showFatal("Graphics memory ran out on this phone (WebGL). Close other tabs and tap Start again, or use a computer.");
-  });
-  window.__game = { get planeMesh() { return planeMesh; }, get plane() { return plane; }, get camera() { return camera; } };
-  window.__scene = scene;
-  gameReady = true;
-  clearStarting();
-  if (/Phone closed the tab|out of memory|Light mode is on/i.test(lastError())) {
-    clearError();
-  }
+    tiles = new TilesRenderer();
+    tiles.registerPlugin({
+      name: "TILE_KEY_POOL_PLUGIN",
+      priority: -100,
+      tiles: null,
+      init(t) {
+        this.tiles = t;
+      },
+      fetchData(url, options) {
+        const g = this.tiles.getPluginByName("GOOGLE_CLOUD_AUTH_PLUGIN");
+        if (g?.auth) g.auth.autoRefreshToken = false;
+        return tilePool
+          .fetchData(url, options)
+          .then((res) => {
+            if (
+              res &&
+              (res.status === 429 || res.status === 403 || res.status === 401)
+            ) {
+              onTileThrottle(res.status);
+            }
+            return res;
+          })
+          .catch((err) => {
+            lastTileErr = String(err?.message || err).slice(0, 220);
+            pendingFailedRetry = true;
+            return new Response("", { status: 599, statusText: lastTileErr });
+          });
+      },
+    });
+    const startSlot = tilePool.current;
+    if (startSlot?.kind === "ion") {
+      tiles.registerPlugin(
+        new CesiumIonAuthPlugin({
+          apiToken: startSlot.token,
+          assetId: ION_GOOGLE_TILES_ASSET,
+          autoRefreshToken: false,
+          useRecommendedSettings: false,
+        })
+      );
+    } else {
+      tiles.registerPlugin(
+        new GoogleCloudAuthPlugin({
+          apiToken: startSlot?.token || tilePool.firstGoogleToken,
+          useRecommendedSettings: false,
+        })
+      );
+    }
+    tilePool.onSwitch = () => {
+      syncTileAuth(tiles, tilePool);
+      applyTileQuality(tiles, isMobile);
+      pendingFailedRetry = true;
+    };
+    tiles.registerPlugin(
+      new TileCompressionPlugin({
+        disableMipmaps: isMobile,
+        compressIndex: true,
+      })
+    );
+    tiles.registerPlugin(new UpdateOnChangePlugin());
+    tiles.registerPlugin(createHoldParentTilesPlugin());
+    tiles.registerPlugin(new UnloadTilesPlugin({ delay: 6000 }));
+    tiles.registerPlugin(new TilesFadePlugin());
+    const draco = new DRACOLoader();
+    draco.setDecoderPath(
+      "https://www.gstatic.com/draco/versioned/decoders/1.5.7/"
+    );
+    tiles.registerPlugin(new GLTFExtensionsPlugin({ dracoLoader: draco }));
+    tiles.group.rotation.x = -Math.PI / 2;
+    tiles.group.visible = false;
+    scene.add(tiles.group);
+    tiles.setResolutionFromRenderer(camera, renderer);
+    tiles.setCamera(camera);
+    applyTileQuality(tiles, isMobile);
+    const maxAniso = Math.min(16, renderer.capabilities.getMaxAnisotropy());
+    tiles.addEventListener("load-model", ({ scene }) => {
+      sharpenTileTextures(scene, isMobile ? Math.min(8, maxAniso) : maxAniso);
+    });
+    tiles.addEventListener("load-tileset", () => {
+      applyTileQuality(tiles, isMobile);
+      tilePool.rememberPluginSession(
+        tiles.getPluginByName("GOOGLE_CLOUD_AUTH_PLUGIN"),
+        tiles.rootURL
+      );
+      syncTileAuth(tiles, tilePool);
+    });
+
+    // czytelny komunikat zamiast wiecznego ładowania
+    tiles.addEventListener("load-error", (ev) => {
+      const msg = String(ev?.error?.message || ev?.error || "");
+      lastTileErr = msg.slice(0, 220);
+      pendingFailedRetry = true;
+      if (/429|403|502|503|quota|resource_exhausted|too many/i.test(msg)) {
+        const code = /403/.test(msg) ? 403 : 429;
+        onTileThrottle(code);
+      }
+      if (!loaderDismissed) {
+        loadError = tilePool.slots.length
+          ? "Map servers are busy – retrying on the next key"
+          : "Missing map keys – add VITE_CESIUM_ION_KEYS to .env";
+      }
+    });
+    setTimeout(() => {
+      if (!loaderDismissed && tiles.group.children.length === 0) {
+        loadError = "The map is not loading… check VITE_CESIUM_ION_KEYS";
+      }
+    }, 20000);
+
+    // niebo — proceduralna kopuła (gradient + słońce + chmury FBM),
+    // horyzont = dokładnie kolor mgły, więc nie ma przerwy ani poświaty
+    sky = createSky(0x9dd0ea);
+    scene.add(sky.mesh);
+
+    if (!isMobile) {
+      new TextureLoader().load(asset("textures/sky_day.jpg"), (tex) => {
+        tex.mapping = EquirectangularReflectionMapping;
+        tex.colorSpace = SRGBColorSpace;
+        scene.environment = tex;
+      });
+    }
+
+    beacon = createBeacon();
+    beacon.visible = false;
+    scene.add(beacon);
+
+    loadPlane(selectedPlane);
+    resetFlight(startLat, startLon);
+    if (planeMesh) planeMesh.visible = false;
+    loaderDismissed = true;
+    hideLoader();
+
+    window.addEventListener("resize", onResize);
+    renderer.domElement.addEventListener("webglcontextlost", (e) => {
+      e.preventDefault();
+      window.__ctxLost = true;
+      showFatal(
+        "Graphics memory ran out on this phone (WebGL). Close other tabs and tap Start again, or use a computer."
+      );
+    });
+    window.__game = {
+      get planeMesh() {
+        return planeMesh;
+      },
+      get plane() {
+        return plane;
+      },
+      get camera() {
+        return camera;
+      },
+    };
+    window.__scene = scene;
+    gameReady = true;
+    clearStarting();
+    if (
+      /Phone closed the tab|out of memory|Light mode is on/i.test(lastError())
+    ) {
+      clearError();
+    }
   } catch (err) {
     console.error(err);
-    const msg = "This phone could not start the 3D engine. Try Safari or Chrome, or a computer.";
+    const msg =
+      "This phone could not start the 3D engine. Try Safari or Chrome, or a computer.";
     setLoader(msg, 0);
     showFatal(err?.message ? `${msg} (${err.message})` : msg);
   }
@@ -2501,7 +2718,11 @@ async function init() {
 function loadPlane(key) {
   const spec = PLANES[key];
   camOffset = spec.cam;
-  if (planeMesh) scene.remove(planeMesh);
+  if (planeMesh) {
+    disposeRocketExhaust(planeMesh);
+    disposeContrails(planeMesh);
+    scene.remove(planeMesh);
+  }
   planeMesh = createPlaneMesh(); // fallback na czas ładowania
   planeMesh.userData.key = key;
   applyRotorState(planeMesh, true);
@@ -2515,18 +2736,14 @@ function loadPlane(key) {
     model.scale.setScalar(spec.wingspan / Math.max(size.x, size.y, size.z));
     box.setFromObject(model);
     model.position.sub(box.getCenter(new Vector3()));
-    model.traverse((o) => {
-      if (o.isMesh && o.material) {
-        o.material.metalness = 0.15;
-        o.material.roughness = 0.65;
-        o.castShadow = true;
-      }
-    });
+    finishVehicleMaterials(model);
     const wrapper = new Group();
     wrapper.add(model);
     wrapper.userData.prop = null;
     wrapper.userData.key = key;
     applyRotorState(wrapper, true);
+    if (spec.exhaust) attachRocketExhaust(wrapper);
+    if (spec.contrails) attachContrails(wrapper, scene);
     scene.remove(planeMesh);
     planeMesh = wrapper;
     scene.add(planeMesh);
@@ -2535,6 +2752,8 @@ function loadPlane(key) {
 
 function disposeMate(id) {
   const mate = mp.mates.get(id);
+  disposeRocketExhaust(mate?.mesh);
+  disposeContrails(mate?.mesh);
   if (mate?.mesh && scene) scene.remove(mate.mesh);
   if (mate?.marker && scene) scene.remove(mate.marker);
   mp.mates.delete(id);
@@ -2592,18 +2811,14 @@ function loadMate(id, key) {
     model.scale.setScalar(spec.wingspan / Math.max(size.x, size.y, size.z));
     box.setFromObject(model);
     model.position.sub(box.getCenter(new Vector3()));
-    model.traverse((o) => {
-      if (o.isMesh && o.material) {
-        o.material.metalness = 0.15;
-        o.material.roughness = 0.65;
-        o.castShadow = true;
-      }
-    });
+    finishVehicleMaterials(model);
     const wrapper = new Group();
     wrapper.add(model);
     wrapper.userData.key = key;
     wrapper.visible = cur.mesh.visible;
     applyRotorState(wrapper, true);
+    if (spec.exhaust) attachRocketExhaust(wrapper);
+    if (spec.contrails) attachContrails(wrapper, scene);
     scene.remove(cur.mesh);
     scene.add(wrapper);
     mp.mates.set(id, { mesh: wrapper, key, marker: cur.marker });
@@ -2686,7 +2901,16 @@ function onResize() {
 
 function frameAt(lat, lon, height, az, elv, roll) {
   const m = new Matrix4();
-  WGS84_ELLIPSOID.getObjectFrame(lat, lon, height, az, elv, roll, m, CAMERA_FRAME);
+  WGS84_ELLIPSOID.getObjectFrame(
+    lat,
+    lon,
+    height,
+    az,
+    elv,
+    roll,
+    m,
+    CAMERA_FRAME
+  );
   m.premultiply(tiles.group.matrixWorld);
   return m;
 }
@@ -2699,7 +2923,12 @@ const _probeLla = {};
 
 function collectProbeHits(lat, lon, refHeight) {
   if (!tiles) return [];
-  WGS84_ELLIPSOID.getCartographicToPosition(lat, lon, refHeight + 100, _probeOrigin);
+  WGS84_ELLIPSOID.getCartographicToPosition(
+    lat,
+    lon,
+    refHeight + 100,
+    _probeOrigin
+  );
   _probeOrigin.applyMatrix4(tiles.group.matrixWorld);
   _probeDir.copy(_probeOrigin).normalize().negate();
   raycaster.set(_probeOrigin, _probeDir);
@@ -2748,7 +2977,9 @@ function tilesBusy() {
   if (tiles.isLoading) return true;
   const s = tiles.stats;
   if (!s) return false;
-  return (s.downloading || 0) > 0 || (s.queued || 0) > 0 || (s.parsing || 0) > 0;
+  return (
+    (s.downloading || 0) > 0 || (s.queued || 0) > 0 || (s.parsing || 0) > 0
+  );
 }
 
 function adoptGround(gh) {
@@ -2800,7 +3031,8 @@ function crash() {
   playExplosionSound();
   shake = 1;
   if (planeMesh) planeMesh.visible = false;
-  if (mode === "home" && plane) homePath.push({ lat: plane.latDeg, lon: plane.lonDeg });
+  if (mode === "home" && plane)
+    homePath.push({ lat: plane.latDeg, lon: plane.lonDeg });
   if (mp.active && mode === "guess") return; // runda trwa — po minucie i tak zgadujecie
   timerActive = false;
   setTimeout(() => showBanner("YOU CRASHED"), 900);
@@ -2875,10 +3107,21 @@ function syncPlaceBadge() {
 }
 
 function placeBeaconAt(latDeg, lonDeg) {
-  const gh = probeSurface(latDeg * (Math.PI / 180), lonDeg * (Math.PI / 180), 2500);
+  const gh = probeSurface(
+    latDeg * (Math.PI / 180),
+    lonDeg * (Math.PI / 180),
+    2500
+  );
   const base = gh !== null ? gh : TERRAIN_ALT;
   beaconGrounded = gh !== null;
-  const m = frameAt(latDeg * (Math.PI / 180), lonDeg * (Math.PI / 180), base, 0, 0, 0);
+  const m = frameAt(
+    latDeg * (Math.PI / 180),
+    lonDeg * (Math.PI / 180),
+    base,
+    0,
+    0,
+    0
+  );
   m.decompose(beacon.position, beacon.quaternion, beacon.scale);
 }
 
@@ -3108,9 +3351,15 @@ function joinCurrentFlight() {
   mp.inRound = true;
   mp.roundActive = true;
   mp.waiting = false;
-  if (mp.seats[mp.myId] == null) mp.seats[mp.myId] = Object.keys(mp.seats).length;
+  if (mp.seats[mp.myId] == null)
+    mp.seats[mp.myId] = Object.keys(mp.seats).length;
   const total = Object.keys(mp.seats).length || 1;
-  const spawn = offsetByIndex(mp.truth.lat, mp.truth.lon, mp.seats[mp.myId], total);
+  const spawn = offsetByIndex(
+    mp.truth.lat,
+    mp.truth.lon,
+    mp.seats[mp.myId],
+    total
+  );
   menuOpen = true;
   guessOpen = false;
   el.lobby.classList.add("hidden");
@@ -3131,7 +3380,8 @@ function requestPlay() {
     return;
   }
   if (mp.host) {
-    if (isRoundLive() && mp.truth && mp.phase === "fly" && !isLocallyFlying()) joinCurrentFlight();
+    if (isRoundLive() && mp.truth && mp.phase === "fly" && !isLocallyFlying())
+      joinCurrentFlight();
     else if (isRoundLive()) {
       mp.waiting = true;
       broadcastRoster();
@@ -3160,9 +3410,10 @@ function syncPauseCopy() {
   if (mp.active) {
     if (el.pauseTitle) el.pauseTitle.textContent = "Leave match?";
     if (el.pauseSub) {
-      el.pauseSub.textContent = humansInRound() && otherPlayers().some((p) => p.inRound)
-        ? "The round keeps going for everyone else."
-        : "You can join again from the lobby.";
+      el.pauseSub.textContent =
+        humansInRound() && otherPlayers().some((p) => p.inRound)
+          ? "The round keeps going for everyone else."
+          : "You can join again from the lobby.";
     }
     el.resume.textContent = "Continue";
     el.restart.textContent = "Leave";
@@ -3243,7 +3494,11 @@ function guessGeoReady() {
 function drawGuessMap(marks = [], tries = 0) {
   if (!guessGeoReady()) return;
   const canvas = el.gmCanvas;
-  if (canvas && (canvas.clientWidth < 8 || canvas.clientHeight < 8) && tries < 12) {
+  if (
+    canvas &&
+    (canvas.clientWidth < 8 || canvas.clientHeight < 8) &&
+    tries < 12
+  ) {
     requestAnimationFrame(() => drawGuessMap(marks, tries + 1));
     return;
   }
@@ -3318,7 +3573,8 @@ function updateGuessPhaseUi() {
     if (el.gmTitle) el.gmTitle.textContent = "Where are you?";
   } else if (mp.phase === "results") {
     const sec = Math.max(0, Math.ceil(mp.resultsLeft));
-    el.gmTimer.textContent = sec > 0 ? `Next round in ${sec}s` : "Starting next round…";
+    el.gmTimer.textContent =
+      sec > 0 ? `Next round in ${sec}s` : "Starting next round…";
     if (el.gmTitle) el.gmTitle.textContent = "Results";
     el.gmSub.textContent = "Scores are in — next location coming up";
   } else {
@@ -3344,16 +3600,28 @@ function revealMpGuesses(force = false) {
   mp.phase = "results";
   mp.resultsLeft = RESULTS_TIME;
   const marks = [
-    { lat: mp.truth.lat, lon: mp.truth.lon, color: "#d8a24a", label: "You were here", truth: true },
+    {
+      lat: mp.truth.lat,
+      lon: mp.truth.lon,
+      color: "#d8a24a",
+      label: "You were here",
+      truth: true,
+    },
   ];
   const results = [];
   for (const [id, g] of mp.guesses) {
     const err = distanceM(g.lat, g.lon, mp.truth.lat, mp.truth.lon) / 1000;
     results.push({ id, err, name: playerName(id) });
-    marks.push({ lat: g.lat, lon: g.lon, color: playerColor(id), label: playerName(id) });
+    marks.push({
+      lat: g.lat,
+      lon: g.lon,
+      color: playerColor(id),
+      label: playerName(id),
+    });
   }
   for (const p of inRoundPlayers()) {
-    if (!mp.guesses.has(p.id)) results.push({ id: p.id, err: Infinity, name: playerName(p.id) });
+    if (!mp.guesses.has(p.id))
+      results.push({ id: p.id, err: Infinity, name: playerName(p.id) });
   }
   drawGuessMap(marks);
   results.sort((a, b) => a.err - b.err);
@@ -3365,15 +3633,21 @@ function revealMpGuesses(force = false) {
     if (w.id === mp.myId) mp.myScore += 1;
     else if (mp.players.has(w.id)) mp.players.get(w.id).score += 1;
   }
-  const line = results.map((r) => `${r.name} ${Number.isFinite(r.err) ? `${Math.round(r.err)} km` : "no mark"}`).join(" · ");
-  el.gmResult.textContent =
-    !winners.length
-      ? `No marks – ${line}`
-      : winners.length > 1
-        ? `Tie – ${line}`
-        : winners[0]?.id === mp.myId
-          ? `You win – ${line}`
-          : `${winners[0]?.name} wins – ${line}`;
+  const line = results
+    .map(
+      (r) =>
+        `${r.name} ${
+          Number.isFinite(r.err) ? `${Math.round(r.err)} km` : "no mark"
+        }`
+    )
+    .join(" · ");
+  el.gmResult.textContent = !winners.length
+    ? `No marks – ${line}`
+    : winners.length > 1
+    ? `Tie – ${line}`
+    : winners[0]?.id === mp.myId
+    ? `You win – ${line}`
+    : `${winners[0]?.name} wins – ${line}`;
   updateGuessScores();
   el.gmClose.style.display = "none";
   el.gmRetry.style.display = "none";
@@ -3422,7 +3696,13 @@ el.gmCanvas.addEventListener("click", (e) => {
   guessAnswered = true;
   recordSoloGuess(errKm);
   drawGuessMap([
-    { lat: plane.latDeg, lon: plane.lonDeg, color: "#d8a24a", label: "You were here", truth: true },
+    {
+      lat: plane.latDeg,
+      lon: plane.lonDeg,
+      color: "#d8a24a",
+      label: "You were here",
+      truth: true,
+    },
     { lat, lon, color: "#f3ead6", label: "Your guess" },
   ]);
   el.gmResult.textContent = `Off by ${Math.round(errKm)} km`;
@@ -3522,7 +3802,14 @@ el.mpOnline?.addEventListener("click", () => {
 });
 window.addEventListener("blur", () => stopTalk());
 
-const touch = { roll: 0, pitch: 0, boost: false, brake: false, pid: null, thr: null };
+const touch = {
+  roll: 0,
+  pitch: 0,
+  boost: false,
+  brake: false,
+  pid: null,
+  thr: null,
+};
 
 function setThrottleLever(v) {
   throttleLever = Math.max(0, Math.min(1, v));
@@ -3539,8 +3826,10 @@ function throttleTarget() {
 function tickThrottle(dt) {
   const target = throttleTarget();
   const step = THROTTLE_RATE * dt;
-  if (throttleShown < target) throttleShown = Math.min(target, throttleShown + step);
-  else if (throttleShown > target) throttleShown = Math.max(target, throttleShown - step);
+  if (throttleShown < target)
+    throttleShown = Math.min(target, throttleShown + step);
+  else if (throttleShown > target)
+    throttleShown = Math.max(target, throttleShown - step);
   syncThrottleUi();
 }
 
@@ -3548,11 +3837,15 @@ function syncThrottleUi() {
   if (el.throttleKnob) {
     el.throttleKnob.style.bottom = `${throttleShown * 100}%`;
   }
-  el.throttleRail?.setAttribute("aria-valuenow", String(Math.round(throttleShown * 100)));
+  el.throttleRail?.setAttribute(
+    "aria-valuenow",
+    String(Math.round(throttleShown * 100))
+  );
 }
 
 function syncThrottleVis() {
-  const show = !menuOpen && !paused && !leaveOpen && !guessOpen && !crashed && !finished;
+  const show =
+    !menuOpen && !paused && !leaveOpen && !guessOpen && !crashed && !finished;
   el.throttle?.classList.toggle("hidden", !show);
 }
 
@@ -3588,7 +3881,8 @@ function moveStick(clientX, clientY) {
   const dead = 0.12;
   touch.roll = Math.abs(nx) < dead ? 0 : nx;
   touch.pitch = Math.abs(ny) < dead ? 0 : ny;
-  if (el.stickKnob) el.stickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+  if (el.stickKnob)
+    el.stickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
 }
 
 function bindHold(btn, down, up) {
@@ -3627,10 +3921,16 @@ if (el.stick) {
   el.stick.addEventListener("pointerup", endStick);
   el.stick.addEventListener("pointercancel", endStick);
 }
-bindHold(el.touchTalk, () => startTalk(), () => stopTalk());
+bindHold(
+  el.touchTalk,
+  () => startTalk(),
+  () => stopTalk()
+);
 el.touchPause?.addEventListener("click", () => setPaused(true));
 el.touchMap?.addEventListener("click", () => toggleFreeMap());
-el.stick?.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
+el.stick?.addEventListener("touchmove", (e) => e.preventDefault(), {
+  passive: false,
+});
 
 if (el.throttleRail) {
   const startThr = (e) => {
@@ -3651,15 +3951,22 @@ if (el.throttleRail) {
   el.throttleRail.addEventListener("pointermove", moveThr);
   el.throttleRail.addEventListener("pointerup", endThr);
   el.throttleRail.addEventListener("pointercancel", endThr);
-  el.throttleRail.addEventListener("wheel", (e) => {
-    e.preventDefault();
-    setThrottleLever(throttleLever + (e.deltaY < 0 ? 0.06 : -0.06));
-  }, { passive: false });
 }
+
+window.addEventListener("wheel", (e) => {
+  if (menuOpen || paused || leaveOpen || guessOpen || crashed || finished || freeMap.open) return;
+  if (e.defaultPrevented || e.ctrlKey || e.metaKey || !Number.isFinite(e.deltaY) || e.deltaY === 0) return;
+  if (e.target?.isContentEditable || e.target?.closest?.("input, textarea, select")) return;
+  e.preventDefault();
+  const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? innerHeight : 1;
+  const delta = e.deltaY * unit;
+  setThrottleLever(throttleLever - Math.sign(delta) * Math.min(0.12, Math.abs(delta) * 0.0006));
+}, { passive: false });
 
 function syncTouchUi() {
   if (!el.touch) return;
-  const show = !menuOpen && !paused && !leaveOpen && !guessOpen && !crashed && !finished;
+  const show =
+    !menuOpen && !paused && !leaveOpen && !guessOpen && !crashed && !finished;
   el.touch.classList.toggle("hidden", !show);
   el.touch.classList.toggle("show", show);
   el.touch.classList.toggle("talk", voiceEnabled());
@@ -3796,8 +4103,9 @@ function tickFrame() {
     (keys.has("w") || keys.has("arrowup") ? 1 : 0);
   const rollIn = keyRoll || touch.roll;
   const pitchIn = keyPitch || touch.pitch;
-  ctrl.roll += (rollIn - ctrl.roll) * Math.min(1, 6 * dt);
-  ctrl.pitch += (pitchIn - ctrl.pitch) * Math.min(1, 6 * dt);
+  const controlBlend = 1 - Math.exp(-6 * dt);
+  ctrl.roll += (rollIn - ctrl.roll) * controlBlend;
+  ctrl.pitch += (pitchIn - ctrl.pitch) * controlBlend;
   if (flying) tickThrottle(dt);
   else if (throttleShown !== throttleLever) {
     throttleShown = throttleLever;
@@ -3818,15 +4126,19 @@ function tickFrame() {
 
   // dźwięk silnika — obroty z przepustnicy i prędkości, opływ z prędkości
   const speed01 = plane.speed / plane.boost;
-  const rpm01 = Math.min(
-    1,
-    Math.max(0.15, 0.22 + plane.throttle * 0.78)
-  );
+  const rpm01 = Math.min(1, Math.max(0.15, 0.22 + plane.throttle * 0.78));
   updateEngineSound(flying, rpm01, speed01, PLANES[selectedPlane].sound);
   updateMusic();
 
   // pozycja i orientacja samolotu
-  const m = frameAt(plane.lat, plane.lon, plane.height, plane.heading, plane.pitch, -plane.roll);
+  const m = frameAt(
+    plane.lat,
+    plane.lon,
+    plane.height,
+    plane.heading,
+    plane.pitch,
+    -plane.roll
+  );
   m.decompose(planePos, planeQuat, planeMesh.scale);
   planeMesh.position.copy(planePos);
   planeMesh.quaternion.copy(planeQuat);
@@ -3834,6 +4146,8 @@ function tickFrame() {
     planeMesh.userData.prop.rotation.z += plane.speed * dt * 1.6;
   }
   spinRotors(planeMesh, dt, plane.speed);
+  updateFighterSurfaces(planeMesh, paused ? 0 : dt, flying ? ctrl.roll : 0, flying ? ctrl.pitch : 0);
+  updateRocketExhaust(planeMesh, dt, plane.kmh, flying);
   for (const mate of mp.mates.values()) {
     if (mate.mesh) spinRotors(mate.mesh, dt, plane.speed);
   }
@@ -3855,6 +4169,9 @@ function tickFrame() {
         pitch: plane.pitch,
         roll: plane.roll,
         plane: selectedPlane,
+        kmh: plane.kmh,
+        controlRoll: ctrl.roll,
+        controlPitch: ctrl.pitch,
       });
     }
   }
@@ -3899,11 +4216,19 @@ function tickFrame() {
       mate.mesh.quaternion.copy(mateQuat);
       mate.mesh.scale.copy(mateScale);
       mate.mesh.visible = true;
+      const mateRoll = (from.controlRoll ?? 0) + ((to.controlRoll ?? 0) - (from.controlRoll ?? 0)) * u;
+      const matePitch = (from.controlPitch ?? 0) + ((to.controlPitch ?? 0) - (from.controlPitch ?? 0)) * u;
+      updateFighterSurfaces(mate.mesh, paused ? 0 : dt, mateRoll, matePitch);
+      const kmh = (from.kmh ?? 0) + ((to.kmh ?? 0) - (from.kmh ?? 0)) * u;
+      updateRocketExhaust(mate.mesh, dt, kmh);
+      mate.kmh = kmh;
       const marker = ensureMateMarker(mate);
       const markOn = mp.goAt && performance.now() - mp.goAt < MATE_MARKER_MS;
       mateUp.set(0, 1, 0).applyQuaternion(mateQuat).normalize();
       marker.scale.copy(mateScale);
-      marker.position.copy(matePos).addScaledVector(mateUp, 18 * (mateScale.y || 1));
+      marker.position
+        .copy(matePos)
+        .addScaledVector(mateUp, 18 * (mateScale.y || 1));
       marker.quaternion.copy(mateQuat);
       marker.visible = markOn && Math.sin(performance.now() * 0.014) > 0;
     }
@@ -3912,9 +4237,19 @@ function tickFrame() {
   }
 
   // sztywna kamera za samolotem — tylko kurs, bez przechyłu/pochylenia
-  const camFrame = frameAt(plane.lat, plane.lon, plane.height, plane.heading, 0, 0);
+  const camFrame = frameAt(
+    plane.lat,
+    plane.lon,
+    plane.height,
+    plane.heading,
+    0,
+    0
+  );
   camFrame.decompose(camFramePos, camFrameQuat, camFrameScale);
-  offset.set(camOffset[0], camOffset[1], camOffset[2]).applyQuaternion(camFrameQuat).add(planePos);
+  offset
+    .set(camOffset[0], camOffset[1], camOffset[2])
+    .applyQuaternion(camFrameQuat)
+    .add(planePos);
   camPos.copy(offset);
   camInit = true;
   camera.position.copy(camPos);
@@ -3926,14 +4261,21 @@ function tickFrame() {
     camera.position.y += (Math.random() - 0.5) * s;
     camera.position.z += (Math.random() - 0.5) * s;
   }
-  camTarget.set(0, 0.5, -camOffset[2] * 1.6).applyQuaternion(camFrameQuat).add(planePos);
+  camTarget
+    .set(0, 0.5, -camOffset[2] * 1.6)
+    .applyQuaternion(camFrameQuat)
+    .add(planePos);
   camera.up.set(0, 1, 0).applyQuaternion(camFrameQuat); // lokalny pion, nie globalny Y
   camera.lookAt(camTarget);
 
   // kopuła nieba i słońce w LOKALNEJ ramce północnej (bez kursu) —
   // globalna oś Y jest przechylona ~38° względem horyzontu na szer. 52°N,
   // co dawało ukośną granicę nieba i błękitną poświatę
-  frameAt(plane.lat, plane.lon, plane.height, 0, 0, 0).decompose(skyFramePos, skyQuat, skyFrameScale);
+  frameAt(plane.lat, plane.lon, plane.height, 0, 0, 0).decompose(
+    skyFramePos,
+    skyQuat,
+    skyFrameScale
+  );
   sky.mesh.position.copy(camPos);
   sky.mesh.quaternion.copy(skyQuat);
   sky.uniforms.uTime.value = clock.elapsedTime;
@@ -4013,8 +4355,8 @@ function tickFrame() {
     const gh = Number.isFinite(snapBestGh)
       ? snapBestGh
       : Number.isFinite(snapLastGh)
-        ? snapLastGh
-        : null;
+      ? snapLastGh
+      : null;
     if (gh !== null) {
       plane.height = gh + snapAgl();
       groundAlt = gh;
@@ -4027,7 +4369,8 @@ function tickFrame() {
   if (lastSafeAgl > 28 && lastSafeAgl - agl > 22) {
     armCrashGrace(1400);
   }
-  const canCrash = flying && !pendingSnap && performance.now() > crashGraceUntil;
+  const canCrash =
+    flying && !pendingSnap && performance.now() > crashGraceUntil;
   const hitGround = canCrash && agl < 3;
   const hitBuilding = canCrash && agl < 80 && bodyHit(4.5);
   if (hitGround || hitBuilding) crashStreak += 1;
@@ -4041,7 +4384,12 @@ function tickFrame() {
 
   // latarnia domu — tylko z bliska, inaczej widać ją z całego lotu
   if (beacon && mode === "home" && homeTarget && !finished && !menuOpen) {
-    const dist = distanceM(plane.latDeg, plane.lonDeg, homeTarget.lat, homeTarget.lon);
+    const dist = distanceM(
+      plane.latDeg,
+      plane.lonDeg,
+      homeTarget.lat,
+      homeTarget.lon
+    );
     const show = dist <= HOME_BEACON_M;
     if (show && (!beaconGrounded || frameCount % 60 === 0)) {
       placeBeaconAt(homeTarget.lat, homeTarget.lon);
@@ -4053,7 +4401,14 @@ function tickFrame() {
   }
 
   // tryby: timer + warunki wygranej
-  if (timerActive && !menuOpen && !paused && !guessOpen && !finished && (!crashed || mp.active)) {
+  if (
+    timerActive &&
+    !menuOpen &&
+    !paused &&
+    !guessOpen &&
+    !finished &&
+    (!crashed || mp.active)
+  ) {
     timeLeft -= dt;
     if (timeLeft <= 0) {
       timeLeft = 0;
@@ -4094,7 +4449,12 @@ function tickFrame() {
   }
   if (mode === "home" && flying && frameCount % 8 === 0) recordHomePath();
   if (mode === "home" && homeTarget && flying) {
-    const dist = distanceM(plane.latDeg, plane.lonDeg, homeTarget.lat, homeTarget.lon);
+    const dist = distanceM(
+      plane.latDeg,
+      plane.lonDeg,
+      homeTarget.lat,
+      homeTarget.lon
+    );
     if (dist < HOME_CAPTURE_M) {
       finished = true;
       timerActive = false;
@@ -4133,6 +4493,11 @@ function tickFrame() {
     updateTilesSafe();
   }
 
+  updateContrails(planeMesh, dt, plane.kmh, flying && !crashed && !menuOpen, camera);
+  for (const mate of mp.mates.values()) {
+    updateContrails(mate.mesh, dt, mate.kmh ?? 0,
+      mp.active && !menuOpen && !paused && !guessOpen && !!mate.mesh?.visible, camera);
+  }
   renderer.render(scene, camera);
 
   const mateDbg = [];
@@ -4140,7 +4505,9 @@ function tickFrame() {
     mateDbg.push({
       id,
       visible: !!mate.mesh?.visible,
-      dist: mate.mesh ? Math.round(mate.mesh.position.distanceTo(planePos)) : -1,
+      dist: mate.mesh
+        ? Math.round(mate.mesh.position.distanceTo(planePos))
+        : -1,
       hasPose: mp.poses.has(id),
       samples: mp.poses.get(id)?.samples?.length || 0,
     });
@@ -4165,10 +4532,14 @@ function tickFrame() {
     tile429: tile429Count,
     tileJobs: tiles.downloadQueue?.maxJobsPerOrigin ?? -1,
     tileErr: lastTileErr,
-    memJs: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : -1,
+    memJs: performance.memory
+      ? Math.round(performance.memory.usedJSHeapSize / 1048576)
+      : -1,
     memTex: renderer.info?.memory?.textures ?? -1,
     memGeo: renderer.info?.memory?.geometries ?? -1,
-    memCache: tiles.lruCache ? Math.round((tiles.lruCache.cachedBytes || 0) / 1048576) : -1,
+    memCache: tiles.lruCache
+      ? Math.round((tiles.lruCache.cachedBytes || 0) / 1048576)
+      : -1,
     tilePool: tilePool.debug(),
     explosions: explosions.length,
     crashed,
@@ -4204,7 +4575,8 @@ window.__forceTestMate = () => {
   const aheadM = 35;
   const eastM = 10;
   const lat = plane.latDeg + (aheadM / R) * (180 / Math.PI);
-  const lon = plane.lonDeg + (eastM / (R * Math.cos(plane.lat))) * (180 / Math.PI);
+  const lon =
+    plane.lonDeg + (eastM / (R * Math.cos(plane.lat))) * (180 / Math.PI);
   seedMatePose("test-mate", lat, lon, plane.height, selectedPlane);
   mp.goAt = performance.now();
 };
@@ -4224,13 +4596,19 @@ function updateHud(agl) {
     el.timer.classList.toggle("low", tsec <= 30 && timerActive);
   }
   if (mode === "home" && homeTarget) {
-    const dist = distanceM(plane.latDeg, plane.lonDeg, homeTarget.lat, homeTarget.lon);
+    const dist = distanceM(
+      plane.latDeg,
+      plane.lonDeg,
+      homeTarget.lat,
+      homeTarget.lon
+    );
     el.dist.textContent = `${(dist / 1000).toFixed(1)} km`;
   }
 }
 
 function recordHomePath() {
-  if (mode !== "home" || !plane || pendingSnap || awaitingSnap || menuOpen) return;
+  if (mode !== "home" || !plane || pendingSnap || awaitingSnap || menuOpen)
+    return;
   const lat = plane.latDeg;
   const lon = plane.lonDeg;
   const last = homePath[homePath.length - 1];

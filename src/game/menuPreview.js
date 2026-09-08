@@ -10,6 +10,7 @@ import {
 } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { applyRotorState } from "./rotors.js";
+import { finishVehicleMaterials } from "./vehicleVisuals.js";
 
 // karuzela pojazdów w menu — jeden duży podgląd, strzałki przełączają model
 export function createCarousel(canvas, items, opts = {}) {
@@ -85,12 +86,7 @@ export function createCarousel(canvas, items, opts = {}) {
       model.scale.setScalar(item.wingspan / Math.max(size.x, size.y, size.z));
       box.setFromObject(model);
       model.position.sub(box.getCenter(new Vector3()));
-      model.traverse((o) => {
-        if (o.isMesh && o.material) {
-          o.material.metalness = 0.15;
-          o.material.roughness = 0.65;
-        }
-      });
+      finishVehicleMaterials(model);
       const group = new Group();
       group.add(model);
       applyRotorState(group, false);

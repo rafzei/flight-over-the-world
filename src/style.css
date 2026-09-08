@@ -1723,6 +1723,10 @@ kbd {
 
 #fm-close:hover { background: rgba(243, 234, 214, 0.08); }
 
+.fm-map {
+  position: relative;
+}
+
 #fm-canvas {
   display: block;
   width: 100%;
@@ -1730,6 +1734,42 @@ kbd {
   aspect-ratio: 720 / 480;
   border-radius: 8px;
   background: #c9d4c0;
+  touch-action: none;
+}
+
+.fm-zoom {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(243, 234, 214, 0.28);
+  border-radius: 8px;
+  background: rgba(18, 14, 10, 0.92);
+}
+
+.fm-zoom button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--paper);
+  font: 26px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.fm-zoom button + button {
+  border-top: 1px solid rgba(243, 234, 214, 0.2);
+}
+
+.fm-zoom button:hover:not(:disabled) { background: rgba(243, 234, 214, 0.12); }
+.fm-zoom button:focus-visible { outline: 2px solid var(--gold); outline-offset: -4px; }
+.fm-zoom button:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .fm-credit {
