@@ -15,7 +15,9 @@ import {
 
 const R_EARTH = 6378137;
 const TURN_SPEED_LIMIT = 50; // m/s — dalsze rozpędzanie nie przyspiesza obrotu
-const HIGH_SPEED_HANDLING = 100; // m/s — od 540 km/h łagodniejsze sterowanie
+const HIGH_SPEED_HANDLING = 100; // m/s — od 360 km/h łagodniejsze sterowanie
+// 1 = original speed penalty, 0 = full control authority at every speed.
+export const HIGH_SPEED_CONTROL_PENALTY = 0.5;
 
 // Cessna 172 — stylizowany low-poly: górnopłat, stelarze, podwozie, śmigło
 export function createPlaneMesh() {
@@ -169,8 +171,10 @@ export class PlaneController {
 
   update(dt, ctrl) {
     const speedRatio = Math.max(1, this.speed / HIGH_SPEED_HANDLING);
-    const targetRoll = (-ctrl.roll * 0.9) / Math.sqrt(speedRatio);
-    const targetPitch = (ctrl.pitch * 0.4) / Math.pow(speedRatio, 0.75);
+    const rollAuthority = MathUtils.lerp(1, 1 / Math.sqrt(speedRatio), HIGH_SPEED_CONTROL_PENALTY);
+    const pitchAuthority = MathUtils.lerp(1, 1 / Math.pow(speedRatio, 0.75), HIGH_SPEED_CONTROL_PENALTY);
+    const targetRoll = -ctrl.roll * 0.9 * rollAuthority;
+    const targetPitch = ctrl.pitch * 0.4 * pitchAuthority;
     this.roll += (targetRoll - this.roll) * (1 - Math.exp(-6 * dt));
     this.pitch += (targetPitch - this.pitch) * (1 - Math.exp(-4 * dt));
 

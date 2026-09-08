@@ -2,17 +2,24 @@ import {
   AdditiveBlending,
   BufferGeometry,
   Float32BufferAttribute,
+  Group,
   NormalBlending,
   PointLight,
   Points,
   PointsMaterial,
+  Vector3,
 } from "three";
 
 // Proceduralny wybuch: kula ognia (addytiwne cząsteczki) + dym + błysk światła.
 // Dźwięk generowany przez WebAudio — szum przez lowpass + opadający sub-bass.
 
-export function createExplosion(scene, pos) {
+export function createExplosion(scene, pos, { up = new Vector3(0, 1, 0) } = {}) {
   const group = [];
+  // Keep GPU particle coordinates close to zero at Earth-sized world positions.
+  const burst = new Group();
+  burst.position.copy(pos);
+  burst.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), up.clone().normalize());
+  scene.add(burst);
 
   // --- ogień ---
   const FIRE_N = 240;
@@ -21,9 +28,6 @@ export function createExplosion(scene, pos) {
   const fireCol = new Float32Array(FIRE_N * 3);
   const fireVel = new Float32Array(FIRE_N * 3);
   for (let i = 0; i < FIRE_N; i++) {
-    firePos[i * 3] = pos.x;
-    firePos[i * 3 + 1] = pos.y;
-    firePos[i * 3 + 2] = pos.z;
     // losowy kierunek sferyczny z lekkim biasem w górę
     const th = Math.random() * Math.PI * 2;
     const ph = Math.acos(2 * Math.random() - 1);
@@ -49,7 +53,7 @@ export function createExplosion(scene, pos) {
   });
   const fire = new Points(fireGeo, fireMat);
   fire.frustumCulled = false;
-  scene.add(fire);
+  burst.add(fire);
   group.push(fire);
 
   // --- dym ---
@@ -58,9 +62,6 @@ export function createExplosion(scene, pos) {
   const smokePos = new Float32Array(SMOKE_N * 3);
   const smokeVel = new Float32Array(SMOKE_N * 3);
   for (let i = 0; i < SMOKE_N; i++) {
-    smokePos[i * 3] = pos.x;
-    smokePos[i * 3 + 1] = pos.y;
-    smokePos[i * 3 + 2] = pos.z;
     const th = Math.random() * Math.PI * 2;
     const sp = 3 + Math.random() * 12;
     smokeVel[i * 3] = Math.cos(th) * sp;
@@ -78,20 +79,31 @@ export function createExplosion(scene, pos) {
   });
   const smoke = new Points(smokeGeo, smokeMat);
   smoke.frustumCulled = false;
-  scene.add(smoke);
+  burst.add(smoke);
   group.push(smoke);
 
   // --- błysk ---
   const flash = new PointLight(0xffa040, 4000, 600, 1.6);
-  flash.position.copy(pos);
-  scene.add(flash);
+  burst.add(flash);
   group.push(flash);
 
   let age = 0;
   const LIFE = 2.6;
+  let disposed = false;
+  function dispose() {
+    if (disposed) return;
+    disposed = true;
+    burst.removeFromParent();
+    for (const o of group) {
+      o.geometry?.dispose();
+      o.material?.dispose();
+    }
+  }
 
   return {
+    dispose,
     update(dt) {
+      if (disposed) return false;
       age += dt;
       const fp = fire.geometry.attributes.position.array;
       for (let i = 0; i < FIRE_N; i++) {
@@ -117,11 +129,7 @@ export function createExplosion(scene, pos) {
       flash.intensity = Math.max(0, 4000 * (1 - age / 0.45));
 
       if (age >= LIFE) {
-        for (const o of group) {
-          scene.remove(o);
-          o.geometry?.dispose();
-          o.material?.dispose();
-        }
+        dispose();
         return false;
       }
       return true;
@@ -141,7 +149,7 @@ export function getAudioCtx() {
   return audioCtx;
 }
 
-export function playExplosionSound() {
+export function playExplosionSound(volume = 1) {
   primeAudio();
   const t = audioCtx.currentTime;
 
@@ -159,7 +167,7 @@ export function playExplosionSound() {
   lp.frequency.setValueAtTime(3200, t);
   lp.frequency.exponentialRampToValueAtTime(110, t + dur);
   const ng = audioCtx.createGain();
-  ng.gain.setValueAtTime(0.85, t);
+  ng.gain.setValueAtTime(0.85 * Math.max(.01, Math.min(1, volume)), t);
   ng.gain.exponentialRampToValueAtTime(0.001, t + dur);
   noise.connect(lp).connect(ng).connect(audioCtx.destination);
   noise.start(t);
@@ -170,7 +178,7 @@ export function playExplosionSound() {
   osc.frequency.setValueAtTime(130, t);
   osc.frequency.exponentialRampToValueAtTime(28, t + 0.9);
   const og = audioCtx.createGain();
-  og.gain.setValueAtTime(0.9, t);
+  og.gain.setValueAtTime(0.9 * Math.max(.01, Math.min(1, volume)), t);
   og.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
   osc.connect(og).connect(audioCtx.destination);
   osc.start(t);

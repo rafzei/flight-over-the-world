@@ -40,6 +40,7 @@ import {
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { loadVehicleModel, disposeModelResources } from "./game/vehicleModels.js";
 import { createCombatDrone, updateCombatDrone } from "./game/combatDrone.js";
+import { createFighterMissiles } from "./game/fighterMissiles.js";
 import { setLoader, hideLoader } from "./game/hud.js";
 import { createPlaneMesh } from "./game/plane.js";
 import { createVehicleController } from "./game/vehicleControllers.js";
@@ -276,6 +277,9 @@ const HOME_BEACON_M = 1000;
 
 let camera, scene, renderer, tiles, sun, sky;
 let vehicleGroundShadows;
+let fighterMissiles;
+let missileShotSeq = 0;
+const lastMissileShotSeq = new Map();
 const shadowUp = new Vector3();
 const shadowSunDirection = new Vector3();
 let tile429Count = 0;
@@ -784,6 +788,7 @@ const el = {
   mmCanvas: document.getElementById("mm-canvas"),
   mapNote: document.getElementById("map-note"),
   dragonRelease: document.getElementById("dragon-release"),
+  missileFire: document.getElementById("missile-fire"),
   lobbyCarCanvas: document.getElementById("lobby-carousel-canvas"),
   lobbyCarPrev: document.getElementById("lobby-car-prev"),
   lobbyCarNext: document.getElementById("lobby-car-next"),
@@ -1790,6 +1795,8 @@ function handleNetData(data, fromId) {
     if (!id || id === mp.myId) return;
     pushMatePose(id, data);
     loadMate(id, data.plane || "pa28");
+  } else if (data.t === "missile") {
+    receiveFighterMissile(data);
   } else if (data.t === "guess") {
     const id = data.from;
     if (!id || id === mp.myId) return;
@@ -2560,6 +2567,13 @@ async function init() {
     renderer.domElement.id = "game-canvas";
     document.body.appendChild(renderer.domElement);
     vehicleGroundShadows = createVehicleGroundShadows(renderer, { mobile: isMobile });
+    fighterMissiles = createFighterMissiles(scene, {
+      onImpact(position, up) {
+        explosions.push(createExplosion(scene, position.clone().addScaledVector(up, .3), { up }));
+        const distance = camera.position.distanceTo(position);
+        if (distance < 1800) playExplosionSound(Math.max(.08, 1 - distance / 1800));
+      },
+    });
 
     scene.add(new HemisphereLight(0xbfd8ee, 0x5a7048, 1.15));
     sun = new DirectionalLight(0xfff2dd, 2.0);
@@ -2750,6 +2764,7 @@ function loadPlane(key) {
   const spec = PLANES[key];
   camOffset = spec.cam;
   if (planeMesh) {
+    fighterMissiles?.removeVehicle(planeMesh);
     vehicleGroundShadows?.removeVehicle(planeMesh);
     disposeRocketExhaust(planeMesh);
     disposeContrails(planeMesh);
@@ -2795,6 +2810,8 @@ function loadPlane(key) {
 
 function disposeMate(id) {
   const mate = mp.mates.get(id);
+  fighterMissiles?.removeVehicle(mate?.mesh);
+  lastMissileShotSeq.delete(id);
   vehicleGroundShadows?.removeVehicle(mate?.mesh);
   disposeRocketExhaust(mate?.mesh);
   disposeContrails(mate?.mesh);
@@ -2878,6 +2895,10 @@ function loadMate(id, key) {
 
 function resetFlight(latDeg, lonDeg) {
   const spec = PLANES[selectedPlane];
+  fighterMissiles?.reset();
+  lastMissileShotSeq.clear();
+  for (const explosion of explosions) explosion.dispose();
+  explosions.length = 0;
   timeLeft = mode === "home" ? HOME_TIME : mode === "guess" ? GUESS_TIME : 0;
   timerActive = false;
   startLat = latDeg;
@@ -3852,6 +3873,11 @@ window.addEventListener("keydown", (e) => {
       deployDragon();
       return;
     }
+    if (k === "enter" && selectedPlane === "jet") {
+      e.preventDefault();
+      fireFighterMissile();
+      return;
+    }
   }
   if (menuOpen || paused || guessOpen) return;
   keys.add(k);
@@ -3882,6 +3908,34 @@ function deployDragon() {
   releaseDragon(planeMesh, scene, velocity, up, vehicleGroundShadows);
 }
 el.dragonRelease?.addEventListener("click", deployDragon);
+
+function fireFighterMissile() {
+  if (selectedPlane !== "jet" || menuOpen || paused || guessOpen || leaveOpen || crashed || finished ||
+      pendingSnap || awaitingSnap || freeMap.open) return;
+  const up = new Vector3().setFromMatrixColumn(frameAt(plane.lat, plane.lon, plane.height, 0, 0, 0), 1).normalize();
+  const shot = fighterMissiles?.fire(planeMesh, { speed: plane.speed, up });
+  if (shot && mp.active) mp.net?.send({
+    t: "missile", from: mp.myId, seq: ++missileShotSeq, station: shot.station,
+    lat: plane.latDeg, lon: plane.lonDeg, h: plane.height,
+    heading: plane.heading, pitch: plane.pitch, roll: plane.roll, kmh: plane.kmh,
+  });
+}
+el.missileFire?.addEventListener("click", fireFighterMissile);
+
+function receiveFighterMissile(data) {
+  if (!mp.active || menuOpen || guessOpen || !data.from || data.from === mp.myId) return;
+  const mate = mp.mates.get(data.from);
+  if (mate?.key !== "jet" || !mate.mesh || !Number.isSafeInteger(data.seq) ||
+      data.seq <= (lastMissileShotSeq.get(data.from) ?? 0) ||
+      !Number.isInteger(data.station) || data.station < 0 || data.station > 3 ||
+      ![data.lat, data.lon, data.h, data.heading, data.pitch, data.roll, data.kmh].every(Number.isFinite) ||
+      Math.abs(data.lat) > 90 || Math.abs(data.lon) > 180 || data.kmh < 0 || data.kmh > 2500) return;
+  lastMissileShotSeq.set(data.from, data.seq);
+  const lat = data.lat * Math.PI / 180, lon = data.lon * Math.PI / 180;
+  const poseMatrix = frameAt(lat, lon, data.h, data.heading, data.pitch, -data.roll);
+  const up = new Vector3().setFromMatrixColumn(frameAt(lat, lon, data.h, 0, 0, 0), 1).normalize();
+  fighterMissiles?.fire(mate.mesh, { speed: data.kmh / 3.6, up, station: data.station, poseMatrix });
+}
 
 const touch = {
   roll: 0,
@@ -4230,6 +4284,12 @@ function tickFrame() {
     el.dragonRelease.disabled = released;
     el.dragonRelease.textContent = released ? "Dragon released" : "Enter · Release Dragon";
   }
+  if (el.missileFire) {
+    const status = fighterMissiles?.status(planeMesh);
+    el.missileFire.hidden = selectedPlane !== "jet" || !flying || leaveOpen || pendingSnap || awaitingSnap || freeMap.open;
+    el.missileFire.disabled = !status?.canFire;
+    el.missileFire.textContent = status?.available ? `Enter · Fire missile (${status.available}/${status.total})` : "Missiles reloading…";
+  }
   for (const mate of mp.mates.values()) {
     if (mate.mesh) spinRotors(mate.mesh, dt, plane.speed);
   }
@@ -4468,8 +4528,10 @@ function tickFrame() {
   if (crashStreak >= 8) crash();
 
   // aktywne wybuchy
+  const weaponsActive = !menuOpen && !paused && !guessOpen && !leaveOpen;
+  fighterMissiles?.update(dt, { terrain: tiles.group, active: weaponsActive, visible: !menuOpen && !guessOpen });
   for (let i = explosions.length - 1; i >= 0; i--) {
-    if (!explosions[i].update(dt)) explosions.splice(i, 1);
+    if (!explosions[i].update(weaponsActive ? dt : 0)) explosions.splice(i, 1);
   }
 
   // latarnia domu — tylko z bliska, inaczej widać ją z całego lotu

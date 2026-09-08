@@ -43,6 +43,20 @@ export function attachFighterArmament(model, resources) {
   const group = new Group();
   group.name = "fighter-armament";
   const batches = new Map();
+  let targetBatches = batches;
+  function flush(parts, parent, origin = [0, 0, 0]) {
+    for (const [mat, geometries] of parts) {
+      if (!geometries.length) continue;
+      const geometry = mergeGeometries(geometries);
+      geometry.translate(-origin[0], -origin[1], -origin[2]);
+      for (const source of geometries) source.dispose();
+      const mesh = new Mesh(geometry, mat);
+      mesh.name = mat.name;
+      mesh.castShadow = mesh.receiveShadow = true;
+      parent.add(mesh);
+      resources.push(geometry);
+    }
+  }
   function material(name, color, metalness = 0.3, roughness = 0.45) {
     const mat = new MeshStandardMaterial({ color, metalness, roughness, side: DoubleSide });
     mat.name = name;
@@ -63,7 +77,8 @@ export function attachFighterArmament(model, resources) {
     // Match attributes for primitives and the custom flat fin shapes.
     source.deleteAttribute("uv");
     source.translate(x, y, z);
-    batches.get(mat).push(source);
+    if (!targetBatches.has(mat)) targetBatches.set(mat, []);
+    targetBatches.get(mat).push(source);
   }
   function cylinder(radius, length, mat, x, y, z, openEnded = false) {
     const geometry = new CylinderGeometry(radius, radius, length, 12, 1, openEnded);
@@ -78,6 +93,7 @@ export function attachFighterArmament(model, resources) {
     geometry.rotateZ(angle);
     add(geometry, mat, x, y, z);
   }
+  let station = 0;
   for (const side of [-1, 1]) {
     for (const [x, z, length] of [[2.18, -0.9, 2.7], [2.99, -1.2, 2.25]]) {
       const px = side * x, py = -0.47;
@@ -85,6 +101,15 @@ export function attachFighterArmament(model, resources) {
       add(new BoxGeometry(0.1, 0.38, 0.62), trim, px, -0.025, z);
       add(new BoxGeometry(0.14, 0.065, 1.12), steel, px, -0.25, z);
       for (const dz of [-0.36, 0.36]) add(new BoxGeometry(0.18, 0.14, 0.1), trim, px, -0.34, z + dz);
+      // Keep each missile separate from its rail so a launch can empty this station.
+      const missile = new Group();
+      missile.name = `fighter-missile-${station}`;
+      missile.position.set(px, py, z);
+      missile.userData.fighterMissile = true;
+      missile.userData.station = station++;
+      missile.userData.length = length;
+      group.add(missile);
+      targetBatches = new Map();
       cylinder(0.13, length, shell, px, py, z);
       const nose = new ConeGeometry(0.13, 0.4, 12);
       nose.rotateX(Math.PI / 2);
@@ -96,6 +121,8 @@ export function attachFighterArmament(model, resources) {
         fin(fins, px, py, z - length * 0.35, i * Math.PI / 2, 0.28, 0.45);
         fin(fins, px, py, z + length * 0.22, i * Math.PI / 2, 0.17, 0.3);
       }
+      flush(targetBatches, missile, [px, py, z]);
+      targetBatches = batches;
     }
   }
   // Compact ventral cannon pod, recessed twin muzzles and cooling slots.
@@ -109,14 +136,6 @@ export function attachFighterArmament(model, resources) {
   for (const side of [-1, 1]) for (let i = 0; i < 5; i++) {
     add(new BoxGeometry(0.012, 0.07, 0.08), dark, side * 0.164, -0.83, 1.44 + i * 0.14);
   }
-  for (const [mat, geometries] of batches) {
-    const geometry = mergeGeometries(geometries);
-    for (const source of geometries) source.dispose();
-    const mesh = new Mesh(geometry, mat);
-    mesh.name = mat.name;
-    mesh.castShadow = mesh.receiveShadow = true;
-    group.add(mesh);
-    resources.push(geometry);
-  }
+  flush(batches, group);
   model.add(group);
 }

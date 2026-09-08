@@ -44,7 +44,7 @@ Seven vehicles are available in single player and multiplayer:
 | **Piper PA-28** | ~170 / 470 km/h | Light propeller aircraft with animated propeller. |
 | **Dash 8 Q400** | ~270 / 670 km/h | Regional turboprop with two animated propellers. |
 | **Cessna Citation** | ~330 / 900 km/h | Business jet. |
-| **Fighter** | ~540 / 1510 km/h | Combat jet with moving control surfaces, navigation lights, visual armament and wingtip contrails above 1000 km/h. |
+| **Fighter** | ~540 / 1510 km/h | Combat jet with moving control surfaces, navigation lights, launchable missiles and wingtip contrails above 1000 km/h. |
 | **Rocket** | ~790 / 5000 km/h | Forward-flying rocket with trails from four fins; engine fire appears above 5000 km/h. |
 | **Combat Drone** | 120 / 320 km/h | Armed quadrotor replacing Rocket 1, with four spinning rotors, two gun pods, a camera and red lights. Independent lift and automatic braking; cutting throttle makes it descend under gravity. |
 | **SpaceX Falcon 9** | Thrust-controlled / 8000 km/h | Upright rocket with nine engine nozzles, steering, gravity and inertia. Press `Enter` to release the Dragon capsule; its red-and-white parachute opens after separation. |
@@ -61,6 +61,7 @@ The drone uses `A` / `D` to turn, even at zero forward speed, and `W` / `S` to d
 - Full-screen map in free flight with mouse-wheel, `+` / `−` and pinch zoom. Zoom is remembered when reopening the map.
 - Mouse-wheel throttle control anywhere in flight, plus a draggable throttle and touch flight stick.
 - Contrails that follow the flight path, spread, drift and fade over time.
+- Fighter missiles: press `Enter` to launch from alternating wing stations. Aim with the aircraft; missiles explode on terrain or building impact, with fire, smoke and sound. Each of the four stations reloads after 4 seconds. Launches are shared in multiplayer; a **Fire missile** button is available for touch controls.
 - Multiplayer vehicle selection, player list and push-to-talk voice chat.
 
 ## Controls
@@ -76,7 +77,7 @@ The drone uses `A` / `D` to turn, even at zero forward speed, and `W` / `S` to d
 | `C` | Cycle camera: chase → 3× farther → 5× farther → nose view → fixed tracking → front |
 | `M` | Open / close the map in free flight |
 | Mouse wheel / `+` / `−` / pinch over the map | Zoom the map |
-| `Enter` | Release Dragon from Falcon 9 once per flight |
+| `Enter` | Fighter: launch a missile; Falcon 9: release Dragon once per flight |
 | `Tab` | Show multiplayer player list (hold) |
 | `T` | Talk (hold) |
 | `Esc` | Close map, pause single player, or open the multiplayer leave menu |

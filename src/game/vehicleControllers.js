@@ -1,5 +1,5 @@
 import { Euler, MathUtils, Vector3 } from "three";
-import { PlaneController } from "./plane.js";
+import { PlaneController, HIGH_SPEED_CONTROL_PENALTY } from "./plane.js";
 
 const EARTH_RADIUS = 6378137;
 const blend = (rate, dt) => 1 - Math.exp(-rate * dt);
@@ -24,7 +24,8 @@ export class DroneController extends PlaneController {
   update(dt, ctrl) {
     const lever = Number.isFinite(ctrl.throttle) ? MathUtils.clamp(ctrl.throttle, 0, 1) : this.cruiseT;
     this.throttle += (lever - this.throttle) * blend(5, dt);
-    this.yawRate += (ctrl.roll * (1.2 - .45 * this.speed / this.boost) - this.yawRate) * blend(7, dt);
+    const yawAuthority = 1.2 - .45 * this.speed / this.boost * HIGH_SPEED_CONTROL_PENALTY;
+    this.yawRate += (ctrl.roll * yawAuthority - this.yawRate) * blend(7, dt);
     this.heading += this.yawRate * dt;
     const targetSpeed = this.throttle * this.boost;
     const dN = Math.cos(this.heading) * targetSpeed - this.northSpeed;
@@ -64,7 +65,7 @@ export class FalconController extends PlaneController {
   update(dt, ctrl) {
     const lever = Number.isFinite(ctrl.throttle) ? MathUtils.clamp(ctrl.throttle, 0, 1) : this.cruiseT;
     this.throttle += (lever - this.throttle) * blend(2, dt);
-    const authority = 1 / Math.sqrt(1 + this.speed / 250);
+    const authority = MathUtils.lerp(1, 1 / Math.sqrt(1 + this.speed / 250), HIGH_SPEED_CONTROL_PENALTY);
     // Pitch persists after releasing the key: a rocket steers by changing its attitude.
     this.pitch = MathUtils.clamp(this.pitch + ctrl.pitch * .38 * authority * dt, -1.35, 1.35);
     this.yawRate += (ctrl.roll * .65 * authority - this.yawRate) * blend(3, dt);

@@ -268,7 +268,7 @@ kbd {
 
 #map-note[hidden] { display: none; }
 
-#dragon-release {
+#dragon-release, #missile-fire {
   position: fixed;
   right: 24px;
   top: 94px;
@@ -281,8 +281,8 @@ kbd {
   pointer-events: auto;
   cursor: pointer;
 }
-#dragon-release[hidden] { display: none; }
-#dragon-release:disabled { opacity: .65; cursor: default; }
+#dragon-release[hidden], #missile-fire[hidden] { display: none; }
+#dragon-release:disabled, #missile-fire:disabled { opacity: .65; cursor: default; }
 
 .mm-hint {
   position: absolute;
