@@ -5,6 +5,7 @@ import {
   SphereGeometry, Sprite, SpriteMaterial, TorusGeometry, Vector3,
 } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { attachFighterArmament } from "./fighterArmament.js";
 
 // All dimensions use the original jet.glb coordinates (nose +Z, port +X).
 // Keep these details on the model so menu, player and multiplayer share them.
@@ -206,6 +207,7 @@ export function prepareFighterDetails(model, bodyMeshes, resources) {
   model.userData.fighterLights = { time: 0, strobes, beacon };
   updateFighterLights(model.userData.fighterLights, 0);
   resources.push(...owned);
+  attachFighterArmament(model, resources);
 }
 
 export function updateFighterLights(lights, dt) {

@@ -176,7 +176,7 @@ export function createVehicleGroundShadows(renderer, { mobile = false } = {}) {
         let node = source;
         let shown = true;
         while (node && node !== root) { shown &&= node.visible; node = node.parent; }
-        proxy.visible = shown;
+        proxy.visible = shown && node === root;
         proxy.matrix.copy(source.matrixWorld);
       }
     }

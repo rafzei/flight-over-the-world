@@ -35,25 +35,64 @@ Fly over photorealistic Earth – guess the region, find your way home, or just 
 - **Fly home** – start ~30 km from the address you enter, 10 minutes to get back.
 - **Free flight** – pick a city and fly.
 
+## Vehicles
+
+Seven vehicles are available in single player and multiplayer:
+
+| Vehicle | Cruise / max speed | Flight characteristics and features |
+| --- | --- | --- |
+| **Piper PA-28** | ~170 / 470 km/h | Light propeller aircraft with animated propeller. |
+| **Dash 8 Q400** | ~270 / 670 km/h | Regional turboprop with two animated propellers. |
+| **Cessna Citation** | ~330 / 900 km/h | Business jet. |
+| **Fighter** | ~540 / 1510 km/h | Combat jet with moving control surfaces, navigation lights, visual armament and wingtip contrails above 1000 km/h. |
+| **Rocket** | ~790 / 5000 km/h | Forward-flying rocket with trails from four fins; engine fire appears above 5000 km/h. |
+| **Combat Drone** | 120 / 320 km/h | Armed quadrotor replacing Rocket 1, with four spinning rotors, two gun pods, a camera and red lights. Independent lift, automatic braking and hover at zero throttle. |
+| **SpaceX Falcon 9** | Thrust-controlled / 8000 km/h | Upright rocket with nine engine nozzles, steering, gravity and inertia. Press `Enter` to release the Dragon capsule; its red-and-white parachute opens after separation. |
+
+Speeds are game settings, not real-world specifications. Aircraft and the original Rocket can exceed their nominal maximum in a dive. Falcon 9 starts upright with zero speed and accelerates under engine thrust.
+
+The drone uses `A` / `D` to turn, including while hovering, and `W` / `S` to descend / climb independently of forward speed. Its throttle controls horizontal speed. Falcon 9 uses `W` / `S` to tilt and `A` / `D` to turn; throttle controls thrust, so cutting it lets gravity pull the rocket down. The released Dragon descends separately while you continue controlling Falcon 9. The on-screen **Release Dragon** button also works on touch devices.
+
+## Flight features
+
+- Speed-sensitive controls for smoother steering at high speed.
+- Vehicle shadows on nearby terrain and buildings, softening and fading out by 180 m above the surface.
+- Four camera views: chase, 3× farther, 5× farther and nose view; Falcon 9's nose camera points up its body axis.
+- Full-screen map in free flight with mouse-wheel, `+` / `−` and pinch zoom. Zoom is remembered when reopening the map.
+- Mouse-wheel throttle control anywhere in flight, plus a draggable throttle and touch flight stick.
+- Contrails that follow the flight path, spread, drift and fade over time.
+- Multiplayer vehicle selection, player list and push-to-talk voice chat.
+
 ## Controls
 
-| Key | Action |
+| Input | Action |
 | --- | --- |
-| `W` `A` `S` `D` | Fly |
+| `W` `A` `S` `D` / arrow keys | Fly; drone and Falcon 9 controls are described above |
+| Mouse wheel / drag throttle | Change throttle without selecting the slider first |
 | `Shift` | Boost |
 | `Ctrl` | Brake |
 | `,` | Set minimum throttle |
 | `.` | Set maximum throttle |
 | `C` | Cycle camera: chase → 3× farther → 5× farther → nose view |
+| `M` | Open / close the map in free flight |
+| Mouse wheel / `+` / `−` / pinch over the map | Zoom the map |
+| `Enter` | Release Dragon from Falcon 9 once per flight |
+| `Tab` | Show multiplayer player list (hold) |
 | `T` | Talk (hold) |
-| `Esc` | Pause |
+| `Esc` | Close map, pause single player, or open the multiplayer leave menu |
+| `R` | Restart after a crash or finished flight |
+
+## Contrail settings
 
 Contrails appear above 1000 km/h. In `src/game/contrails.js`,
 `CONTRAIL_DEFAULTS.lifetimeSeconds` controls their total lifetime (15 seconds),
 and `fadeSeconds` controls the final fade (5 seconds). Both can also be passed
 as options to `attachContrails(root, scene, { lifetimeSeconds: 15, fadeSeconds: 5 })`.
-Both rocket variants emit from four fins (`wingAxes: ["x", "y"]`); aircraft
-emit from the left and right wing tips by default.
+The original Rocket emits from four fins (`wingAxes: ["x", "y"]`); aircraft
+emit from the left and right wing tips by default. Falcon 9 uses its engine plume.
+`spreadMetersPerSecond` (0.35) controls how quickly the vapor widens, while
+`driftMetersPerSecond` (0.12) controls its gentle turbulent drift. The cloud
+pattern stays attached to the emitted trail as it spreads and loses density.
 
 ## Run it locally
 

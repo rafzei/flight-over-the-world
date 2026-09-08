@@ -12,6 +12,7 @@ import {
 } from "three";
 import { prepareFighterDetails, updateFighterLights } from "./fighterDetails.js";
 import { disposeCombatDrone } from "./combatDrone.js";
+import { disposeFalcon9 } from "./falcon9.js";
 
 export function finishVehicleMaterials(model) {
   const finished = new Set();
@@ -164,6 +165,7 @@ export function updateFighterSurfaces(root, dt, roll, pitch) {
 }
 
 export function disposeVehicleVisuals(root) {
+  disposeFalcon9(root);
   disposeCombatDrone(root);
   root?.traverse((node) => {
     for (const resource of node.userData.fighterResources ?? []) resource.dispose();

@@ -63,7 +63,7 @@ export function createCarousel(canvas, items, opts = {}) {
   }
 
   function frame(wingspan) {
-    camera.position.set(0, wingspan * 0.42, wingspan * 1.75);
+    camera.position.set(0, wingspan * (current?.vertical ? .2 : .42), wingspan * (current?.vertical ? 2.25 : 1.75));
     camera.lookAt(0, 0, 0);
   }
 
@@ -72,7 +72,7 @@ export function createCarousel(canvas, items, opts = {}) {
     const entry = models.get(keyName);
     if (!entry) return;
     if (current) scene.remove(current.group);
-    current = { group: entry.group, wingspan: entry.wingspan, slideX: dir * entry.wingspan * 1.4 };
+    current = { group: entry.group, wingspan: entry.wingspan, vertical: entry.vertical, slideX: dir * entry.wingspan * 1.4 };
     currentKey = keyName;
     scene.add(entry.group);
     frame(entry.wingspan);
@@ -94,7 +94,7 @@ export function createCarousel(canvas, items, opts = {}) {
       const group = new Group();
       group.add(model);
       applyRotorState(group, false);
-      models.set(item.key, { group, wingspan: item.wingspan });
+      models.set(item.key, { group, wingspan: item.wingspan, vertical: item.vertical });
       if (item.key === wantedKey && currentKey !== wantedKey) show(item.key);
     }).catch((err) => {
       console.error(`Could not load vehicle preview ${item.key}`, err);

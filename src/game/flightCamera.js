@@ -20,25 +20,29 @@ export class FlightCamera {
     this.mode = (this.mode + 1) % FLIGHT_CAMERAS.length;
   }
 
-  setModel(model) {
+  setModel(model, { vertical = false } = {}) {
+    this.vertical = vertical;
     // Called after orienting, scaling and centering the model, before placing
     // it on Earth. Stay ahead of its nose, including propellers and antennas.
     const bounds = new Box3().setFromObject(model);
-    if (!bounds.isEmpty()) this.noseOffset.set(0, 0, bounds.min.z - 0.75);
+    if (!bounds.isEmpty()) {
+      if (vertical) this.noseOffset.set(0, bounds.max.y + .75, 0);
+      else this.noseOffset.set(0, 0, bounds.min.z - 0.75);
+    }
   }
 
   update(baseOffset, planePosition, planeQuaternion, levelQuaternion) {
     const { distance } = FLIGHT_CAMERAS[this.mode];
     if (distance === 0) {
       this.position.copy(this.noseOffset).applyQuaternion(planeQuaternion).add(planePosition);
-      this.target.set(0, 0, -100).applyQuaternion(planeQuaternion).add(this.position);
-      this.up.set(0, 1, 0).applyQuaternion(planeQuaternion);
+      this.target.set(0, this.vertical ? 100 : 0, this.vertical ? 0 : -100).applyQuaternion(planeQuaternion).add(this.position);
+      this.up.set(0, this.vertical ? 0 : 1, this.vertical ? -1 : 0).applyQuaternion(planeQuaternion);
       return;
     }
     this.position.fromArray(baseOffset).multiplyScalar(distance)
       .applyQuaternion(levelQuaternion).add(planePosition);
     // Scale the look-ahead too, preserving the current framing at every zoom.
-    this.target.set(0, 0.5, -baseOffset[2] * 1.6).multiplyScalar(distance)
+    this.target.set(0, this.vertical ? 2 : .5, this.vertical ? 0 : -baseOffset[2] * 1.6).multiplyScalar(distance)
       .applyQuaternion(levelQuaternion).add(planePosition);
     this.up.set(0, 1, 0).applyQuaternion(levelQuaternion);
   }

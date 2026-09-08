@@ -34,16 +34,20 @@ function glowTexture() {
 
 // Attach after the model is rotated, scaled and centered, before placing it on Earth.
 // Flight points toward -Z, so the engine plume extends along local +Z.
-export function attachRocketExhaust(root) {
+export function attachRocketExhaust(root, { axis = "z", ignitionKmh = IGNITION_KMH } = {}) {
   if (root.userData.rocketExhaust) return;
   const box = new Box3().setFromObject(root);
   const size = box.getSize(new Vector3());
   const center = box.getCenter(new Vector3());
-  const bodyLength = size.z;
-  const nozzleRadius = Math.min(size.x, size.y) * 0.12;
+  const bodyLength = size[axis];
+  const nozzleRadius = Math.min(size.x, axis === "y" ? size.z : size.y) * (axis === "y" ? .3 : .12);
   const group = new Group();
   group.name = "rocket-exhaust";
   group.position.set(center.x, center.y, box.max.z - bodyLength * 0.025);
+  if (axis === "y") {
+    group.position.set(center.x, box.min.y + .15, center.z);
+    group.rotation.x = Math.PI / 2;
+  }
   group.visible = false;
   root.add(group);
 
@@ -94,10 +98,10 @@ export function attachRocketExhaust(root) {
   let time = 0;
   root.userData.rocketExhaust = {
     update(dt, kmh, active) {
-      group.visible = active && Number.isFinite(kmh) && kmh > IGNITION_KMH;
+      group.visible = active && Number.isFinite(kmh) && kmh > ignitionKmh;
       if (!group.visible) return;
       time += dt;
-      const power = Math.min(1, (kmh - IGNITION_KMH) / 15000);
+      const power = Math.min(1, (kmh - ignitionKmh) / 15000);
       const flicker = 1 + Math.sin(time * 43) * 0.045 + Math.sin(time * 71) * 0.025;
       const length = bodyLength * (0.4 + power * 0.35) * flicker;
       for (const layer of layers) {
