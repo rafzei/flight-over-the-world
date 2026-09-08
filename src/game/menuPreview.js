@@ -10,7 +10,7 @@ import {
 } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { applyRotorState } from "./rotors.js";
-import { finishVehicleMaterials } from "./vehicleVisuals.js";
+import { finishVehicleMaterials, disposeVehicleVisuals } from "./vehicleVisuals.js";
 
 // karuzela pojazdów w menu — jeden duży podgląd, strzałki przełączają model
 export function createCarousel(canvas, items, opts = {}) {
@@ -113,6 +113,7 @@ export function createCarousel(canvas, items, opts = {}) {
 
   function dispose() {
     active = false;
+    for (const entry of models.values()) disposeVehicleVisuals(entry.group);
     try {
       renderer.dispose();
       const gl = renderer.getContext();

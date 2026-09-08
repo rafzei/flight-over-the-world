@@ -48,7 +48,7 @@ import {
   disposeRocketExhaust,
 } from "./game/rocketExhaust.js";
 import { attachContrails, updateContrails, disposeContrails } from "./game/contrails.js";
-import { finishVehicleMaterials, prepareFighterSurfaces, updateFighterSurfaces } from "./game/vehicleVisuals.js";
+import { finishVehicleMaterials, prepareFighterSurfaces, updateFighterSurfaces, disposeVehicleVisuals } from "./game/vehicleVisuals.js";
 import { createCarousel } from "./game/menuPreview.js";
 import { createSky, SUN_DIR } from "./game/sky.js";
 import {
@@ -2721,6 +2721,7 @@ function loadPlane(key) {
   if (planeMesh) {
     disposeRocketExhaust(planeMesh);
     disposeContrails(planeMesh);
+    disposeVehicleVisuals(planeMesh);
     scene.remove(planeMesh);
   }
   planeMesh = createPlaneMesh(); // fallback na czas ładowania
@@ -2754,6 +2755,7 @@ function disposeMate(id) {
   const mate = mp.mates.get(id);
   disposeRocketExhaust(mate?.mesh);
   disposeContrails(mate?.mesh);
+  disposeVehicleVisuals(mate?.mesh);
   if (mate?.mesh && scene) scene.remove(mate.mesh);
   if (mate?.marker && scene) scene.remove(mate.marker);
   mp.mates.delete(id);

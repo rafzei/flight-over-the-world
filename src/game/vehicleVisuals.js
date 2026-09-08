@@ -10,6 +10,7 @@ import {
   Mesh,
   Vector3,
 } from "three";
+import { prepareFighterDetails, updateFighterLights } from "./fighterDetails.js";
 
 export function finishVehicleMaterials(model) {
   const finished = new Set();
@@ -19,7 +20,7 @@ export function finishVehicleMaterials(model) {
     mesh.receiveShadow = true;
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     for (const material of materials) {
-      if (!material?.isMeshStandardMaterial || finished.has(material)) continue;
+      if (!material?.isMeshStandardMaterial || material.userData.vehicleFinish || finished.has(material)) continue;
       finished.add(material);
       const name = (material.name || "").toLowerCase();
       const glass = /glass|window|transparent/.test(name) || name === "80deea";
@@ -106,6 +107,7 @@ function extractPanel(mesh, side) {
 export function prepareFighterSurfaces(model) {
   if (model.userData.fighterSurfaces) return;
   const surfaces = [];
+  const resources = [];
   const bodyMeshes = [];
   model.traverse((mesh) => {
     if (mesh.isMesh && mesh.material?.name === "455A64") bodyMeshes.push(mesh);
@@ -129,25 +131,44 @@ export function prepareFighterSurfaces(model) {
       }));
       hinge.add(edges);
       mesh.add(hinge);
+      resources.push(geometry, material, edges.geometry, edges.material);
       surfaces.push({ hinge, side, axis: new Vector3(1, 0, -0.48 * side).normalize(), angle: 0 });
     }
+    resources.push(mesh.geometry);
   }
   model.userData.fighterSurfaces = surfaces;
+  prepareFighterDetails(model, bodyMeshes, resources);
+  model.userData.fighterResources = resources;
 }
 
 export function updateFighterSurfaces(root, dt, roll, pitch) {
   if (!root) return;
   if (!root.userData.flightSurfaces) {
     const surfaces = [];
+    const lights = [];
     root.traverse((node) => {
       if (node.userData.fighterSurfaces) surfaces.push(...node.userData.fighterSurfaces);
+      if (node.userData.fighterLights) lights.push(node.userData.fighterLights);
     });
     root.userData.flightSurfaces = surfaces;
+    root.userData.flightLights = lights;
   }
+  for (const lights of root.userData.flightLights ?? []) updateFighterLights(lights, dt);
   const blend = 1 - Math.exp(-12 * dt);
   for (const surface of root.userData.flightSurfaces) {
     const target = MathUtils.clamp(pitch * 0.48 - surface.side * roll * 0.5, -0.7, 0.7);
     surface.angle += (target - surface.angle) * blend;
     surface.hinge.quaternion.setFromAxisAngle(surface.axis, surface.angle);
   }
+}
+
+export function disposeVehicleVisuals(root) {
+  root?.traverse((node) => {
+    for (const resource of node.userData.fighterResources ?? []) resource.dispose();
+    delete node.userData.fighterResources;
+    delete node.userData.fighterSurfaces;
+    delete node.userData.flightSurfaces;
+    delete node.userData.fighterLights;
+    delete node.userData.flightLights;
+  });
 }
