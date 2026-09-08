@@ -13,6 +13,7 @@ import {
 import { prepareFighterDetails, updateFighterLights } from "./fighterDetails.js";
 import { disposeCombatDrone } from "./combatDrone.js";
 import { disposeFalcon9 } from "./falcon9.js";
+import { markContrailEmitters } from "./contrails.js";
 
 export function finishVehicleMaterials(model) {
   const finished = new Set();
@@ -114,6 +115,7 @@ export function prepareFighterSurfaces(model) {
   model.traverse((mesh) => {
     if (mesh.isMesh && mesh.material?.name === "455A64") bodyMeshes.push(mesh);
   });
+  markContrailEmitters(model, bodyMeshes);
   for (const mesh of bodyMeshes) {
     for (const side of [-1, 1]) {
       const geometry = extractPanel(mesh, side);

@@ -46,12 +46,12 @@ Seven vehicles are available in single player and multiplayer:
 | **Cessna Citation** | ~330 / 900 km/h | Business jet. |
 | **Fighter** | ~540 / 1510 km/h | Combat jet with moving control surfaces, navigation lights, visual armament and wingtip contrails above 1000 km/h. |
 | **Rocket** | ~790 / 5000 km/h | Forward-flying rocket with trails from four fins; engine fire appears above 5000 km/h. |
-| **Combat Drone** | 120 / 320 km/h | Armed quadrotor replacing Rocket 1, with four spinning rotors, two gun pods, a camera and red lights. Independent lift, automatic braking and hover at zero throttle. |
+| **Combat Drone** | 120 / 320 km/h | Armed quadrotor replacing Rocket 1, with four spinning rotors, two gun pods, a camera and red lights. Independent lift and automatic braking; cutting throttle makes it descend under gravity. |
 | **SpaceX Falcon 9** | Thrust-controlled / 8000 km/h | Upright rocket with nine engine nozzles, steering, gravity and inertia. Press `Enter` to release the Dragon capsule; its red-and-white parachute opens after separation. |
 
 Speeds are game settings, not real-world specifications. Aircraft and the original Rocket can exceed their nominal maximum in a dive. Falcon 9 starts upright with zero speed and accelerates under engine thrust.
 
-The drone uses `A` / `D` to turn, including while hovering, and `W` / `S` to descend / climb independently of forward speed. Its throttle controls horizontal speed. Falcon 9 uses `W` / `S` to tilt and `A` / `D` to turn; throttle controls thrust, so cutting it lets gravity pull the rocket down. The released Dragon descends separately while you continue controlling Falcon 9. The on-screen **Release Dragon** button also works on touch devices.
+The drone uses `A` / `D` to turn, even at zero forward speed, and `W` / `S` to descend / climb while powered. Its throttle controls horizontal speed and rotor lift: at zero throttle it brakes and falls towards the ground; adding power restores altitude control. Falcon 9 uses `W` / `S` to tilt and `A` / `D` to turn; throttle controls thrust, so cutting it lets gravity pull the rocket down. The released Dragon descends separately while you continue controlling Falcon 9. The on-screen **Release Dragon** button also works on touch devices.
 
 ## Flight features
 
@@ -73,7 +73,7 @@ The drone uses `A` / `D` to turn, including while hovering, and `W` / `S` to des
 | `Ctrl` | Brake |
 | `,` | Set minimum throttle |
 | `.` | Set maximum throttle |
-| `C` | Cycle camera: chase → 3× farther → 5× farther → nose view |
+| `C` | Cycle camera: chase → 3× farther → 5× farther → nose view → fixed tracking → front |
 | `M` | Open / close the map in free flight |
 | Mouse wheel / `+` / `−` / pinch over the map | Zoom the map |
 | `Enter` | Release Dragon from Falcon 9 once per flight |
@@ -81,6 +81,10 @@ The drone uses `A` / `D` to turn, including while hovering, and `W` / `S` to des
 | `T` | Talk (hold) |
 | `Esc` | Close map, pause single player, or open the multiplayer leave menu |
 | `R` | Restart after a crash or finished flight |
+
+Fixed tracking keeps the camera at its current location and turns it toward
+the flying vehicle. The next `C` switches to an external front view that follows
+the vehicle and looks back at it. Press `C` once more to return to normal chase.
 
 ## Contrail settings
 

@@ -10,8 +10,8 @@ function integrate(controller, dt, north, east, vertical) {
   controller.height += vertical * dt;
 }
 
-// Assisted quadrotor: horizontal velocity and altitude are independent. The
-// motors hold height at idle, brake drift and turn even when forward speed is zero.
+// Assisted quadrotor: powered rotors control lift independently of forward
+// speed. Cutting throttle removes lift, so the drone sinks under gravity.
 export class DroneController extends PlaneController {
   constructor(...args) {
     super(...args);
@@ -35,8 +35,12 @@ export class DroneController extends PlaneController {
     this.northSpeed += dN * response;
     this.eastSpeed += dE * response;
     if (lever === 0 && Math.hypot(this.northSpeed, this.eastSpeed) < .02) this.northSpeed = this.eastSpeed = 0;
-    this.verticalSpeed += (ctrl.pitch * 16 - this.verticalSpeed) * blend(4, dt);
-    if (ctrl.pitch === 0 && Math.abs(this.verticalSpeed) < .01) this.verticalSpeed = 0;
+    const lift = MathUtils.smoothstep(this.throttle, 0, .12);
+    const verticalTarget = ctrl.pitch * 16 * lift - (1 - lift) * 28;
+    // With the motors off, gravity accelerates the descent towards a terminal
+    // speed; restoring throttle smoothly restores altitude control.
+    this.verticalSpeed += (verticalTarget - this.verticalSpeed) * blend(.35 + 3.65 * lift, dt);
+    if (Math.abs(verticalTarget) < .001 && Math.abs(this.verticalSpeed) < .01) this.verticalSpeed = 0;
     this.speed = Math.hypot(this.northSpeed, this.eastSpeed);
     this.roll += (-ctrl.roll * .32 - this.roll) * blend(7, dt);
     this.pitch += (-this.speed / this.boost * .22 + ctrl.pitch * .12 - this.pitch) * blend(5, dt);

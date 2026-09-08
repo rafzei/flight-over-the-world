@@ -245,7 +245,7 @@ const PLANES = {
     brake: 0,
     cam: [0, 4, 12],
     name: "Combat Drone",
-    desc: "Armed quadrotor – hover, cruise 120, max 320 km/h",
+    desc: "Armed quadrotor – descends at idle, cruise 120, max 320 km/h",
     sound: "drone",
     flightModel: "drone",
   },
@@ -3844,7 +3844,7 @@ window.addEventListener("keydown", (e) => {
     }
     if (k === "c") {
       e.preventDefault();
-      flightCamera.cycle();
+      flightCamera.cycle(camera);
       return;
     }
     if (k === "enter" && selectedPlane === "falcon9" && !crashed && !finished && !freeMap.open) {
@@ -4347,7 +4347,7 @@ function tickFrame() {
   // trzęsienie kamery po wybuchu
   if (shake > 0) {
     shake = Math.max(0, shake - dt * 1.3);
-    const s = shake * shake * 7;
+    const s = flightCamera.fixed ? 0 : shake * shake * 7;
     camera.position.x += (Math.random() - 0.5) * s;
     camera.position.y += (Math.random() - 0.5) * s;
     camera.position.z += (Math.random() - 0.5) * s;
@@ -4358,11 +4358,13 @@ function tickFrame() {
   // kopuła nieba i słońce w LOKALNEJ ramce północnej (bez kursu) —
   // globalna oś Y jest przechylona ~38° względem horyzontu na szer. 52°N,
   // co dawało ukośną granicę nieba i błękitną poświatę
-  frameAt(plane.lat, plane.lon, plane.height, 0, 0, 0).decompose(
-    skyFramePos,
-    skyQuat,
-    skyFrameScale
-  );
+  if (!flightCamera.fixed) {
+    frameAt(plane.lat, plane.lon, plane.height, 0, 0, 0).decompose(
+      skyFramePos,
+      skyQuat,
+      skyFrameScale
+    );
+  }
   sky.mesh.position.copy(camPos);
   sky.mesh.quaternion.copy(skyQuat);
   sky.uniforms.uTime.value = clock.elapsedTime;

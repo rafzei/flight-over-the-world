@@ -25,13 +25,13 @@ export const CONTRAIL_DEFAULTS = {
   driftMetersPerSecond: 0.12,
 };
 
-function wingTips(root, wingAxes) {
+function wingTips(root, wingAxes, sources) {
   root.updateWorldMatrix(true, true);
   const inverse = root.matrixWorld.clone().invert();
   const point = new Vector3();
   const box = new Box3();
   const meshes = [];
-  root.traverse((mesh) => {
+  const readMesh = (mesh) => {
     const positions = mesh.isMesh && mesh.geometry?.attributes.position;
     if (!positions) return;
     const transform = new Matrix4().multiplyMatrices(inverse, mesh.matrixWorld);
@@ -40,7 +40,9 @@ function wingTips(root, wingAxes) {
       point.fromBufferAttribute(positions, i).applyMatrix4(transform);
       box.expandByPoint(point);
     }
-  });
+  };
+  if (sources) sources.forEach(readMesh);
+  else root.traverse(readMesh);
   // Use the same mesh vertices and aircraft-local frame for bounds and tips.
   // Sprite halos extend beyond the wings but cannot emit a contrail.
   const wings = wingAxes.flatMap((axis) => {
@@ -64,6 +66,31 @@ function wingTips(root, wingAxes) {
   return tips;
 }
 
+// Record attachment points on the airframe before adding weapons, lights or
+// moving panels. These markers inherit all later model rotations and scaling.
+export function markContrailEmitters(model, airframeMeshes) {
+  if (model.children.some(node => node.userData.contrailEmitter)) return;
+  const tips = wingTips(model, ["x"], airframeMeshes);
+  if (tips.some(tip => !tip.toArray().every(Number.isFinite))) return;
+  for (const [index, tip] of tips.entries()) {
+    const emitter = new Group();
+    emitter.name = `wing-contrail-emitter-${index}`;
+    emitter.userData.contrailEmitter = true;
+    emitter.position.copy(tip);
+    model.add(emitter);
+  }
+}
+
+function emissionPoints(root, wingAxes) {
+  root.updateWorldMatrix(true, true);
+  const inverse = root.matrixWorld.clone().invert();
+  const tips = [];
+  root.traverse(node => {
+    if (node.userData.contrailEmitter) tips.push(node.getWorldPosition(new Vector3()).applyMatrix4(inverse));
+  });
+  return tips.length ? tips : wingTips(root, wingAxes);
+}
+
 function trailTexture() {
   const size = 64;
   const data = new Uint8Array(size * size * 4);
@@ -75,9 +102,12 @@ function trailTexture() {
     const cloud = Math.exp(-2 * ((across - center) / softness) ** 2);
     const wisps = 0.55 + Math.sin(along * 3 + across * 7) * 0.25 + Math.cos(along * 5 - across * 11) * 0.2;
     const edge = Math.max(0, 1 - Math.abs(across) ** 4);
+    // A continuous white core stays readable in the chase camera. The cloud
+    // texture still breaks up the edges as the trail spreads and loses density.
+    const core = Math.exp(-3.2 * across * across);
     const i = (y * size + x) * 4;
     data[i] = data[i + 1] = data[i + 2] = 255;
-    data[i + 3] = Math.round(cloud * wisps * edge * 255);
+    data[i + 3] = Math.round(Math.min(1, (core * .85 + cloud * wisps * .3) * edge) * 255);
   }
   const texture = new DataTexture(data, size, size);
   texture.wrapT = RepeatWrapping;
@@ -103,7 +133,7 @@ export function attachContrails(root, scene, options = {}) {
   // Retain a full lifetime even at the highest sampling rate, plus the live tip.
   const capacity = Math.ceil(lifetimeSeconds / SAMPLE_INTERVAL) + 2;
   // Aircraft use left/right wings; rockets also have lower/upper fins.
-  const tips = wingTips(root, options.wingAxes ?? ["x"]);
+  const tips = emissionPoints(root, options.wingAxes ?? ["x"]);
   if (tips.some((tip) => !Number.isFinite(tip.z))) return;
   const group = new Group();
   group.name = "wing-contrails";
@@ -115,7 +145,7 @@ export function attachContrails(root, scene, options = {}) {
     map: texture,
     vertexColors: true,
     transparent: true,
-    opacity: 0.7,
+    opacity: 0.85,
     depthWrite: false,
     side: DoubleSide,
     toneMapped: false,
@@ -231,7 +261,7 @@ export function attachContrails(root, scene, options = {}) {
           view.subVectors(cameraPos, dispersedPoint);
           side.crossVectors(tangent, view);
           if (side.lengthSq() < 1e-10) side.setFromMatrixColumn(camera.matrixWorld, 0);
-          const width = 0.14 + ageSeconds * spreadRate;
+          const width = 0.22 + ageSeconds * spreadRate;
           const irregularity = 1 + Math.sin(phase * 1.7 + ageSeconds * 0.45) * diffusion * 0.12;
           side.normalize().multiplyScalar(width * irregularity * 0.5);
           const fade = fadeSeconds > 0
