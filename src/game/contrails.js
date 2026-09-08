@@ -21,22 +21,31 @@ const CAPACITY = 128;
 function wingTips(root) {
   root.updateWorldMatrix(true, true);
   const inverse = root.matrixWorld.clone().invert();
-  const transform = new Matrix4();
   const point = new Vector3();
-  const box = new Box3().setFromObject(root);
-  const margin = (box.max.x - box.min.x) * 0.02;
-  const tips = [new Vector3(0, 0, -Infinity), new Vector3(0, 0, -Infinity)];
+  const box = new Box3();
+  const meshes = [];
   root.traverse((mesh) => {
     const positions = mesh.isMesh && mesh.geometry?.attributes.position;
     if (!positions) return;
-    transform.multiplyMatrices(inverse, mesh.matrixWorld);
+    const transform = new Matrix4().multiplyMatrices(inverse, mesh.matrixWorld);
+    meshes.push({ positions, transform });
+    for (let i = 0; i < positions.count; i++) {
+      point.fromBufferAttribute(positions, i).applyMatrix4(transform);
+      box.expandByPoint(point);
+    }
+  });
+  // Use the same mesh vertices and aircraft-local frame for bounds and tips.
+  // Sprite halos extend beyond the wings but cannot emit a contrail.
+  const margin = (box.max.x - box.min.x) * 0.02;
+  const tips = [new Vector3(0, 0, -Infinity), new Vector3(0, 0, -Infinity)];
+  for (const { positions, transform } of meshes) {
     for (let i = 0; i < positions.count; i++) {
       point.fromBufferAttribute(positions, i).applyMatrix4(transform);
       // Trailing edge of each outer wing, after model normalization.
       if (point.x <= box.min.x + margin && point.z > tips[0].z) tips[0].copy(point);
       if (point.x >= box.max.x - margin && point.z > tips[1].z) tips[1].copy(point);
     }
-  });
+  }
   return tips;
 }
 

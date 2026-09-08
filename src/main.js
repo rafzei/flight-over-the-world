@@ -218,7 +218,6 @@ const PLANES = {
     name: "Fighter",
     desc: "Combat jet – cruise 540, max 1510 km/h",
     sound: "jet",
-    contrails: true,
     prepare: prepareJet,
   },
   rocket: {
@@ -2755,7 +2754,7 @@ function loadPlane(key) {
     wrapper.userData.key = key;
     applyRotorState(wrapper, true);
     if (spec.exhaust) attachRocketExhaust(wrapper);
-    if (spec.contrails) attachContrails(wrapper, scene);
+    attachContrails(wrapper, scene);
     vehicleGroundShadows?.addVehicle(wrapper);
     scene.remove(planeMesh);
     planeMesh = wrapper;
@@ -2833,7 +2832,7 @@ function loadMate(id, key) {
     wrapper.visible = cur.mesh.visible;
     applyRotorState(wrapper, true);
     if (spec.exhaust) attachRocketExhaust(wrapper);
-    if (spec.contrails) attachContrails(wrapper, scene);
+    attachContrails(wrapper, scene);
     vehicleGroundShadows?.addVehicle(wrapper);
     scene.remove(cur.mesh);
     scene.add(wrapper);
