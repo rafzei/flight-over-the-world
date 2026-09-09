@@ -45,9 +45,12 @@ export class TrafficSpheres {
       if (distance > range || hiddenByEarth(camera.position, this.point, this.inverse)) continue;
       const visual = aircraftVisual(sample.aircraft?.typeCode);
       const radius = markerRadius(distance, camera.fov, viewportHeight) * Math.sqrt(sample.freshness);
-      this.sphere.set(this.point, radius);
+      const spec = visual ? AIRLINERS[visual.model] : null;
+      const metersPerPixel = 2 * distance * Math.tan(camera.fov * Math.PI / 360) / Math.max(1, viewportHeight);
+      const modelScale = spec ? Math.min(12, Math.max(1, 18 * metersPerPixel / spec.span)) * Math.sqrt(sample.freshness) : 1;
+      this.sphere.set(this.point, spec ? Math.max(radius, Math.hypot(visual.length, spec.span, 14) * modelScale / 2) : radius);
       if (!this.frustum.intersectsSphere(this.sphere)) continue;
-      candidates.push({ sample, distance, radius, visual, position: this.point.clone() });
+      candidates.push({ sample, distance, radius, visual, modelScale, position: this.point.clone() });
     }
     candidates.sort((a, b) => a.distance - b.distance);
     this.visible = candidates.slice(0, this.limit);
@@ -60,8 +63,7 @@ export class TrafficSpheres {
       if (item.visual) {
         const sample = item.sample, spec = AIRLINERS[item.visual.model];
         // A bounded visual enlargement keeps the silhouette readable at map distances.
-        const metersPerPixel = 2 * item.distance * Math.tan(camera.fov * Math.PI / 360) / Math.max(1, viewportHeight);
-        const scale = Math.min(12, Math.max(1, 18 * metersPerPixel / spec.span)) * Math.sqrt(sample.freshness);
+        const scale = item.modelScale;
         const heading = (sample.trueTrackDeg ?? 0) * Math.PI / 180;
         const pitch = Math.atan2(sample.verticalRateMps ?? 0, Math.max(1, sample.velocityMps ?? 1));
         WGS84_ELLIPSOID.getObjectFrame(sample.latitudeDeg*Math.PI/180, sample.longitudeDeg*Math.PI/180, sample.altitudeM, heading, pitch, 0, this.matrix, CAMERA_FRAME);

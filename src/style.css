@@ -149,6 +149,18 @@ button, .mode-card, .scope-btn {
   z-index: 2;
 }
 
+#landing-panel { position: absolute; pointer-events: auto; top: 22px; right: 22px; width: 315px; padding: 12px; border: 1px solid #ffffff30; border-radius: 6px; background: #120e0add; font-size: 12px; }
+#landing-panel[hidden] { display: none; }
+#landing-panel strong { display: block; color: #ffd986; }
+#landing-panel pre { white-space: pre-wrap; font: 11px/1.5 monospace; }
+#landing-panel button { font: inherit; color: var(--paper); background: #ffffff12; border: 1px solid #ffffff35; border-radius: 4px; padding: 8px; cursor: pointer; }
+#landing-panel button:disabled { opacity: .55; cursor: default; }
+#wheel-brake { touch-action: none; user-select: none; }
+@media (max-width: 760px), (pointer: coarse) {
+  #landing-panel { top: 80px; left: 10px; right: auto; width: min(315px, calc(100vw - 30px)); padding: 8px; }
+  #hud:has(#landing-panel:not([hidden])) #traffic-panel { top: 255px; max-height: max(80px, calc(100dvh - 540px)); }
+}
+
 #traffic-panel {
   pointer-events: auto;
   position: absolute;
@@ -1110,6 +1122,8 @@ kbd {
   gap: 12px;
   margin-bottom: 20px;
 }
+#menu .modes { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 760px) { #menu .modes { grid-template-columns: repeat(2, 1fr); } }
 
 .mode-card {
   display: flex;

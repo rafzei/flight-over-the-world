@@ -8,6 +8,10 @@ Celem pierwszej wersji jest pokazanie rzeczywistych, poruszających się kontakt
 
 **Etap modeli:** dodano autorskie, uproszczone modele Boeing 737-800 oraz Airbus A320, dostępne w karuzeli pojazdów. Backend uzupełnia pozycje OpenSky metadanymi z adsbdb po `icao24`, sprawdzając zgodność zwróconego adresu Mode-S. Obsługiwane kody typu zastępują kule odpowiednim modelem; pozostałe kontakty zachowują kulę i znany typ w diagnostyce. Szczegóły wariantów, cache i limitów metadanych opisano w README. Poniższe sekcje planu opisują również pierwotny etap kul.
 
+Weryfikacja tego etapu: test w Chromium potwierdził wybór obu modeli w menu, ich ruch w pełnej grze nad Warszawą i identyfikację modeli w replay. Prawdziwy odczyt adsbdb zwrócił `48c124 → B738 → SP-RKE` i `3c66a1 → A320 → D-AIUA`; oba typy zostały przypisane do właściwej geometrii. Powtarzalny ograniczony test: `node scripts/test-aircraft-metadata.mjs`. Dodatkowo sprawdzono przejście do gwiazd, Słońca i Księżyca powyżej 20 km oraz powrót widoku dziennego po zejściu; pełne przejście zajmuje zakres 20–22 km.
+
+Po restarcie backendu test z prawdziwym OpenSky nad Warszawą zwrócił 7 świeżych kontaktów, w tym `46b8a9 → A320 → SX-NEI`, oraz poprawnie odróżnił `AS50`, `E75S` i `E195`. Trzy stare pozycje odrzucono. Pełny zestaw liczy obecnie 44 przechodzące testy; kompilacja produkcyjna także przechodzi.
+
 ### Weryfikacja implementacji
 
 - 40 testów automatycznych przechodzi: autoryzacja i odnowienie tokenu na sterowanym zegarze, pojedyncza powtórka 401, 429, zachowanie budżetu po restarcie, wspólny cache, HTTP/CORS, parser, bieguny i południk 180°, transformacja globu, widoczność, ruch, timery i regresja istniejących kolizji/broni.

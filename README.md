@@ -34,6 +34,7 @@ Fly over photorealistic Earth – guess the region, find your way home, or just 
 - **Guess the region** – one minute of flight, then mark on the map where you are (Poland / Europe / World).
 - **Fly home** – start ~30 km from the address you enter, 10 minutes to get back.
 - **Free flight** – pick a city and fly.
+- **Land in Warsaw** – start 6 km before Warsaw Chopin runway 33, aligned with a 3° approach and landing gear down. Available for Piper, Q400, Citation, Boeing 737, Airbus A320 and Fighter.
 
 ## Vehicles
 
@@ -76,6 +77,8 @@ The drone uses `A` / `D` to turn, even at zero forward speed, and `W` / `S` to d
 | Mouse wheel / drag throttle | Change throttle without selecting the slider first |
 | `Shift` | Boost |
 | `Ctrl` | Brake |
+| `G` | Extend / retract landing gear (Piper has fixed gear) |
+| `B` (hold) | Wheel brakes during landing rollout |
 | `,` | Set minimum throttle |
 | `.` | Set maximum throttle |
 | `C` | Cycle camera: chase → 3× farther → 5× farther → nose view → fixed tracking → front |
@@ -90,6 +93,16 @@ The drone uses `A` / `D` to turn, even at zero forward speed, and `W` / `S` to d
 Fixed tracking keeps the camera at its current location and turns it toward
 the flying vehicle. The next `C` switches to an external front view that follows
 the vehicle and looks back at it. Press `C` once more to return to normal chase.
+
+## Landing in Warsaw
+
+Choose **Single player → Land in Warsaw → Start**. Follow the runway centreline and the landing panel's target speed, descent rate and glide-path error. The marked threshold is displaced from the physical start of the pavement: touch down beyond the threshold stripes, near the paired aiming-point blocks.
+
+Keep the wings level, reduce throttle near the runway and gently pull back with `S` to flare. The main wheels must touch first, with a small nose-up attitude and a low descent rate. After touchdown, let the nose settle, press `,` for idle and hold `B` to stop. `A` / `D` steer on the ground; sharp turns at speed can cause a runway excursion. For another takeoff, release the brakes, press `.` for full power and pull back after accelerating above approach speed. Gear and wheel-brake buttons also support touch input.
+
+The aircraft rests on its wheels, with animated retractable gear, wheel rotation and suspension compression. Excessive sink can cause a bounce or gear failure; a belly landing, nose-first impact, wing strike or departure from the pavement ends the flight. `R` restarts the approach after a crash. Landing gear cannot retract while on the ground.
+
+This is a simplified game flight model with descent inertia, flare, rollout drag and wheel braking. It is not a training simulator. The runway uses the published EPWA 15/33 location, 332° true heading, 3690 × 60 m dimensions and 661.4 m displaced threshold from [OurAirports runway data](https://ourairports.com/data/) ([source CSV](https://davidmegginson.github.io/ourairports-data/runways.csv)). Its elevation is calibrated against loaded map terrain before the practice approach; the visible surface and wheel collision share the same plane. Elsewhere, terrain impacts retain the existing crash behavior. Landing tests and browser checks can run with **Live traffic** off, without OpenSky credits.
 
 ## Contrail settings
 

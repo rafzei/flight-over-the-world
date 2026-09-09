@@ -60,6 +60,9 @@ import { createVehicleCollisionDetector, raycastTerrain } from "./game/vehicleCo
 import { createCarousel } from "./game/menuPreview.js";
 import { createSky, SUN_DIR } from "./game/sky.js";
 import { createAirliner } from "./game/airliner.js";
+import { WarsawRunway, createRunwayVisual } from "./game/warsawRunway.js";
+import { attachLandingGear, LANDING_SPEEDS } from "./game/landingGear.js";
+import { LandingSystem, flightPose } from "./game/landingDynamics.js";
 import {
   drawAirspeed,
   drawAltimeter,
@@ -292,6 +295,9 @@ const HOME_BEACON_M = 1000;
 
 let camera, scene, renderer, tiles, sun, sky;
 let liveTraffic;
+const warsawRunway = new WarsawRunway();
+const landingSystem = new LandingSystem(warsawRunway);
+let runwayVisual, landingBrake = false;
 let vehicleGroundShadows;
 let fighterMissiles;
 let droneCannons;
@@ -956,11 +962,13 @@ lobbyCarousel.setActive(false);
 
 // wybór trybu — same przyciski, instrukcja pokazuje się dopiero pod spodem
 const MODE_PLACEHOLDERS = {
+  landing: "Warsaw Chopin · runway 33",
   free: "Starting city… e.g. Paris",
   home: "Your address… e.g. 5th Avenue, New York",
   guess: "",
 };
 const MODE_DESCS = {
+  landing: "Approach Warsaw Chopin runway 33. G: landing gear. Reduce throttle, flare gently with S, then hold B to brake. Touch down on the main wheels.",
   free: "Pick a starting city and fly with no time limit.",
   home: "We drop you ~30 km from home. You have 10 minutes to find your way back.",
   guess:
@@ -974,7 +982,7 @@ function selectMode(m) {
     .forEach((b) => b.classList.toggle("selected", b.dataset.mode === m));
   el.modeDesc.textContent = MODE_DESCS[m];
   el.city.placeholder = MODE_PLACEHOLDERS[m];
-  el.city.style.display = m === "guess" ? "none" : "";
+  el.city.style.display = m === "guess" || m === "landing" ? "none" : "";
   el.guessScope.style.display = m === "guess" ? "" : "none";
   el.menuError.textContent = "";
   if (m === "guess") GUESS_SCOPES[guessScope]?.load().catch(() => {});
@@ -2681,6 +2689,7 @@ async function init() {
     tiles.group.rotation.x = -Math.PI / 2;
     tiles.group.visible = false;
     scene.add(tiles.group);
+    runwayVisual = createRunwayVisual(scene, warsawRunway, tiles.group);
     liveTraffic = createLiveTraffic({ scene, camera, mapRoot: tiles.group, mobile: isMobile, baseUrl: import.meta.env.VITE_TRAFFIC_API_BASE || "" });
     tiles.setResolutionFromRenderer(camera, renderer);
     tiles.setCamera(camera);
@@ -2785,6 +2794,7 @@ function loadPlane(key) {
   const spec = PLANES[key];
   camOffset = spec.cam;
   if (planeMesh) {
+    planeMesh.userData.landingGear?.dispose();
     droneCannons?.removeVehicle(planeMesh);
     fighterMissiles?.removeVehicle(planeMesh);
     vehicleGroundShadows?.removeVehicle(planeMesh);
@@ -2815,6 +2825,8 @@ function loadPlane(key) {
     flightCamera.setModel(model, { vertical: spec.vertical });
     const wrapper = new Group();
     wrapper.add(model);
+    const gear = attachLandingGear(wrapper, model, key);
+    if (gear && !gear.fixed && mode !== "landing") gear.extension = gear.target = 0;
     wrapper.userData.prop = null;
     wrapper.userData.key = key;
     applyRotorState(wrapper, true);
@@ -2918,6 +2930,10 @@ function loadMate(id, key) {
 }
 
 function resetFlight(latDeg, lonDeg) {
+  landingSystem.reset();
+  planeMesh?.userData.landingGear?.reset();
+  if (planeMesh?.userData.landingGear && !planeMesh.userData.landingGear.fixed && mode !== "landing") planeMesh.userData.landingGear.extension = planeMesh.userData.landingGear.target = 0;
+  landingBrake = false;
   liveTraffic?.reset();
   const spec = PLANES[selectedPlane];
   droneCannons?.reset();
@@ -3117,10 +3133,22 @@ function updateFlightPhysics(dt) {
   let left = dt;
   while (left > 0) {
     const step = Math.min(1 / 60, left);
+    if (canCrash && landingSystem?.gear && landingSystem.grounded) {
+      const result = landingSystem.roll(plane, step, ctrl);
+      left -= step;
+      if (result.crash) { flightPosition(planePos); crash(planePos); return; }
+      continue;
+    }
+    const before = landingSystem?.gear ? flightPose(plane) : null;
     if (canCrash) flightPosition(_flightFrom);
     plane.update(step, ctrl);
     left -= step;
     if (canCrash) {
+      if (before) {
+        const result = landingSystem.resolve(plane, before, step);
+        if (result.crash) { flightPosition(planePos); crash(planePos); return; }
+        if (result.handled) continue;
+      }
       flightPosition(_flightTo);
       WGS84_ELLIPSOID.getCartographicToNormal(plane.lat, plane.lon, _flightUp);
       _flightUp.transformDirection(tiles.group.matrixWorld);
@@ -3132,6 +3160,7 @@ function updateFlightPhysics(dt) {
     }
   }
   if (!canCrash) return;
+  if (landingSystem?.grounded || landingSystem?.protects(plane)) { groundAlt = warsawRunway.pose(0, -warsawRunway.coordinates(plane).z).height; return; }
   // Recheck this location, not an old altitude from another tile. This also
   // catches penetration when terrain arrives during the brief spawn grace.
   const col = probeColumn(plane.lat, plane.lon, Math.max(plane.height, 2500));
@@ -3259,7 +3288,11 @@ async function startGame() {
   el.start.disabled = true;
   el.menuError.textContent = "";
   try {
-    if (mode === "free") {
+    if (mode === "landing") {
+      if (!LANDING_SPEEDS[selectedPlane]) return menuFail("Choose an aircraft with landing gear: Piper, Q400, Citation, 737, A320 or Fighter.");
+      const p = warsawRunway.pose(0, warsawRunway.definition.threshold - 6000, 340);
+      beginFlight(p.lat * 180 / Math.PI, p.lon * 180 / Math.PI);
+    } else if (mode === "free") {
       const city = el.city.value.trim() || "Niepruszewo";
       el.menuError.textContent = `Looking up: ${city}…`;
       const loc = await geocodeCity(city);
@@ -3305,7 +3338,7 @@ function beginFlight(lat, lon) {
   if (selectedPlane !== planeMesh?.userData?.key) loadPlane(selectedPlane);
   resetFlight(lat, lon);
   retryFailedTiles(true);
-  el.timerBox.classList.toggle("show", mode !== "free");
+  el.timerBox.classList.toggle("show", mode === "home" || mode === "guess");
   el.distBox.classList.remove("show");
   lastPlaceAt = 0;
   hidePlaceBadge();
@@ -3317,6 +3350,18 @@ function beginFlight(lat, lon) {
 
 // wywoływane gdy teren zmierzony — właściwy start gry
 function finishSnapStart() {
+  if (mode === "landing") {
+    warsawRunway.calibrate(probeSurface);
+    const clearance = Math.max(0, ...(planeMesh?.userData.landingGear?.points() || []).map(w => -w.point.y));
+    Object.assign(plane, warsawRunway.pose(0, warsawRunway.definition.threshold - 6000, 6300 * Math.tan(3 * Math.PI / 180) + clearance));
+    plane.heading = warsawRunway.definition.heading * Math.PI / 180;
+    plane.speed = LANDING_SPEEDS[selectedPlane];
+    plane.verticalSpeed = -plane.speed * Math.sin(3 * Math.PI / 180);
+    plane.pitch = plane.roll = 0;
+    plane.throttle = (plane.speed - plane.speed * .55) / (plane.boost - plane.speed * .55);
+    throttleLever = throttleShown = ctrl.throttle = plane.throttle;
+    syncThrottleUi(); camInit = false;
+  }
   // Start with the full mode duration only after the terrain is ready, even
   // when this flight was restarted or entered through a different start path.
   timeLeft = mode === "home" ? HOME_TIME : mode === "guess" ? GUESS_TIME : 0;
@@ -3334,7 +3379,7 @@ function finishSnapStart() {
   carousel.setActive(false);
   hideMpWait();
   el.start.disabled = false;
-  timerActive = mode !== "free";
+  timerActive = mode === "guess" || mode === "home";
   clearError();
   updateMpPresence();
   if (mode === "free") {
@@ -3569,6 +3614,7 @@ function setPaused(v) {
   }
   leaveOpen = false;
   paused = v;
+  landingBrake = false;
   keys.clear();
   if (v) {
     freeMap.hide();
@@ -3917,6 +3963,9 @@ window.addEventListener("keydown", (e) => {
       flightCamera.cycle(camera);
       return;
     }
+    if (k === "g" && !crashed && !finished) {
+      e.preventDefault(); planeMesh?.userData.landingGear?.toggle(landingSystem.grounded); return;
+    }
     if (k === "enter" && selectedPlane === "falcon9" && !crashed && !finished && !freeMap.open) {
       e.preventDefault();
       deployDragon();
@@ -3951,6 +4000,11 @@ el.mpOnline?.addEventListener("click", () => {
   setTabList(!tabListOpen);
 });
 window.addEventListener("blur", () => stopTalk());
+window.addEventListener("blur", () => { landingBrake = false; keys.delete("b"); });
+document.getElementById("gear-toggle")?.addEventListener("click", () => { if (!paused && !crashed) planeMesh?.userData.landingGear?.toggle(landingSystem.grounded); });
+const brakeButton = document.getElementById("wheel-brake");
+brakeButton?.addEventListener("pointerdown", e => { if (paused || crashed) return; landingBrake = true; brakeButton.setPointerCapture(e.pointerId); });
+for (const event of ["pointerup", "pointercancel", "lostpointercapture"]) brakeButton?.addEventListener(event, () => { landingBrake = false; });
 
 function deployDragon() {
   if (selectedPlane !== "falcon9" || menuOpen || paused || guessOpen || leaveOpen || crashed || finished || freeMap.open) return;
@@ -4165,7 +4219,7 @@ if (el.throttleRail) {
 window.addEventListener("wheel", (e) => {
   if (menuOpen || paused || leaveOpen || guessOpen || crashed || finished || freeMap.open) return;
   if (e.defaultPrevented || e.ctrlKey || e.metaKey || !Number.isFinite(e.deltaY) || e.deltaY === 0) return;
-  if (e.target?.isContentEditable || e.target?.closest?.("input, textarea, select, #traffic-panel")) return;
+  if (e.target?.isContentEditable || e.target?.closest?.("input, textarea, select, #traffic-panel, #landing-panel")) return;
   e.preventDefault();
   const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? innerHeight : 1;
   const delta = e.deltaY * unit;
@@ -4252,6 +4306,7 @@ window.__foeDebug = () => ({
   cameraMode: FLIGHT_CAMERAS[flightCamera.mode].name,
   traffic: liveTraffic?.debug(),
   spaceSky: sky?.uniforms.uSpace.value,
+  landing: plane ? landingSystem.diagnostics(plane) : null,
 });
 const skyQuat = new Quaternion(); // lokalna ramka N/S (bez kursu) — dla kopuły nieba i słońca
 const skyFramePos = new Vector3();
@@ -4315,10 +4370,31 @@ function tickFrame() {
     syncThrottleUi();
   }
   ctrl.throttle = throttleShown;
+  landingSystem.gear = planeMesh?.userData.landingGear || null;
+  const nearRunway = landingSystem.gear && landingSystem.near(plane);
+  ctrl.approach = !!(landingSystem.gear && (mode === "landing" || (nearRunway && landingSystem.gear.target === 1 && plane.height < warsawRunway.elevation + 1000)));
+  ctrl.approachSpeed = landingSystem.gear?.speed || 0;
+  ctrl.wheelBrake = keys.has("b") || landingBrake;
+  landingSystem.gear?.update(flying ? dt : 0, plane.speed, landingSystem.grounded, landingSystem.touchdown?.sink || 0);
 
   if (flying) {
     updateFlightPhysics(dt);
     flying = !crashed;
+  }
+  runwayVisual?.update();
+  const landingPanel = document.getElementById("landing-panel");
+  if (landingPanel) {
+    landingPanel.hidden = menuOpen || paused || guessOpen || leaveOpen || freeMap.open || !landingSystem.gear || (!nearRunway && mode !== "landing");
+    if (!landingPanel.hidden && frameCount % 8 === 0) {
+      const d = landingSystem.diagnostics(plane);
+      const status = d.reason || (d.status === "stopped" ? "LANDED · aircraft stopped on its wheels" : d.status === "rollout" ? `ON WHEELS · hold B to brake · ${Math.round(d.runwayRemainingM)} m left` : d.status === "bounced" ? "BOUNCE · stabilize and flare gently" : `RWY 33 · ${Math.max(0,d.distanceToThresholdM/1000).toFixed(1)} km to threshold`);
+      document.getElementById("landing-status").textContent = status;
+      document.getElementById("landing-details").textContent = `${Math.round(d.speedKmh)} / target ${Math.round(d.targetKmh)} km/h · sink ${d.sinkMps.toFixed(1)} m/s\nCentreline ${Math.round(d.crossTrackM)} m · glide ${d.glideErrorM > 0 ? "+" : ""}${Math.round(d.glideErrorM)} m\nWheels above runway ${Math.max(0,d.wheelClearanceM).toFixed(1)} m`;
+      const gearButton = document.getElementById("gear-toggle");
+      gearButton.textContent = landingSystem.gear.fixed ? "Fixed landing gear" : `G · Gear ${d.gearDown ? "DOWN" : d.gearExtension < .02 ? "UP" : "moving…"}`;
+      gearButton.disabled = landingSystem.grounded || landingSystem.gear.fixed || crashed;
+      brakeButton.textContent = ctrl.wheelBrake ? "BRAKING" : "Hold B · Wheel brakes";
+    }
   }
 
   // dźwięk silnika — obroty z przepustnicy i prędkości, opływ z prędkości

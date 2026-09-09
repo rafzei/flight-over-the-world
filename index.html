@@ -144,6 +144,7 @@
           <button class="mode-card" data-mode="free" type="button">
             <span class="m-name">Free flight</span>
           </button>
+          <button class="mode-card" data-mode="landing" type="button"><span class="m-name">Land in Warsaw</span></button>
         </div>
         <p id="mode-desc"></p>
 
@@ -229,6 +230,12 @@
     </div>
 
     <div id="hud">
+      <section id="landing-panel" aria-label="Landing instruments" hidden>
+        <strong id="landing-status">Warsaw Chopin · runway 33</strong>
+        <pre id="landing-details"></pre>
+        <button id="gear-toggle" type="button">G · Gear DOWN</button>
+        <button id="wheel-brake" type="button">Hold B · Wheel brakes</button>
+      </section>
       <section id="traffic-panel" aria-label="Nearby air traffic" hidden>
         <button id="traffic-toggle" type="button" aria-pressed="true">Live traffic · On</button>
         <p id="traffic-status" role="status">Loading nearby aircraft…</p>

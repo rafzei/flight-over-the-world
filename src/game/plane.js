@@ -167,6 +167,7 @@ export class PlaneController {
     this.cruiseT = Math.max(0, Math.min(1, (this.cruise - this.brake) / span));
     this.throttle = this.cruiseT;
     this.crashed = false;
+    this.verticalSpeed = 0;
   }
 
   update(dt, ctrl) {
@@ -174,7 +175,7 @@ export class PlaneController {
     const rollAuthority = MathUtils.lerp(1, 1 / Math.sqrt(speedRatio), HIGH_SPEED_CONTROL_PENALTY);
     const pitchAuthority = MathUtils.lerp(1, 1 / Math.pow(speedRatio, 0.75), HIGH_SPEED_CONTROL_PENALTY);
     const targetRoll = -ctrl.roll * 0.9 * rollAuthority;
-    const targetPitch = ctrl.pitch * 0.4 * pitchAuthority;
+    const targetPitch = ctrl.pitch * (ctrl.approach ? .22 : .4) * pitchAuthority;
     this.roll += (targetRoll - this.roll) * (1 - Math.exp(-6 * dt));
     this.pitch += (targetPitch - this.pitch) * (1 - Math.exp(-4 * dt));
 
@@ -183,14 +184,16 @@ export class PlaneController {
       : this.cruiseT;
     this.throttle += (lever - this.throttle) * Math.min(1, 3.4 * dt);
     const span = this.boost - this.brake;
-    const throttleSpeed = this.brake + this.throttle * span;
+    const minimum = ctrl.approach ? ctrl.approachSpeed * .55 : this.brake;
+    const throttleSpeed = minimum + this.throttle * (this.boost - minimum);
     // nos w dół = ujemny pitch: więcej i szybciej prędkości niż przy wznoszeniu
     const incline = Math.sin(this.pitch);
     const slopeTarget = throttleSpeed - incline * span * 0.55;
     const settle = incline < 0 ? 3.1 : 1.45;
-    this.speed += (slopeTarget - this.speed) * Math.min(1, settle * dt);
+    const speedChange=(slopeTarget-this.speed)*Math.min(1,settle*dt);
+    this.speed += ctrl.approach ? Math.max(-3.5*dt,Math.min(2.8*dt,speedChange)) : speedChange;
     this.speed = Math.max(
-      this.brake * 0.55,
+      ctrl.approach ? 0 : this.brake * 0.55,
       Math.min(this.boost * 1.18, this.speed)
     );
     const turnSpeed = Math.min(this.speed, TURN_SPEED_LIMIT);
@@ -200,7 +203,11 @@ export class PlaneController {
     const stallSpeed = this.brake + 4;
     const stallSink =
       this.speed < stallSpeed ? (stallSpeed - this.speed) * 1.1 : 0;
-    const climb = Math.sin(this.pitch) * this.speed - stallSink;
+    let climb = Math.sin(this.pitch) * this.speed - stallSink;
+    if(ctrl.approach){
+      const target=this.speed*Math.sin(this.pitch-3*MathUtils.DEG2RAD)-Math.max(0,ctrl.approachSpeed*.75-this.speed)*.8;
+      this.verticalSpeed+=(target-this.verticalSpeed)*(1-Math.exp(-dt/1.4));climb=this.verticalSpeed;
+    } else this.verticalSpeed=climb;
     const vH = Math.cos(this.pitch) * this.speed;
 
     const vN = Math.cos(this.heading) * vH;

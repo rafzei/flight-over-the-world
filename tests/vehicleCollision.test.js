@@ -88,7 +88,7 @@ function flight({ groundHeight = 0, height = 40, vertical = false, lat = .9, lon
   let now = 10000;
   const impacts = [];
   const context = vm.createContext({
-    WGS84_ELLIPSOID, earthPosition, raycastTerrain, tiles: { group }, raycaster: new Raycaster(),
+    WGS84_ELLIPSOID, earthPosition, raycastTerrain, landingSystem: null, tiles: { group }, raycaster: new Raycaster(),
     plane: { lat, lon, height, update(dt) { this.height -= 2400 * dt; } },
     planePos: new Vector3(), ctrl: {}, PLANES: { vehicle: { vertical } }, selectedPlane: "vehicle",
     pendingSnap: false, awaitingSnap: false, crashGraceUntil: 0, groundAlt: 120, crashed: false,
