@@ -90,6 +90,8 @@ import {
 } from "./game/tileAuth.js";
 import { createHoldParentTilesPlugin } from "./game/holdParentTiles.js";
 import { createFreeMap, createMiniMap, paintTrailMap } from "./game/freeMap.js";
+import { createLiveTraffic } from "./game/liveTraffic.js";
+import { earthPosition } from "./game/trafficVisibility.js";
 
 // rakieta stoi pionowo (+Y) — połóż ją nosem do przodu (-Z, konwencja lotu)
 function prepareRocket(model) {
@@ -278,6 +280,7 @@ const HOME_CAPTURE_M = 600;
 const HOME_BEACON_M = 1000;
 
 let camera, scene, renderer, tiles, sun, sky;
+let liveTraffic;
 let vehicleGroundShadows;
 let fighterMissiles;
 let droneCannons;
@@ -2667,6 +2670,7 @@ async function init() {
     tiles.group.rotation.x = -Math.PI / 2;
     tiles.group.visible = false;
     scene.add(tiles.group);
+    liveTraffic = createLiveTraffic({ scene, camera, mapRoot: tiles.group, mobile: isMobile, baseUrl: import.meta.env.VITE_TRAFFIC_API_BASE || "" });
     tiles.setResolutionFromRenderer(camera, renderer);
     tiles.setCamera(camera);
     applyTileQuality(tiles, isMobile);
@@ -2733,6 +2737,7 @@ async function init() {
     renderer.domElement.addEventListener("webglcontextlost", (e) => {
       e.preventDefault();
       window.__ctxLost = true;
+      liveTraffic?.reset();
       showFatal(
         "Graphics memory ran out on this phone (WebGL). Close other tabs and tap Start again, or use a computer."
       );
@@ -2902,6 +2907,7 @@ function loadMate(id, key) {
 }
 
 function resetFlight(latDeg, lonDeg) {
+  liveTraffic?.reset();
   const spec = PLANES[selectedPlane];
   droneCannons?.reset();
   lastDroneBurstSeq.clear();
@@ -3080,8 +3086,7 @@ const _flightInv = new Matrix4();
 const _flightLla = {};
 
 function flightPosition(target) {
-  return WGS84_ELLIPSOID.getCartographicToPosition(plane.lat, plane.lon, plane.height, target)
-    .applyMatrix4(tiles.group.matrixWorld);
+  return earthPosition(plane.lat, plane.lon, plane.height, tiles.group.matrixWorld, target);
 }
 
 function stopAtImpact(hit) {
@@ -4234,6 +4239,7 @@ window.__foeDebug = () => ({
   tileMaxed: tile429Count,
   camPos: camera?.position?.toArray?.() || [],
   cameraMode: FLIGHT_CAMERAS[flightCamera.mode].name,
+  traffic: liveTraffic?.debug(),
 });
 const skyQuat = new Quaternion(); // lokalna ramka N/S (bez kursu) — dla kopuły nieba i słońca
 const skyFramePos = new Vector3();
@@ -4707,6 +4713,11 @@ function tickFrame() {
     up: shadowUp,
     sunDirection: shadowSunDirection,
     active: !menuOpen && !pendingSnap && !awaitingSnap,
+  });
+  liveTraffic?.update({
+    active: !menuOpen && !paused && !guessOpen && !leaveOpen && !crashed && !finished && !pendingSnap && !awaitingSnap && !freeMap.open && !window.__ctxLost,
+    speedMps: plane.speed,
+    viewportHeight: innerHeight,
   });
   renderer.render(scene, camera);
 

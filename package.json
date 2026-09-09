@@ -4,10 +4,14 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev.mjs",
+    "traffic:server": "node server/trafficServer.mjs",
+    "traffic:test-api": "node scripts/test-opensky.mjs",
+    "test": "node --test tests/*.test.js",
     "build": "vite build",
     "preview": "vite preview"
   },
+  "engines": { "node": ">=22" },
   "dependencies": {
     "3d-tiles-renderer": "^0.5.2",
     "peerjs": "^1.5.5",

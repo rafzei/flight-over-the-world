@@ -1,0 +1,6 @@
+*
+!server/
+!server/**
+!shared/
+!shared/**
+!package.json

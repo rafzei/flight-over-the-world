@@ -229,6 +229,17 @@
     </div>
 
     <div id="hud">
+      <section id="traffic-panel" aria-label="Nearby air traffic" hidden>
+        <button id="traffic-toggle" type="button" aria-pressed="true">Live traffic · On</button>
+        <p id="traffic-status" role="status">Loading nearby aircraft…</p>
+        <details>
+          <summary>Traffic details</summary>
+          <label>Source <select id="traffic-source"><option value="live">OpenSky live</option><option value="replay">Synthetic replay</option></select></label>
+          <label><input id="traffic-prediction" type="checkbox" checked /> Predict movement</label>
+          <pre id="traffic-details"></pre>
+          <a href="https://opensky-network.org/" target="_blank" rel="noopener">Data: OpenSky Network</a>
+        </details>
+      </section>
       <div id="f-banner">
         <div class="b-title"></div>
         <div class="b-sub"></div>
