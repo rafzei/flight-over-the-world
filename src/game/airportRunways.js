@@ -39,14 +39,12 @@ export class AirportRunways {
     }
     return best;
   }
-  updateVisuals(plane, active, probe) {
+  updateVisuals(plane) {
     if (!this.scene) return;
     const visible = new Set(this.nearby(plane));
     for (const runway of visible) {
       let visual = this.visuals.get(runway);
       if (!visual) {
-        // Never recalibrate a surface during touchdown or ground roll.
-        if (runway !== active?.physical || runway.coordinates(plane).y > 60) runway.calibrate(probe);
         visual = createRunwayVisual(this.scene, runway, this.mapRoot);
         this.visuals.set(runway, visual);
       }

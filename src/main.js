@@ -980,7 +980,7 @@ function syncLandingSelection(keepDirection = false) {
 function syncRunwayInfo() {
   const d = airportRunways.get(selectedApproach).definition;
   const short = d.length - d.threshold < 1200 ? " · Short runway: choose a light aircraft" : "";
-  document.getElementById("landing-runway-info").textContent = `${Math.round(d.length)} × ${Math.round(d.width)} m · landing distance ${Math.round(d.length - d.threshold)} m${short}`;
+  document.getElementById("landing-runway-info").textContent = `${Math.round(d.length)} × ${d.widthEstimated ? "~" : ""}${Math.round(d.width)} m · landing distance ${Math.round(d.length - d.threshold)} m${short}`;
 }
 airportSelect.addEventListener("change", () => syncLandingSelection());
 runwaySelect.addEventListener("change", () => { selectedApproach = runwaySelect.value; syncRunwayInfo(); });
@@ -3381,7 +3381,7 @@ function finishSnapStart() {
   if (mode === "landing") {
     const runway = airportRunways.get(selectedApproach);
     landingSystem.runway = runway;
-    runway.calibrate(probeSurface);
+    runway.calibrate(probeSurface, { force: true, distance: 6000 });
     const clearance = Math.max(0, ...(planeMesh?.userData.landingGear?.points() || []).map(w => -w.point.y));
     Object.assign(plane, runway.pose(0, runway.definition.threshold - 6000, (6000 + runway.definition.aimingPoint) * Math.tan(3 * Math.PI / 180) + clearance));
     plane.heading = runway.definition.heading * Math.PI / 180;
@@ -4409,8 +4409,12 @@ function tickFrame() {
   const nearRunway = landingSystem.gear && landingSystem.near(plane);
   // Free-flight arrivals share the same runway and ground physics as practice.
   // Finish terrain calibration while safely airborne, never move the pavement under the wheels.
-  if (flying && nearRunway && !activeRunway.calibrated && frameCount % 60 === 0 && activeRunway.coordinates(plane).y > 60) {
-    activeRunway.calibrate(probeSurface);
+  if (flying && !pendingSnap && !awaitingSnap && nearRunway && frameCount % 60 === 0) {
+    const p = activeRunway.coordinates(plane);
+    const distance = Math.hypot(p.x, Math.max(0, p.z, -p.z - activeRunway.definition.length));
+    if (p.y > 60 && (!activeRunway.calibrated || distance < activeRunway.physical.calibrationDistance * .6)) {
+      activeRunway.calibrate(probeSurface, { force: true, distance });
+    }
   }
   ctrl.approach = !!(landingSystem.gear && (mode === "landing" || (nearRunway && landingSystem.gear.target === 1 && plane.height < activeRunway.elevation + 1000)));
   ctrl.approachSpeed = landingSystem.gear?.speed || 0;
@@ -4421,7 +4425,7 @@ function tickFrame() {
     updateFlightPhysics(dt);
     flying = !crashed;
   }
-  if (!menuOpen || awaitingSnap) airportRunways.updateVisuals(plane, activeRunway, probeSurface);
+  if (!menuOpen || awaitingSnap) airportRunways.updateVisuals(plane);
   const landingPanel = document.getElementById("landing-panel");
   if (landingPanel) {
     landingPanel.hidden = menuOpen || paused || guessOpen || leaveOpen || freeMap.open || !landingSystem.gear || (!nearRunway && mode !== "landing");

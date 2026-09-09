@@ -36,7 +36,7 @@ class ReverseRunway extends RunwayFrame {
   get elevation() { return this.physical.elevation; }
   set elevation(value) { this.physical.elevation = value; }
   get calibrated() { return this.physical.calibrated; }
-  calibrate(probe) { return this.physical.calibrate(probe); }
+  calibrate(probe, options) { return this.physical.calibrate(probe, options); }
   rebuildFrame() {
     this.frame.copy(this.physical.frame).multiply(new Matrix4().makeTranslation(0, 0, -this.definition.length)).multiply(new Matrix4().makeRotationY(Math.PI));
     this.inverse.copy(this.frame).invert();
@@ -61,6 +61,7 @@ export class Runway extends RunwayFrame {
     this.elevation = data.elevation;
     this.slope = 0;
     this.calibrated = false;
+    this.calibrationDistance = Infinity;
     this.rebuildFrame();
     this.opposite = new ReverseRunway(this);
     this.directions = [this, this.opposite];
@@ -71,14 +72,18 @@ export class Runway extends RunwayFrame {
     this.inverse.copy(this.frame).invert();
     this.opposite?.rebuildFrame();
   }
-  calibrate(probe) {
-    if (this.calibrated) return false;
+  calibrate(probe, { force = false, distance = Infinity } = {}) {
+    if (this.calibrated && !force) return false;
     const length = this.data.length;
+    // Always measure against the unpitched geodetic tangent, including on a later LOD refresh.
+    const reference = new Matrix4();
+    WGS84_ELLIPSOID.getObjectFrame(this.data.lat * DEG, this.data.lon * DEG, this.data.elevation, this.data.heading * DEG, 0, 0, reference, CAMERA_FRAME);
     const samples = [30, length / 2, length - 30].map(along => {
-      const p = this.pose(0, along);
+      const point = new Vector3(0, 0, -along).applyMatrix4(reference);
+      const p = WGS84_ELLIPSOID.getPositionToCartographic(point, {});
       const h = probe(p.lat, p.lon, Math.max(3000, this.elevation + 1000));
       // Reject missing / coarse sea-level tiles using the airport's published elevation.
-      return Number.isFinite(h) && Math.abs(h - this.data.elevation) < 70 ? { along, height: h - (p.height - this.elevation) } : null;
+      return Number.isFinite(h) && Math.abs(h - this.data.elevation) < 70 ? { along, height: h - (p.height - this.data.elevation) } : null;
     });
     if (samples.some(p => !p)) return false;
     const slope = (samples[2].height - samples[0].height) / (length - 60);
@@ -86,6 +91,7 @@ export class Runway extends RunwayFrame {
     this.elevation = Math.max(...samples.map(p => p.height - slope * p.along)) + .35;
     this.slope = Math.atan(slope);
     this.calibrated = true;
+    this.calibrationDistance = distance;
     this.rebuildFrame();
     return true;
   }

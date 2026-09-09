@@ -25,6 +25,7 @@
       "elevation": 478.48,
       "surface": "ASP",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "16",
@@ -54,6 +55,7 @@
       "elevation": 139.55,
       "surface": "CON",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "10R",
@@ -83,6 +85,7 @@
       "elevation": 188.01,
       "surface": "asphalt",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "09R",
@@ -111,6 +114,7 @@
       "elevation": 177.04,
       "surface": "asphalt",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "10",
@@ -139,6 +143,7 @@
       "elevation": 106.93,
       "surface": "CON",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "08",
@@ -168,6 +173,7 @@
       "elevation": 252.02,
       "surface": "CON",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "18L",
@@ -197,6 +203,7 @@
       "elevation": 184.05,
       "surface": "ASP",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "07",
@@ -226,6 +233,7 @@
       "elevation": 38.05,
       "surface": "asphalt",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "04",
@@ -254,6 +262,7 @@
       "elevation": 154.18,
       "surface": "ASP",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "12",
@@ -283,6 +292,7 @@
       "elevation": 172.16,
       "surface": "ASP",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "11",
@@ -312,6 +322,7 @@
       "elevation": 296.82,
       "surface": "Ashpalt",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "08R",
@@ -341,6 +352,7 @@
       "elevation": 159.05,
       "surface": "asphalt",
       "lighted": false,
+      "widthEstimated": true,
       "ends": [
         {
           "ident": "09",
@@ -369,6 +381,7 @@
       "elevation": 342.85,
       "surface": "asphalt concrete",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "11R",
@@ -398,6 +411,7 @@
       "elevation": 145.03,
       "surface": "asphalt",
       "lighted": false,
+      "widthEstimated": true,
       "ends": [
         {
           "ident": "09",
@@ -426,6 +440,7 @@
       "elevation": 42.01,
       "surface": "Concrete",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "07",
@@ -455,6 +470,7 @@
       "elevation": 276.4,
       "surface": "CON",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "07",
@@ -484,6 +500,7 @@
       "elevation": 310.23,
       "surface": "CON",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "05L",
@@ -513,6 +530,7 @@
       "elevation": 235.56,
       "surface": "CON",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "11",
@@ -542,6 +560,7 @@
       "elevation": 315.11,
       "surface": "ASP",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "11R",
@@ -571,6 +590,7 @@
       "elevation": 117.91,
       "surface": "CON",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "12",
@@ -600,6 +620,7 @@
       "elevation": 330.66,
       "surface": "CON",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "08",
@@ -629,6 +650,7 @@
       "elevation": 285.55,
       "surface": "ASP",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "13",
@@ -658,6 +680,7 @@
       "elevation": 227.63,
       "surface": "ASPHALT",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "07",
@@ -687,6 +710,7 @@
       "elevation": 223.06,
       "surface": "CON",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "10",
@@ -716,6 +740,7 @@
       "elevation": 215.44,
       "surface": "ASPH-CONC",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "07",
@@ -745,6 +770,7 @@
       "elevation": 191.06,
       "surface": "ASP",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "13L",
@@ -774,6 +800,7 @@
       "elevation": 153.87,
       "surface": "ASP",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "10",
@@ -803,6 +830,7 @@
       "elevation": 39.88,
       "surface": "CON",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "07",
@@ -832,6 +860,7 @@
       "elevation": 184.96,
       "surface": "CON",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "12",
@@ -861,6 +890,7 @@
       "elevation": 200.51,
       "surface": "CON",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "08R",
@@ -890,6 +920,7 @@
       "elevation": 199.59,
       "surface": "CON",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "17",
@@ -919,6 +950,7 @@
       "elevation": 205.99,
       "surface": "CON",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "09",
@@ -948,6 +980,7 @@
       "elevation": 138.02,
       "surface": "ASP",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "08",
@@ -977,6 +1010,7 @@
       "elevation": 191.06,
       "surface": "concrete:plates",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "08",
@@ -1005,6 +1039,7 @@
       "elevation": 167.89,
       "surface": "ASP",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "09L",
@@ -1034,6 +1069,7 @@
       "elevation": 78.89,
       "surface": "ASP",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "08",
@@ -1063,6 +1099,7 @@
       "elevation": 77.98,
       "surface": "CON",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "13",
@@ -1082,7 +1119,7 @@
     {
       "id": "EPPG-10L-28R",
       "airportId": "EPPG",
-      "airportName": "Kakolewo (former military)",
+      "airportName": "Kąkolewo Airport",
       "municipality": "Kąkolewo",
       "lat": 52.2365593,
       "lon": 16.2326996,
@@ -1092,6 +1129,7 @@
       "elevation": 129.49,
       "surface": "Concrete",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "10L",
@@ -1122,6 +1160,7 @@
       "elevation": 113.94,
       "surface": "PEM",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "03",
@@ -1151,6 +1190,7 @@
       "elevation": 129.18,
       "surface": "ASP",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "10",
@@ -1180,6 +1220,7 @@
       "elevation": 38.96,
       "surface": "ASP",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "09",
@@ -1209,6 +1250,7 @@
       "elevation": 240.13,
       "surface": "CON",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "03",
@@ -1238,6 +1280,7 @@
       "elevation": 146.86,
       "surface": "CON",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "10L",
@@ -1267,6 +1310,7 @@
       "elevation": 145.64,
       "surface": "CON",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "10R",
@@ -1296,6 +1340,7 @@
       "elevation": 224.59,
       "surface": "ASP",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "07",
@@ -1325,6 +1370,7 @@
       "elevation": 233.12,
       "surface": "ASPH",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "08R",
@@ -1354,6 +1400,7 @@
       "elevation": 297.13,
       "surface": "CON",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "08",
@@ -1383,6 +1430,7 @@
       "elevation": 244.7,
       "surface": "CON",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "09",
@@ -1412,6 +1460,7 @@
       "elevation": 70.97,
       "surface": "ASP",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "13",
@@ -1441,6 +1490,7 @@
       "elevation": 152.04,
       "surface": "CON",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "11",
@@ -1470,6 +1520,7 @@
       "elevation": 212.09,
       "surface": "ASP",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "08",
@@ -1499,6 +1550,7 @@
       "elevation": 168.5,
       "surface": "CON",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "01",
@@ -1528,6 +1580,7 @@
       "elevation": 209.04,
       "surface": "ASP",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "11",
@@ -1557,6 +1610,7 @@
       "elevation": 84.99,
       "surface": "CON",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "10",
@@ -1586,6 +1640,7 @@
       "elevation": 145.34,
       "surface": "ASPH",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "11",
@@ -1615,6 +1670,7 @@
       "elevation": 142.59,
       "surface": "ASPH",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "15",
@@ -1644,6 +1700,7 @@
       "elevation": 158.44,
       "surface": "CONC-ASPH",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "11",
@@ -1673,6 +1730,7 @@
       "elevation": 94.13,
       "surface": "CON",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "06",
@@ -1702,6 +1760,7 @@
       "elevation": 138.94,
       "surface": "CON",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "11R",
@@ -1731,6 +1790,7 @@
       "elevation": 92.0,
       "surface": "concrete:plates",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "09",
@@ -1759,6 +1819,7 @@
       "elevation": 114.25,
       "surface": "Brick",
       "lighted": true,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "06",
@@ -1788,6 +1849,7 @@
       "elevation": 35.0,
       "surface": "asphalt",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "05",
@@ -1816,6 +1878,7 @@
       "elevation": 35.0,
       "surface": "asphalt",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "10",
@@ -1844,6 +1907,7 @@
       "elevation": 35.0,
       "surface": "asphalt",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "06",
@@ -1872,6 +1936,7 @@
       "elevation": 35.0,
       "surface": "asphalt",
       "lighted": false,
+      "widthEstimated": true,
       "ends": [
         {
           "ident": "10",
@@ -1900,6 +1965,7 @@
       "elevation": 159.05,
       "surface": "paved",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "03",
@@ -1928,6 +1994,7 @@
       "elevation": 35.0,
       "surface": "asphalt",
       "lighted": false,
+      "widthEstimated": false,
       "ends": [
         {
           "ident": "17",
@@ -1956,6 +2023,7 @@
       "elevation": 35.0,
       "surface": "asphalt",
       "lighted": false,
+      "widthEstimated": true,
       "ends": [
         {
           "ident": "07",

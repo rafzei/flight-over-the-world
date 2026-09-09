@@ -105,9 +105,9 @@ def build(airports_file, runways_file, osm_file):
             length = 1190; thresholds = [0,0]; airport_id = 'EPPG'; elevation = 310*.3048
             sources.append('https://www.lotniskokakolewo.pl/en/aviation/for-pilots/')
         record = dict(id=f'{airport_id}-{idents[0]}-{idents[1]}', airportId=airport_id,
-            airportName=a['name'], municipality=a['municipality'], lat=round(points[0][0],7), lon=round(points[0][1],7),
+            airportName='Kąkolewo Airport' if airport_id=='EPPG' else a['name'], municipality=a['municipality'], lat=round(points[0][0],7), lon=round(points[0][1],7),
             heading=round(heading,4), length=round(length,1), width=round(width,1), elevation=round(elevation+35,2),
-            surface=(r['surface'] if r else t['surface']), lighted=bool(r and r['lighted']=='1'),
+            surface=(r['surface'] if r else t['surface']), lighted=bool(r and r['lighted']=='1'), widthEstimated=not bool((r and r['width_ft']) or t.get('width')),
             ends=[dict(ident=ident, threshold=round(threshold,1)) for ident,threshold in zip(idents,thresholds)], sources=sources)
         if min(thresholds)<0 or sum(thresholds)>=length or not 250<=length<=5000:
             omissions.append({'airport':a['ident'],'reason':'Invalid or very short runway geometry'}); return

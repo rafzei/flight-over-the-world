@@ -75,12 +75,15 @@ test('a light aircraft touches down, rolls and brakes on every runway in either 
   const model = createPlaneMesh(), wrapper = new Group();
   model.position.sub(new Box3().setFromObject(model).getCenter(new Vector3())); wrapper.add(model);
   const gear = attachLandingGear(wrapper, model, 'pa28');
-  for (const data of POLISH_RUNWAYS) for (const runway of new Runway(data).directions) {
+  const surfaces = POLISH_RUNWAYS.map(data => new Runway(data));
+  const sloped = new Runway(POLISH_RUNWAYS.find(r => r.airportId === 'EPKK'));
+  sloped.slope = .018; sloped.rebuildFrame(); surfaces.push(sloped);
+  for (const physical of surfaces) for (const runway of physical.directions) {
     const system = new LandingSystem(runway); system.gear = gear; gear.reset();
     const d = runway.definition;
     const p = runway.pose(0, d.threshold + 40, 10);
     const plane = new PlaneController(p.lat / DEG, p.lon / DEG, p.height, d.heading);
-    plane.pitch = 3 * DEG; plane.speed = gear.speed; plane.verticalSpeed = -1.5; plane.throttle = 0;
+    plane.pitch = runway.groundPitch + 3 * DEG; plane.speed = gear.speed; plane.verticalSpeed = -1.5; plane.throttle = 0;
     system.align(plane); plane.height += .08;
     for (let i = 0; i < 20 && !system.grounded; i++) {
       const before = flightPose(plane), at = runway.coordinates(plane);
