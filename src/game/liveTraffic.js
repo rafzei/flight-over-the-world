@@ -65,7 +65,7 @@ export function createLiveTraffic({ scene, camera, mapRoot, mobile = false, base
           rangeKm: Number((trafficRange(scene.fog) / 1000).toFixed(1)), view, prediction,
           snapshotTime: mode === "live" ? feed.snapshot?.snapshotTime ?? null : now,
           stats: mode === "live" ? feed.snapshot?.stats ?? null : { total: 4, stale: 1 },
-          contacts: spheres.visible.slice(0, 8).map(({ sample, distance }) => ({ icao24: sample.icao24, callsign: sample.callsign, distanceM: Math.round(distance), ageSeconds: Math.round(sample.ageSeconds), altitudeSource: sample.altitudeSource })),
+          contacts: spheres.visible.slice(0, 8).map(({ sample, distance, visual }) => ({ icao24: sample.icao24, callsign: sample.callsign, distanceM: Math.round(distance), ageSeconds: Math.round(sample.ageSeconds), altitudeSource: sample.altitudeSource, typeCode: sample.aircraft?.typeCode ?? null, modelName: sample.aircraft?.modelName ?? null, registration: sample.aircraft?.registration ?? null, model: visual?.model ?? null })),
         };
       }
       if (performance.now() >= nextUi) {
@@ -81,7 +81,7 @@ export function createLiveTraffic({ scene, camera, mapRoot, mobile = false, base
         if (enabled && running && mode === "live" && feed.status === "disabled" && status) status.textContent = "Live traffic not configured";
         if (details) {
           const age = debug.newestAgeSeconds === null || debug.newestAgeSeconds === undefined ? "—" : `${debug.newestAgeSeconds}s`;
-          details.textContent = `View ${debug.rangeKm ?? 25} km · newest position ${age}\nReceived ${debug.stats?.total ?? 0} · stale rejected ${debug.stats?.stale ?? 0}\n${(debug.contacts || []).map(item => `${item.callsign || item.icao24} · ${(item.distanceM / 1000).toFixed(1)} km · ${item.ageSeconds}s`).join("\n")}`;
+          details.textContent = `View ${debug.rangeKm ?? 25} km · newest position ${age}\nReceived ${debug.stats?.total ?? 0} · stale rejected ${debug.stats?.stale ?? 0}\n${(debug.contacts || []).map(item => `${item.callsign || item.icao24} · ${item.typeCode || "unknown type"} · ${(item.distanceM / 1000).toFixed(1)} km · ${item.ageSeconds}s`).join("\n")}`;
         }
         if (panel) panel.dataset.source = mode;
       }

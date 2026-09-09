@@ -2,8 +2,8 @@ import { TRAFFIC, coverageFor, coverageContains, creditCost, normalizeStates } f
 import { TrafficError } from "./trafficBudget.mjs";
 
 export class TrafficService {
-  constructor({ client, budget, now = Date.now, maxRegions = 32, maxActiveRegions = 8 } = {}) {
-    Object.assign(this, { client, budget, now, maxRegions, maxActiveRegions });
+  constructor({ client, budget, metadata = null, now = Date.now, maxRegions = 32, maxActiveRegions = 8 } = {}) {
+    Object.assign(this, { client, budget, metadata, now, maxRegions, maxActiveRegions });
     this.regions = new Map();
     this.metrics = { upstreamRequests: 0, cacheHits: 0, joinedRequests: 0 };
   }
@@ -72,7 +72,8 @@ export class TrafficService {
         for (const key of Object.keys(stats)) stats[key] += chunk.stats[key];
       }
       for (const id of removed) aircraft.delete(id);
-      entry.data = { aircraft: [...aircraft.values()], removedIds: [...removed], stats, snapshotTime: Math.min(...chunks.map(x => x.snapshotTime)), fetchedAt: this.now() };
+      const enriched = this.metadata ? await this.metadata.enrich([...aircraft.values()]) : [...aircraft.values()];
+      entry.data = { aircraft: enriched, removedIds: [...removed], stats, snapshotTime: Math.min(...chunks.map(x => x.snapshotTime)), fetchedAt: this.now() };
       entry.retryAt = 0;
       entry.retryStatus = null;
       return this.response(entry, { nextPollAfterMs: interval });

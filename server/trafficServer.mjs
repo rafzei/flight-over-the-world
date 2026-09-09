@@ -6,6 +6,7 @@ import { TRAFFIC, validView } from "../shared/trafficState.js";
 import { OpenSkyClient } from "./openskyClient.mjs";
 import { TrafficBudget } from "./trafficBudget.mjs";
 import { TrafficService } from "./trafficCache.mjs";
+import { AircraftMetadata } from "./aircraftMetadata.mjs";
 
 export function createTrafficServer({ service, allowedOrigins = [], now = Date.now } = {}) {
   const clients = new Map();
@@ -25,7 +26,9 @@ export function createTrafficServer({ service, allowedOrigins = [], now = Date.n
     }
     if (request.method === "OPTIONS") { response.writeHead(204); response.end(); return; }
     if (request.method !== "GET") return send(405, { error: "GET required" });
-    const url = new URL(request.url, "http://localhost");
+    let url;
+    try { url = new URL(request.url, "http://localhost"); }
+    catch { return send(400, { error: "Invalid request URL" }); }
     if (url.pathname === "/api/traffic/health") return send(200, { ok: true, configured: service.client.configured });
     if (url.pathname !== "/api/traffic") return send(404, { error: "Not found" });
     // Remote address is deliberately not taken from untrusted forwarding headers.
@@ -59,7 +62,9 @@ export async function startTrafficServer(options = {}) {
   const budget = new TrafficBudget({ file: process.env.TRAFFIC_BUDGET_FILE || resolve(root, ".data/opensky-budget.json") });
   await budget.load();
   const client = new OpenSkyClient({ clientId: process.env.OPEN_SKY_CLIENT_ID, clientSecret: process.env.OPEN_SKY_CLIENT_SECRET });
-  const service = new TrafficService({ client, budget });
+  const metadata = new AircraftMetadata({ file: process.env.TRAFFIC_METADATA_FILE || resolve(root, ".data/aircraft-metadata.json") });
+  await metadata.load();
+  const service = new TrafficService({ client, budget, metadata });
   const allowedOrigins = options.allowedOrigins ?? (process.env.TRAFFIC_ALLOWED_ORIGINS || "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173").split(",").map(x => x.trim()).filter(Boolean);
   const server = createTrafficServer({ service, allowedOrigins });
   server.requestTimeout = 30_000;

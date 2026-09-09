@@ -182,7 +182,7 @@ button, .mode-card, .scope-btn {
 #traffic-panel a { color: var(--muted); }
 #traffic-panel[data-source="replay"] #traffic-status { color: #ffcd6e; }
 @media (max-width: 760px), (pointer: coarse) {
-  #traffic-panel { top: max(12px, env(safe-area-inset-top)); left: 10px; width: 190px; max-height: 65vh; padding: 7px 9px; }
+  #traffic-panel { top: max(216px, calc(env(safe-area-inset-top) + 204px)); left: 10px; width: 190px; max-height: max(90px, calc(100dvh - 500px)); padding: 7px 9px; }
   #traffic-panel details:not([open]) { font-size: 10px; }
   #traffic-status { font-size: 11px; }
 }

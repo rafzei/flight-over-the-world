@@ -5,6 +5,7 @@ const trafficProxy = () => ({ "/api/traffic": { target: `http://127.0.0.1:${proc
 export default defineConfig({
   base: "./",
   server: {
+    host: "0.0.0.0",
     port: 5173,
     strictPort: true,
     proxy: trafficProxy(),

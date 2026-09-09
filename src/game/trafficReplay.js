@@ -11,7 +11,8 @@ export function replaySnapshot(center, now, elapsed) {
   const aircraft = definitions.map(([icao24, callsign, distance, bearing, track, height, speed]) => {
     const position = destination(center.lat, center.lon, bearing, distance);
     return { icao24, callsign, latitudeDeg: position.lat, longitudeDeg: position.lon, altitudeM: height, altitudeSource: "geo", onGround: false,
-      timePosition: icao24 === "f00004" ? now - 240 : now, lastContact: now, velocityMps: speed, trueTrackDeg: track, verticalRateMps: 0, category: 0 };
+      timePosition: icao24 === "f00004" ? now - 240 : now, lastContact: now, velocityMps: speed, trueTrackDeg: track, verticalRateMps: 0, category: 0,
+      aircraft: icao24 === "f00001" || icao24 === "f00002" ? { typeCode: "B738", modelName: "Boeing 737-800", source: "synthetic" } : icao24 === "f00003" ? { typeCode: "A320", modelName: "Airbus A320", source: "synthetic" } : null };
   });
   return { schemaVersion: 1, status: "replay", serverTime: now, snapshotTime: now, aircraft, removedIds: [], stats: { total: 4, stale: 1 } };
 }

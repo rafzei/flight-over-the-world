@@ -33,7 +33,10 @@ export class TrafficTracks {
         track = { samples: [], correction: null }; this.tracks.set(sample.icao24, track);
       }
       const previous = track.samples.at(-1);
-      if (previous && sample.timePosition <= previous.timePosition) continue;
+      if (previous && sample.timePosition <= previous.timePosition) {
+        if (sample.timePosition === previous.timePosition && sample.aircraft) previous.aircraft = sample.aircraft;
+        continue;
+      }
       if (previous) {
         const jump = distanceM({ lat: previous.latitudeDeg, lon: previous.longitudeDeg }, { lat: sample.latitudeDeg, lon: sample.longitudeDeg });
         if (jump > Math.max(5000, (sample.timePosition - previous.timePosition) * 500 + 2000)) { track.samples = []; track.correction = null; }

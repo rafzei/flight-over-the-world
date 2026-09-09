@@ -4,7 +4,18 @@ Data: **9 września 2026 r.**
 
 Celem pierwszej wersji jest pokazanie rzeczywistych, poruszających się kontaktów lotniczych z OpenSky jako dużych czerwonych kul w świecie gry. Obiekt nadlatujący w okolice obserwatora powinien pojawić się w granicach widoczności sceny, poruszać płynnie i zniknąć po utracie aktualnych danych. Docelowe modele samolotów powstaną w kolejnym etapie.
 
-**Status:** wykonano audyt integracji i ograniczony test prawdziwego API. Backend, kule i integracja z rozgrywką są zaplanowane, ale nie zostały jeszcze zaimplementowane.
+**Status:** zaimplementowano backend OAuth, trwałą kontrolę kredytów, cache regionów, czerwone kule w scenie, predykcję ruchu, filtrowanie starych pozycji i jawny replay. Integracja działa lokalnie. Przygotowano kontener backendu i konfigurację frontendu dla zewnętrznego API; publiczny backend wymaga wskazania hostingu.
+
+**Etap modeli:** dodano autorskie, uproszczone modele Boeing 737-800 oraz Airbus A320, dostępne w karuzeli pojazdów. Backend uzupełnia pozycje OpenSky metadanymi z adsbdb po `icao24`, sprawdzając zgodność zwróconego adresu Mode-S. Obsługiwane kody typu zastępują kule odpowiednim modelem; pozostałe kontakty zachowują kulę i znany typ w diagnostyce. Szczegóły wariantów, cache i limitów metadanych opisano w README. Poniższe sekcje planu opisują również pierwotny etap kul.
+
+### Weryfikacja implementacji
+
+- 40 testów automatycznych przechodzi: autoryzacja i odnowienie tokenu na sterowanym zegarze, pojedyncza powtórka 401, 429, zachowanie budżetu po restarcie, wspólny cache, HTTP/CORS, parser, bieguny i południk 180°, transformacja globu, widoczność, ruch, timery i regresja istniejących kolizji/broni.
+- `npm run build` przechodzi. Sprawdzono brak rzeczywistych wartości identyfikatora i sekretu OpenSky w plikach wynikowych frontendu.
+- Test prawdziwego backendu nad Warszawą: dwa równoczesne żądania HTTP 200 dostały tę samą migawkę; jeden odczyt upstream / jeden kredyt w lokalnym rejestrze. Zwrócono 10 świeżych kontaktów, odrzucono 6 starych. Ostatni zaobserwowany nagłówek pozostałego budżetu wynosił 3994 — jest to zapis z chwili testu, nie bieżący licznik.
+- Chromium: potwierdzono działanie natywnych timerów i fetch, przełączanie live/replay/off, renderowanie czerwonych znaczników i brak błędów strony. Naprawiono zgłoszony `Illegal invocation`: funkcje timerów muszą zachować kontekst `Window`.
+- Pełna gra z rzeczywistą mapą Cesium nad Warszawą: 260 załadowanych kafli, działające kule replay, przełączanie sześciu kamer i pauza/wznowienie. Osobny test renderowania potwierdził zasłanianie znacznika przez geometrię w buforze głębokości.
+- Nie wykonano wdrożenia na publiczny serwer, testu ciągłego 24/7 ani testu na fizycznym telefonie. Odnowienie tokenu i wyczerpanie limitu sprawdzono deterministycznie, bez celowego zużywania dziennej puli. Poniższy plan pozostaje specyfikacją oraz listą scenariuszy do dłuższego odbioru produkcyjnego.
 
 ## 1. Co potwierdził test API
 

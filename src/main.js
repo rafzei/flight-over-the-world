@@ -59,6 +59,7 @@ import { createVehicleGroundShadows } from "./game/vehicleGroundShadows.js";
 import { createVehicleCollisionDetector, raycastTerrain } from "./game/vehicleCollision.js";
 import { createCarousel } from "./game/menuPreview.js";
 import { createSky, SUN_DIR } from "./game/sky.js";
+import { createAirliner } from "./game/airliner.js";
 import {
   drawAirspeed,
   drawAltimeter,
@@ -216,6 +217,16 @@ const PLANES = {
     desc: "Business jet – cruise 330, max 900 km/h",
     sound: "jet",
   },
+  b738: {
+    create: () => createAirliner("b738"), wingspan: 39.47,
+    cruise: 230, boost: 270, brake: 70, cam: [0, 12, 56],
+    name: "Boeing 737-800", desc: "Twin-engine airliner – cruise 830, max 970 km/h", sound: "jet",
+  },
+  a320: {
+    create: () => createAirliner("a320"), wingspan: 37.57,
+    cruise: 225, boost: 265, brake: 68, cam: [0, 12, 54],
+    name: "Airbus A320", desc: "Twin-engine airliner – cruise 810, max 950 km/h", sound: "jet",
+  },
   jet: {
     file: asset("models/jet.glb"),
     wingspan: 10,
@@ -270,7 +281,7 @@ const PLANES = {
     exhaustOptions: { axis: "y", ignitionKmh: 0 },
   },
 };
-const PLANE_ORDER = ["pa28", "q400", "citation", "jet", "rocket", "drone", "falcon9"];
+const PLANE_ORDER = ["pa28", "q400", "citation", "b738", "a320", "jet", "rocket", "drone", "falcon9"];
 
 const HOME_TIME = 600; // 10 min na dolot do domu
 const GUESS_TIME = 60; // 1 min na rozpoznanie terenu
@@ -4154,7 +4165,7 @@ if (el.throttleRail) {
 window.addEventListener("wheel", (e) => {
   if (menuOpen || paused || leaveOpen || guessOpen || crashed || finished || freeMap.open) return;
   if (e.defaultPrevented || e.ctrlKey || e.metaKey || !Number.isFinite(e.deltaY) || e.deltaY === 0) return;
-  if (e.target?.isContentEditable || e.target?.closest?.("input, textarea, select")) return;
+  if (e.target?.isContentEditable || e.target?.closest?.("input, textarea, select, #traffic-panel")) return;
   e.preventDefault();
   const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? innerHeight : 1;
   const delta = e.deltaY * unit;
@@ -4240,6 +4251,7 @@ window.__foeDebug = () => ({
   camPos: camera?.position?.toArray?.() || [],
   cameraMode: FLIGHT_CAMERAS[flightCamera.mode].name,
   traffic: liveTraffic?.debug(),
+  spaceSky: sky?.uniforms.uSpace.value,
 });
 const skyQuat = new Quaternion(); // lokalna ramka N/S (bez kursu) — dla kopuły nieba i słońca
 const skyFramePos = new Vector3();
@@ -4491,7 +4503,7 @@ function tickFrame() {
   }
   sky.mesh.position.copy(camPos);
   sky.mesh.quaternion.copy(skyQuat);
-  sky.uniforms.uTime.value = clock.elapsedTime;
+  sky.update(plane.height, clock.elapsedTime, scene.fog);
 
   offset.copy(SUN_DIR).applyQuaternion(skyQuat);
   sun.position.copy(offset).multiplyScalar(700).add(planePos);
