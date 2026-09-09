@@ -33,8 +33,8 @@ Fly over photorealistic Earth – guess the region, find your way home, or just 
 
 - **Guess the region** – one minute of flight, then mark on the map where you are (Poland / Europe / World).
 - **Fly home** – start ~30 km from the address you enter, 10 minutes to get back.
-- **Free flight** – pick a city and fly.
-- **Land in Warsaw** – start 6 km before Warsaw Chopin runway 33, aligned with a 3° approach and landing gear down. Available for Piper, Q400, Citation, Boeing 737, Airbus A320 and Fighter.
+- **Free flight** – pick a city and fly. You can also fly to Warsaw Chopin runway 33 and land without changing modes.
+- **Land** – practise landing, initially at Warsaw Chopin runway 33. Start 6 km before the threshold, aligned with a 3° approach and landing gear down. Available for Piper, Q400, Citation, Boeing 737, Airbus A320 and Fighter.
 
 ## Vehicles
 
@@ -96,7 +96,7 @@ the vehicle and looks back at it. Press `C` once more to return to normal chase.
 
 ## Landing in Warsaw
 
-Choose **Single player → Land in Warsaw → Start**. Follow the runway centreline and the landing panel's target speed, descent rate and glide-path error. The marked threshold is displaced from the physical start of the pavement: touch down beyond the threshold stripes, near the paired aiming-point blocks.
+Choose **Single player → Land → Start** for a prepared approach, or fly to Warsaw Chopin in **Free flight** and extend the gear with `G`. The same landing physics and instruments work in both modes. Follow the runway centreline and the landing panel's target speed, descent rate and glide-path error. The marked threshold is displaced from the physical start of the pavement: touch down beyond the threshold stripes, near the paired aiming-point blocks.
 
 Keep the wings level, reduce throttle near the runway and gently pull back with `S` to flare. The main wheels must touch first, with a small nose-up attitude and a low descent rate. After touchdown, let the nose settle, press `,` for idle and hold `B` to stop. `A` / `D` steer on the ground; sharp turns at speed can cause a runway excursion. For another takeoff, release the brakes, press `.` for full power and pull back after accelerating above approach speed. Gear and wheel-brake buttons also support touch input.
 

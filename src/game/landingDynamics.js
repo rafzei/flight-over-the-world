@@ -37,7 +37,8 @@ export class LandingSystem {
     if(first.name==='nose'&&!hits.some(h=>h.name==='main'&&Math.abs(h.fraction-first.fraction)<.04))return this.failure(plane,'Nose wheel first — flare before touchdown');
     const sink=Math.max(0,(from.y-to.y)/dt),yaw=Math.abs(angle(plane.heading-this.runway.definition.heading*DEG));
     if(Math.abs(plane.roll)>7*DEG)return this.failure(plane,'Too much bank at touchdown');
-    if(plane.pitch<-.8*DEG||plane.pitch>11*DEG)return this.failure(plane,'Unsafe pitch at touchdown');
+    const surfacePitch = plane.pitch - (this.runway.groundPitch || 0);
+    if(surfacePitch<-.8*DEG||surfacePitch>11*DEG)return this.failure(plane,'Unsafe pitch at touchdown');
     if(yaw>12*DEG)return this.failure(plane,'Not aligned with the runway');
     if(plane.speed<this.gear.speed*.68||plane.speed>this.gear.speed*1.4)return this.failure(plane,'Unsafe landing speed');
     if(sink>4.5)return this.failure(plane,'Hard impact — landing gear failed');
@@ -58,7 +59,8 @@ export class LandingSystem {
     if(Math.abs(turn*plane.speed)>6)return this.failure(plane,'Lost directional control');
     plane.heading+=turn*dt;
     plane.roll*=Math.exp(-8*dt);
-    plane.pitch=this.gear.restPitch+((this.touchdown?.pitch||0)-this.gear.restPitch)*Math.exp(-1.8*this.groundTime);
+    const restPitch=this.gear.restPitch+(this.runway.groundPitch||0);
+    plane.pitch=restPitch+((this.touchdown?.pitch||0)-restPitch)*Math.exp(-1.8*this.groundTime);
     const p=this.runway.coordinates(plane),delta=angle(plane.heading-this.runway.definition.heading*DEG);
     p.x+=Math.sin(delta)*plane.speed*dt;p.z-=Math.cos(delta)*plane.speed*dt;
     Object.assign(plane,this.runway.pose(p.x,-p.z,p.y));this.align(plane);
@@ -75,8 +77,8 @@ export class LandingSystem {
     const p=this.runway.coordinates(plane),d=this.runway.definition,remaining=d.threshold+p.z;
     const feet=this.gear?this.feet(plane):[];
     const wheelClearance=feet.length?Math.min(...feet.map(w=>w.point.y)):p.y;
-    return {status:this.status,grounded:this.grounded,reason:this.reason,runway:d.name,elevation:this.runway.elevation,crossTrackM:p.x,distanceToThresholdM:remaining,runwayRemainingM:d.length+p.z,
+    return {status:this.status,grounded:this.grounded,reason:this.reason,runway:d.name,runwayId:d.id,airportId:d.airportId,ident:d.ident,elevation:this.runway.elevation,runwaySlope:this.runway.physical?.slope||0,crossTrackM:p.x,distanceToThresholdM:remaining,runwayRemainingM:d.length+p.z,
       gearDown:this.gear?.extension>=.98,gearExtension:this.gear?.extension??0,sinkMps:-(plane.verticalSpeed||0),speedKmh:plane.speed*3.6,targetKmh:(this.gear?.speed||0)*3.6,
-      wheelClearanceM:wheelClearance,glideErrorM:wheelClearance-Math.max(0,remaining+300)*Math.tan(3*DEG),touchdown:this.touchdown,wheelHeights:feet.map(w=>({name:w.name,height:w.point.y}))};
+      wheelClearanceM:wheelClearance,glideErrorM:wheelClearance-Math.max(0,remaining+(d.aimingPoint??300))*Math.tan(3*DEG),touchdown:this.touchdown,wheelHeights:feet.map(w=>({name:w.name,height:w.point.y}))};
   }
 }

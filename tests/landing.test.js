@@ -69,3 +69,32 @@ test('approach dynamics retain descent through a flare and are stable across fra
   }
   assert(Math.max(...heights)-Math.min(...heights)<.1);
 });
+
+test('takeoff accelerates from a standstill, rotates on the wheels and climbs clear of the runway',()=>{
+  const r=rig();descend(r);
+  r.plane.speed=0;r.plane.throttle=0;
+  const ctrl={throttle:1,roll:0,pitch:1,wheelBrake:false,approach:true,approachSpeed:r.gear.speed};
+  for(let i=0;i<6000&&r.system.grounded;i++){
+    r.gear.update(1/60,r.plane.speed,true);
+    const result=r.system.roll(r.plane,1/60,ctrl);
+    assert(!result.crash);
+    assert(r.system.feet(r.plane).every(w=>w.point.y>-.001),'rotation cannot push wheels through the runway');
+  }
+  assert(!r.system.grounded);assert(r.plane.verticalSpeed>0);
+  for(let i=0;i<120;i++){
+    const before=flightPose(r.plane);
+    r.gear.update(1/60,r.plane.speed,false);
+    r.plane.update(1/60,ctrl);
+    assert(!r.system.resolve(r.plane,before,1/60).crash);
+  }
+  assert(!r.system.grounded);assert(r.system.feet(r.plane).every(w=>w.point.y>1));r.dispose();
+});
+
+test('gear travels over three simulation seconds and freezes while paused',()=>{
+  const r=rig();r.gear.toggle(false);r.gear.update(1,72,false);
+  assert(Math.abs(r.gear.extension-2/3)<1e-8);
+  const before=r.gear.extension;r.gear.update(0,72,false);assert.equal(r.gear.extension,before);
+  r.gear.update(2,72,false);assert(r.gear.extension<1e-8);assert(!r.gear.root.visible);
+  r.gear.toggle(false);r.gear.update(3,72,false);assert.equal(r.gear.extension,1);
+  r.gear.reset();assert.equal(r.gear.target,1);assert.equal(r.gear.compression,0);r.dispose();
+});

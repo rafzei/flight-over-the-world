@@ -60,7 +60,7 @@ import { createVehicleCollisionDetector, raycastTerrain } from "./game/vehicleCo
 import { createCarousel } from "./game/menuPreview.js";
 import { createSky, SUN_DIR } from "./game/sky.js";
 import { createAirliner } from "./game/airliner.js";
-import { WarsawRunway, createRunwayVisual } from "./game/warsawRunway.js";
+import { AirportRunways, DEFAULT_APPROACH } from "./game/airportRunways.js";
 import { attachLandingGear, LANDING_SPEEDS } from "./game/landingGear.js";
 import { LandingSystem, flightPose } from "./game/landingDynamics.js";
 import {
@@ -295,9 +295,10 @@ const HOME_BEACON_M = 1000;
 
 let camera, scene, renderer, tiles, sun, sky;
 let liveTraffic;
-const warsawRunway = new WarsawRunway();
-const landingSystem = new LandingSystem(warsawRunway);
-let runwayVisual, landingBrake = false;
+const airportRunways = new AirportRunways();
+let selectedApproach = DEFAULT_APPROACH;
+const landingSystem = new LandingSystem(airportRunways.get(selectedApproach));
+let landingBrake = false;
 let vehicleGroundShadows;
 let fighterMissiles;
 let droneCannons;
@@ -961,15 +962,39 @@ carousel.setActive(false);
 lobbyCarousel.setActive(false);
 
 // wybór trybu — same przyciski, instrukcja pokazuje się dopiero pod spodem
+const airportSelect = document.getElementById("landing-airport");
+const runwaySelect = document.getElementById("landing-runway");
+const landingAirports = [...new Map(airportRunways.runways.map(r => [r.data.airportId, r.data])).values()]
+  .sort((a, b) => a.airportName.localeCompare(b.airportName, "pl"));
+for (const airport of landingAirports) {
+  airportSelect.add(new Option(`${airport.airportName} (${airport.airportId})`, airport.airportId));
+}
+airportSelect.value = airportRunways.get(selectedApproach).definition.airportId;
+function syncLandingSelection(keepDirection = false) {
+  const options = airportRunways.approaches.filter(r => r.definition.airportId === airportSelect.value);
+  runwaySelect.replaceChildren(...options.map(r => new Option(`RWY ${r.definition.ident} · ${Math.round(r.definition.heading)}°`, r.definition.id)));
+  selectedApproach = keepDirection && options.some(r => r.definition.id === selectedApproach) ? selectedApproach : options[0].definition.id;
+  runwaySelect.value = selectedApproach;
+  syncRunwayInfo();
+}
+function syncRunwayInfo() {
+  const d = airportRunways.get(selectedApproach).definition;
+  const short = d.length - d.threshold < 1200 ? " · Short runway: choose a light aircraft" : "";
+  document.getElementById("landing-runway-info").textContent = `${Math.round(d.length)} × ${Math.round(d.width)} m · landing distance ${Math.round(d.length - d.threshold)} m${short}`;
+}
+airportSelect.addEventListener("change", () => syncLandingSelection());
+runwaySelect.addEventListener("change", () => { selectedApproach = runwaySelect.value; syncRunwayInfo(); });
+syncLandingSelection(true);
+
 const MODE_PLACEHOLDERS = {
-  landing: "Warsaw Chopin · runway 33",
+  landing: "Choose an airport and runway",
   free: "Starting city… e.g. Paris",
   home: "Your address… e.g. 5th Avenue, New York",
   guess: "",
 };
 const MODE_DESCS = {
-  landing: "Approach Warsaw Chopin runway 33. G: landing gear. Reduce throttle, flare gently with S, then hold B to brake. Touch down on the main wheels.",
-  free: "Pick a starting city and fly with no time limit.",
+  landing: "Choose a paved runway in Poland. G: landing gear. Reduce throttle, flare gently with S, then hold B to brake. Landing also works during Free flight.",
+  free: "Pick a starting city and fly with no time limit. Land on paved runways across Poland: extend gear with G, touch down on the main wheels and hold B to brake.",
   home: "We drop you ~30 km from home. You have 10 minutes to find your way back.",
   guess:
     "You have one minute in the air to get your bearings, then mark on the map where you are.",
@@ -983,6 +1008,7 @@ function selectMode(m) {
   el.modeDesc.textContent = MODE_DESCS[m];
   el.city.placeholder = MODE_PLACEHOLDERS[m];
   el.city.style.display = m === "guess" || m === "landing" ? "none" : "";
+  document.getElementById("landing-selectors").hidden = m !== "landing";
   el.guessScope.style.display = m === "guess" ? "" : "none";
   el.menuError.textContent = "";
   if (m === "guess") GUESS_SCOPES[guessScope]?.load().catch(() => {});
@@ -2689,7 +2715,7 @@ async function init() {
     tiles.group.rotation.x = -Math.PI / 2;
     tiles.group.visible = false;
     scene.add(tiles.group);
-    runwayVisual = createRunwayVisual(scene, warsawRunway, tiles.group);
+    airportRunways.attach(scene, tiles.group);
     liveTraffic = createLiveTraffic({ scene, camera, mapRoot: tiles.group, mobile: isMobile, baseUrl: import.meta.env.VITE_TRAFFIC_API_BASE || "" });
     tiles.setResolutionFromRenderer(camera, renderer);
     tiles.setCamera(camera);
@@ -2931,6 +2957,7 @@ function loadMate(id, key) {
 
 function resetFlight(latDeg, lonDeg) {
   landingSystem.reset();
+  if (mode === "landing") landingSystem.runway = airportRunways.get(selectedApproach);
   planeMesh?.userData.landingGear?.reset();
   if (planeMesh?.userData.landingGear && !planeMesh.userData.landingGear.fixed && mode !== "landing") planeMesh.userData.landingGear.extension = planeMesh.userData.landingGear.target = 0;
   landingBrake = false;
@@ -3160,7 +3187,7 @@ function updateFlightPhysics(dt) {
     }
   }
   if (!canCrash) return;
-  if (landingSystem?.grounded || landingSystem?.protects(plane)) { groundAlt = warsawRunway.pose(0, -warsawRunway.coordinates(plane).z).height; return; }
+  if (landingSystem?.grounded || landingSystem?.protects(plane)) { const runway = landingSystem.runway; groundAlt = runway.pose(0, -runway.coordinates(plane).z).height; return; }
   // Recheck this location, not an old altitude from another tile. This also
   // catches penetration when terrain arrives during the brief spawn grace.
   const col = probeColumn(plane.lat, plane.lon, Math.max(plane.height, 2500));
@@ -3290,7 +3317,8 @@ async function startGame() {
   try {
     if (mode === "landing") {
       if (!LANDING_SPEEDS[selectedPlane]) return menuFail("Choose an aircraft with landing gear: Piper, Q400, Citation, 737, A320 or Fighter.");
-      const p = warsawRunway.pose(0, warsawRunway.definition.threshold - 6000, 340);
+      const runway = airportRunways.get(selectedApproach);
+      const p = runway.pose(0, runway.definition.threshold - 6000, 340);
       beginFlight(p.lat * 180 / Math.PI, p.lon * 180 / Math.PI);
     } else if (mode === "free") {
       const city = el.city.value.trim() || "Niepruszewo";
@@ -3351,10 +3379,12 @@ function beginFlight(lat, lon) {
 // wywoływane gdy teren zmierzony — właściwy start gry
 function finishSnapStart() {
   if (mode === "landing") {
-    warsawRunway.calibrate(probeSurface);
+    const runway = airportRunways.get(selectedApproach);
+    landingSystem.runway = runway;
+    runway.calibrate(probeSurface);
     const clearance = Math.max(0, ...(planeMesh?.userData.landingGear?.points() || []).map(w => -w.point.y));
-    Object.assign(plane, warsawRunway.pose(0, warsawRunway.definition.threshold - 6000, 6300 * Math.tan(3 * Math.PI / 180) + clearance));
-    plane.heading = warsawRunway.definition.heading * Math.PI / 180;
+    Object.assign(plane, runway.pose(0, runway.definition.threshold - 6000, (6000 + runway.definition.aimingPoint) * Math.tan(3 * Math.PI / 180) + clearance));
+    plane.heading = runway.definition.heading * Math.PI / 180;
     plane.speed = LANDING_SPEEDS[selectedPlane];
     plane.verticalSpeed = -plane.speed * Math.sin(3 * Math.PI / 180);
     plane.pitch = plane.roll = 0;
@@ -4371,8 +4401,18 @@ function tickFrame() {
   }
   ctrl.throttle = throttleShown;
   landingSystem.gear = planeMesh?.userData.landingGear || null;
+  if (flying && landingSystem.gear) {
+    const nextRunway = airportRunways.choose(plane, { current: landingSystem.runway, locked: landingSystem.grounded || landingSystem.bounceTime > 0, preferred: mode === "landing" ? selectedApproach : null });
+    if (nextRunway !== landingSystem.runway) { landingSystem.reset(); landingSystem.runway = nextRunway; }
+  }
+  const activeRunway = landingSystem.runway;
   const nearRunway = landingSystem.gear && landingSystem.near(plane);
-  ctrl.approach = !!(landingSystem.gear && (mode === "landing" || (nearRunway && landingSystem.gear.target === 1 && plane.height < warsawRunway.elevation + 1000)));
+  // Free-flight arrivals share the same runway and ground physics as practice.
+  // Finish terrain calibration while safely airborne, never move the pavement under the wheels.
+  if (flying && nearRunway && !activeRunway.calibrated && frameCount % 60 === 0 && activeRunway.coordinates(plane).y > 60) {
+    activeRunway.calibrate(probeSurface);
+  }
+  ctrl.approach = !!(landingSystem.gear && (mode === "landing" || (nearRunway && landingSystem.gear.target === 1 && plane.height < activeRunway.elevation + 1000)));
   ctrl.approachSpeed = landingSystem.gear?.speed || 0;
   ctrl.wheelBrake = keys.has("b") || landingBrake;
   landingSystem.gear?.update(flying ? dt : 0, plane.speed, landingSystem.grounded, landingSystem.touchdown?.sink || 0);
@@ -4381,13 +4421,13 @@ function tickFrame() {
     updateFlightPhysics(dt);
     flying = !crashed;
   }
-  runwayVisual?.update();
+  if (!menuOpen || awaitingSnap) airportRunways.updateVisuals(plane, activeRunway, probeSurface);
   const landingPanel = document.getElementById("landing-panel");
   if (landingPanel) {
     landingPanel.hidden = menuOpen || paused || guessOpen || leaveOpen || freeMap.open || !landingSystem.gear || (!nearRunway && mode !== "landing");
     if (!landingPanel.hidden && frameCount % 8 === 0) {
       const d = landingSystem.diagnostics(plane);
-      const status = d.reason || (d.status === "stopped" ? "LANDED · aircraft stopped on its wheels" : d.status === "rollout" ? `ON WHEELS · hold B to brake · ${Math.round(d.runwayRemainingM)} m left` : d.status === "bounced" ? "BOUNCE · stabilize and flare gently" : `RWY 33 · ${Math.max(0,d.distanceToThresholdM/1000).toFixed(1)} km to threshold`);
+      const status = d.reason || (d.status === "stopped" ? "LANDED · aircraft stopped on its wheels" : d.status === "rollout" ? `ON WHEELS · hold B to brake · ${Math.round(d.runwayRemainingM)} m left` : d.status === "bounced" ? "BOUNCE · stabilize and flare gently" : `${d.airportId} RWY ${d.ident} · ${Math.max(0,d.distanceToThresholdM/1000).toFixed(1)} km to threshold`);
       document.getElementById("landing-status").textContent = status;
       document.getElementById("landing-details").textContent = `${Math.round(d.speedKmh)} / target ${Math.round(d.targetKmh)} km/h · sink ${d.sinkMps.toFixed(1)} m/s\nCentreline ${Math.round(d.crossTrackM)} m · glide ${d.glideErrorM > 0 ? "+" : ""}${Math.round(d.glideErrorM)} m\nWheels above runway ${Math.max(0,d.wheelClearanceM).toFixed(1)} m`;
       const gearButton = document.getElementById("gear-toggle");

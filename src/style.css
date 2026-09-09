@@ -156,6 +156,11 @@ button, .mode-card, .scope-btn {
 #landing-panel button { font: inherit; color: var(--paper); background: #ffffff12; border: 1px solid #ffffff35; border-radius: 4px; padding: 8px; cursor: pointer; }
 #landing-panel button:disabled { opacity: .55; cursor: default; }
 #wheel-brake { touch-action: none; user-select: none; }
+#landing-selectors { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 8px 12px; margin-bottom: 12px; text-align: left; }
+#landing-selectors[hidden] { display: none; }
+#landing-selectors label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; min-width: 0; }
+#landing-selectors select { width: 100%; min-width: 0; color: var(--paper); background: #26211c; border: 1px solid #ffffff35; border-radius: 4px; padding: 9px; font: inherit; }
+#landing-runway-info, #landing-selectors small { grid-column: 1 / -1; margin: 0; font-size: 11px; color: var(--muted); }
 @media (max-width: 760px), (pointer: coarse) {
   #landing-panel { top: 80px; left: 10px; right: auto; width: min(315px, calc(100vw - 30px)); padding: 8px; }
   #hud:has(#landing-panel:not([hidden])) #traffic-panel { top: 255px; max-height: max(80px, calc(100dvh - 540px)); }
