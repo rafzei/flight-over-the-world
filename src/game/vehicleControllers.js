@@ -1,6 +1,7 @@
 import { Euler, MathUtils, Vector3 } from "three";
 import { PlaneController, HIGH_SPEED_CONTROL_PENALTY } from "./plane.js";
 import { LunarController } from "./lunarController.js";
+import { SailplaneController } from "./sailplane.js";
 
 const EARTH_RADIUS = 6378137;
 const blend = (rate, dt) => 1 - Math.exp(-rate * dt);
@@ -86,6 +87,7 @@ export class FalconController extends PlaneController {
 
 export function createVehicleController(lat, lon, height, heading, spec) {
   const Controller = spec.flightModel === "lunar" ? LunarController
+    : spec.flightModel === "sailplane" ? SailplaneController
     : spec.flightModel === "drone" ? DroneController
     : spec.flightModel === "falcon" ? FalconController : PlaneController;
   return new Controller(lat, lon, height, heading, spec);

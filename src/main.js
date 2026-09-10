@@ -45,6 +45,7 @@ import { createDroneCannons } from "./game/droneCannons.js";
 import { setLoader, hideLoader } from "./game/hud.js";
 import { createPlaneMesh } from "./game/plane.js";
 import { createVehicleController } from "./game/vehicleControllers.js";
+import { SAILPLANE_SPEC, updateSailplane } from "./game/sailplane.js";
 import { createFalcon9, falconState, releaseDragon, resetFalcon9, updateDragon } from "./game/falcon9.js";
 import { FlightCamera, FLIGHT_CAMERAS } from "./game/flightCamera.js";
 import { applyRotorState, spinRotors } from "./game/rotors.js";
@@ -190,6 +191,7 @@ const TERRAIN_ALT = 120; // przybliżona wysokość elipsoidalna nizin
 const ION_GOOGLE_TILES_ASSET = "2275207";
 
 const PLANES = {
+  sailplane: SAILPLANE_SPEC,
   pa28: {
     file: asset("models/pa28.glb"),
     wingspan: 11,
@@ -288,7 +290,7 @@ const PLANES = {
     exhaustOptions: { axis: "y", ignitionKmh: 0 },
   },
 };
-const PLANE_ORDER = ["pa28", "q400", "citation", "b738", "a320", "jet", "rocket", "drone", "falcon9"];
+const PLANE_ORDER = ["pa28", "sailplane", "q400", "citation", "b738", "a320", "jet", "rocket", "drone", "falcon9"];
 
 const HOME_TIME = 600; // 10 min na dolot do domu
 const GUESS_TIME = 60; // 1 min na rozpoznanie terenu
@@ -949,6 +951,7 @@ function ensureLobbyCarousel() {
   lobbyCarousel.show(selectedPlane, 0);
 }
 let planeIdx = 0;
+const flightHints = [...document.querySelectorAll(".hint-desk, .hint-touch")].map(node => ({ node, html: node.innerHTML }));
 function selectPlane(i, dir, silent = false) {
   planeIdx = (i + PLANE_ORDER.length) % PLANE_ORDER.length;
   selectedPlane = PLANE_ORDER[planeIdx];
@@ -959,6 +962,13 @@ function selectPlane(i, dir, silent = false) {
   el.carDesc.textContent = spec.desc;
   el.lobbyCarName.textContent = spec.name;
   el.lobbyCarDesc.textContent = spec.desc;
+  for (const hint of flightHints) {
+    hint.node.innerHTML = selectedPlane === "sailplane"
+      ? hint.node.classList.contains("hint-touch")
+        ? "Drag the stick to glide · nose down gains speed, nose up trades speed for height · slide AIRBRK to descend faster"
+        : "<kbd>W</kbd> nose down / gain speed · <kbd>S</kbd> nose up / slow down · <kbd>A</kbd><kbd>D</kbd> bank · scroll or drag AIRBRK · <kbd>Ctrl</kbd> airbrakes · <kbd>Shift</kbd> retract airbrakes · <kbd>,</kbd> / <kbd>.</kbd> retract / extend · <kbd>B</kbd> wheel brake · <kbd>C</kbd> camera · <kbd>M</kbd> map · <kbd>Esc</kbd> pause"
+      : hint.html;
+  }
   if (!silent && mp.active && mp.net) {
     mp.net.send({ t: "plane", plane: selectedPlane, from: mp.myId });
     renderLobby();
@@ -3353,7 +3363,7 @@ async function startGame() {
   el.menuError.textContent = "";
   try {
     if (mode === "landing") {
-      if (!LANDING_SPEEDS[selectedPlane]) return menuFail("Choose an aircraft with landing gear: Piper, Q400, Citation, 737, A320 or Fighter.");
+      if (!LANDING_SPEEDS[selectedPlane]) return menuFail("Choose an aircraft with landing gear: Piper, Sailplane, Q400, Citation, 737, A320 or Fighter.");
       const runway = airportRunways.get(selectedApproach);
       const p = runway.pose(0, runway.definition.threshold - 6000, 340);
       beginFlight(p.lat * 180 / Math.PI, p.lon * 180 / Math.PI);
@@ -3425,8 +3435,11 @@ function finishSnapStart() {
     plane.speed = LANDING_SPEEDS[selectedPlane];
     plane.verticalSpeed = -plane.speed * Math.sin(3 * Math.PI / 180);
     plane.pitch = plane.roll = 0;
-    plane.throttle = (plane.speed - plane.speed * .55) / (plane.boost - plane.speed * .55);
-    throttleLever = throttleShown = ctrl.throttle = plane.throttle;
+    plane.throttle = plane.isSailplane ? 0 : (plane.speed - plane.speed * .55) / (plane.boost - plane.speed * .55);
+    // Partial spoilers put the glider on the prepared three-degree approach.
+    if (plane.isSailplane) plane.airbrake = .35;
+    throttleLever = throttleShown = plane.isSailplane ? plane.airbrake : plane.throttle;
+    ctrl.throttle = plane.throttle;
     syncThrottleUi(); camInit = false;
   }
   // Start with the full mode duration only after the terrain is ready, even
@@ -4199,6 +4212,11 @@ function setThrottleLever(v) {
 }
 
 function throttleTarget() {
+  if (plane?.isSailplane) {
+    if (keys.has("control")) return 1;
+    if (keys.has("shift")) return 0;
+    return throttleLever;
+  }
   if (keys.has("shift")) return 1;
   if (keys.has("control")) return 0;
   return throttleLever;
@@ -4215,6 +4233,10 @@ function tickThrottle(dt) {
 }
 
 function syncThrottleUi() {
+  const gliding = !!plane?.isSailplane;
+  const label = el.throttle?.querySelector("span");
+  if (label) label.textContent = gliding ? "AIRBRK" : "THR";
+  el.throttleRail?.setAttribute("aria-label", gliding ? "Airbrakes" : "Throttle");
   if (el.throttleKnob) {
     el.throttleKnob.style.bottom = `${throttleShown * 100}%`;
   }
@@ -4494,7 +4516,8 @@ function tickFrame() {
     throttleShown = throttleLever;
     syncThrottleUi();
   }
-  ctrl.throttle = throttleShown;
+  ctrl.throttle = plane.isSailplane ? 0 : throttleShown;
+  ctrl.airbrake = plane.isSailplane ? throttleShown : 0;
   landingSystem.gear = planeMesh?.userData.landingGear || null;
   if (flying && landingSystem.gear) {
     const nextRunway = airportRunways.choose(plane, { current: landingSystem.runway, locked: landingSystem.grounded || landingSystem.bounceTime > 0, preferred: mode === "landing" ? selectedApproach : null });
@@ -4542,6 +4565,7 @@ function tickFrame() {
   const speed01 = plane.speed / plane.boost;
   const rpm01 = Math.min(1, Math.max(0.15, 0.22 + plane.throttle * 0.78));
   updateEngineSound(flying, rpm01, speed01, PLANES[selectedPlane].sound);
+  updateSailplane(planeMesh, plane.airbrake);
   updateMusic();
 
   // pozycja i orientacja samolotu

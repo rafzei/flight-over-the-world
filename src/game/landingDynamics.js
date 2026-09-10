@@ -51,7 +51,8 @@ export class LandingSystem {
   roll(plane,dt,ctrl){
     this.groundTime+=dt;
     const brake=ctrl.wheelBrake?1:0;
-    plane.throttle+=(Math.max(0,Math.min(1,ctrl.throttle))-plane.throttle)*(1-Math.exp(-3*dt));
+    if(plane.isSailplane)plane.throttle=0;
+    else plane.throttle+=(Math.max(0,Math.min(1,ctrl.throttle))-plane.throttle)*(1-Math.exp(-3*dt));
     const resistance=.12+.00025*plane.speed*plane.speed+brake*4.2;
     plane.speed=Math.max(0,plane.speed+(plane.throttle*3.8-resistance)*dt);
     if(plane.speed<.35&&plane.throttle<.04)plane.speed=0;
