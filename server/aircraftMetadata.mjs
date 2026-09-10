@@ -6,8 +6,8 @@ const clean = (value, max = 100) => typeof value === "string" ? value.trim().sli
 export function parseAircraftMetadata(payload, icao24) {
   const data = payload?.response?.aircraft;
   if (!data || typeof data.mode_s !== "string" || data.mode_s.toLowerCase() !== icao24) return null;
-  const typeCode = clean(data.icao_type, 8)?.toUpperCase();
-  if (!/^[A-Z0-9]{2,4}$/.test(typeCode || "")) return null;
+  const typeCode = clean(data.icao_type, 12)?.toUpperCase();
+  if (!/^[A-Z][A-Z0-9-]{1,11}$/.test(typeCode || "")) return null;
   return { typeCode, manufacturer: clean(data.manufacturer), modelName: clean(data.type), registration: clean(data.registration, 16), source: "adsbdb" };
 }
 
@@ -24,7 +24,7 @@ export class AircraftMetadata {
       if (data.version !== 1 || !Array.isArray(data.entries)) return;
       for (const [id, value] of data.entries.slice(-this.maxEntries)) {
         if (/^[a-f0-9]{6}$/.test(id) && value && Number.isFinite(value.expiresAt) && value.expiresAt > this.now()
-          && (value.aircraft === null || (value.aircraft.source === "adsbdb" && /^[A-Z0-9]{2,4}$/.test(value.aircraft.typeCode)))) this.cache.set(id, value);
+          && (value.aircraft === null || (value.aircraft.source === "adsbdb" && /^[A-Z][A-Z0-9-]{1,11}$/.test(value.aircraft.typeCode)))) this.cache.set(id, value);
       }
     } catch { /* An unavailable metadata cache must not stop live positions. */ }
   }

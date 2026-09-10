@@ -4,7 +4,7 @@ import { Box3, FogExp2, Matrix4, PerspectiveCamera, Scene, Vector3 } from "three
 import { WGS84_ELLIPSOID } from "3d-tiles-renderer";
 import { createSky, spaceSkyBlend } from "../src/game/sky.js";
 import { createAirliner } from "../src/game/airliner.js";
-import { aircraftVisual } from "../shared/aircraftTypes.js";
+import { AIRLINERS, aircraftVisual } from "../shared/aircraftTypes.js";
 import { TrafficSpheres } from "../src/game/trafficSpheres.js";
 import { TrafficTracks } from "../src/game/trafficTracks.js";
 import { disposeModelResources } from "../src/game/vehicleModels.js";
@@ -21,11 +21,11 @@ test("space sky begins above 20 km and reversibly updates fog, for both quality 
   }
 });
 
-test("both original airliners have finite meter-scale geometry and a bounded number of parts", () => {
-  for(const key of ["b738","a320"]) {
+test("all airliners have finite meter-scale geometry and a bounded number of parts", () => {
+  for(const key of Object.keys(AIRLINERS)) {
     const model=createAirliner(key), box=new Box3().setFromObject(model), size=box.getSize(new Vector3());
     assert.equal(model.userData.airliner,key); assert(model.children.length<=6);
-    assert(size.x>35&&size.x<37); assert(size.z>37&&size.z<40); assert(size.y>10&&size.y<15);
+    assert(Math.abs(size.x-AIRLINERS[key].span)<.6); assert(Math.abs(size.z-AIRLINERS[key].length)<.1); assert(size.y>9&&size.y<15);
     for(const part of model.children) {
       assert([...part.geometry.attributes.position.array].every(Number.isFinite));
       assert([...part.geometry.attributes.normal.array].every(Number.isFinite));
@@ -60,11 +60,11 @@ test("known types replace spheres, preserve geographic heading and update metada
   const scene=new Scene(), matrix=new Matrix4().makeRotationX(-Math.PI/2), camera=new PerspectiveCamera(70,1.8,1,1e8);
   earthPosition(.5,.2,1000,matrix,camera.position);camera.up.copy(earthPosition(.5,.2,1100,matrix).sub(camera.position).normalize());
   camera.lookAt(earthPosition(.501,.2,1000,matrix));camera.updateMatrixWorld();
-  const samples=['B738','A320','E195'].map((type,i)=>({icao24:`abc12${i}`,latitudeDeg:.501*180/Math.PI,longitudeDeg:.2*180/Math.PI,altitudeM:1000,timePosition:1000,onGround:false,freshness:1,trueTrackDeg:90,velocityMps:200,aircraft:{typeCode:type}}));
+  const samples=['B738','A320-214','E195LR','Airbus A321-231','A359'].map((type,i)=>({icao24:`abc12${i}`,latitudeDeg:.501*180/Math.PI,longitudeDeg:.2*180/Math.PI,altitudeM:1000,timePosition:1000,onGround:false,freshness:1,trueTrackDeg:90,velocityMps:200,aircraft:{typeCode:type}}));
   const layer=new TrafficSpheres(scene);
   layer.update(samples,camera,matrix,new FogExp2(0xffffff,.00007),1080);
   assert.equal(layer.mesh.count,1);
-  for(const key of ['b738','a320'])assert(layer.airliners.get(key).every(p=>p.count===1));
+  for(const key of Object.keys(AIRLINERS))assert(layer.airliners.get(key).every(p=>p.count===1));
   const transform=new Matrix4();layer.airliners.get('b738')[0].getMatrixAt(0,transform);
   const forward=new Vector3(0,0,-1).transformDirection(transform);
   const here=earthPosition(.501,.2,1000,matrix), east=earthPosition(.501,.20001,1000,matrix).sub(here).normalize();
@@ -72,4 +72,18 @@ test("known types replace spheres, preserve geographic heading and update metada
   const tracks=new TrafficTracks();tracks.ingest({aircraft:[{...samples[0],aircraft:null}]},1000);
   tracks.ingest({aircraft:[samples[0]]},1001);assert.equal(tracks.positions(1001)[0].aircraft.typeCode,'B738');
   layer.hide();assert(layer.airliners.get('b738').every(p=>p.count===0));layer.dispose();
+});
+
+test("aircraft type/name prefixes cover variants without interpreting airline callsigns", () => {
+  for (const [key, names] of Object.entries({
+    e195: ["E195", "E195LR", "E195-200LR", "Embraer E195LR", "ERJ 190-200 LR", "Embraer ERJ-195 LR"],
+    a321: ["A321", "a321-231", "Airbus A321neo", "A321XLR", "A21N"],
+    a320: ["A320", "A320-214", "Airbus A320neo", "A20N"],
+  })) for(const name of names) assert.equal(aircraftVisual(name)?.model,key,name);
+  assert.equal(aircraftVisual(null,"Embraer E195LR").model,"e195");
+  assert.equal(aircraftVisual(null,"Airbus A321-231").model,"a321");
+  for(const name of ["LOT195", "E195-E2", "E295", "A319", "E190", "Airbus A321ish", "A32", "Boeing A320"])
+    assert.equal(aircraftVisual(name),null,name);
+  assert.equal(aircraftVisual("E295","Embraer E195-E2"),null);
+  for(const type of ["E195LR", "A321-231"]) assert.equal(parseAircraftMetadata(metadata("abc123",type),"abc123").typeCode,type);
 });

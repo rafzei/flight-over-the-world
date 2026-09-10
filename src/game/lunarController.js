@@ -184,6 +184,15 @@ export class LunarController extends PlaneController {
     const altitude = ecefToGeodetic(this.positionInertial).height;
     if (altitude < 150000) {
       const airVelocity = this.velocityInertial.clone().sub(surfaceVelocityInertial(this.positionInertial));
+      if (this.weather && altitude < 24000) {
+        const { lat, lon } = ecefToGeodetic(this.positionInertial);
+        const n=this.weather.north, e=this.weather.east, u=this.weather.up;
+        airVelocity.sub(new Vector3(
+          -Math.sin(lat)*Math.cos(lon)*n-Math.sin(lon)*e+Math.cos(lat)*Math.cos(lon)*u,
+          -Math.sin(lat)*Math.sin(lon)*n+Math.cos(lon)*e+Math.cos(lat)*Math.sin(lon)*u,
+          Math.cos(lat)*n+Math.sin(lat)*u,
+        ));
+      }
       const density = 1.225 * Math.exp(-Math.max(0, altitude) / 8500);
       acceleration.addScaledVector(airVelocity, -.5 * density * airVelocity.length() / 40000);
     }
@@ -213,6 +222,7 @@ export class LunarController extends PlaneController {
 
   update(dt, ctrl = {}) {
     if (!(dt > 0) || !Number.isFinite(dt)) return;
+    this.weather = ctrl.weather ?? null;
     // Tile snapping, Restart and the spawn menu set geodetic coordinates from
     // outside. Rebase once so the old inertial trajectory cannot pull us back.
     if (this._needsRebase()) this.rebaseFromGeodetic();

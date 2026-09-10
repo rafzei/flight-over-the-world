@@ -123,7 +123,7 @@ export function createAirliner(key = "b738") {
     for(let u=0;u<8;u++)for(let v=0;v<6;v++)patch([point(u/8,v/6),point((u+1)/8,v/6),point((u+1)/8,(v+1)/6),point(u/8,(v+1)/6)],"glass",side>0);
     for(let i=0;i<4;i++)for(let step=0;step<8;step++){
       const a=corners[i],b=corners[(i+1)%4],at=t=>surface(a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,.042);
-      rod(at(step/8),at((step+1)/8),.024,"body");
+      rod(at(step/8),at((step+1)/8),.012,"body");
     }
   }
   function slab(outline, thickness, vertical = false, yOffset=0) {

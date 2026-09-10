@@ -47,12 +47,12 @@ test("civil GLB detailing preserves all authored geometry, landing bounds and pr
 });
 
 test("detailed airliners retain instancing budgets and correctly sided glazing, intakes and navigation lights", () => {
-  for(const key of ["b738","a320"]) {
+  for(const key of ["b738","a320","a321","e195"]) {
     const model=createAirliner(key);model.updateMatrixWorld(true);
     const details=model.userData.aircraftDetails;
     assert.equal(model.children.length,6);assert(model.children.every(node=>node.isMesh));
     assert(model.children.reduce((sum,node)=>sum+node.geometry.attributes.position.count/3,0)<22_000);
-    assert.equal(details.cockpitPanes,6);assert.equal(details.doors,8);assert.equal(details.fanBlades,48);assert.equal(details.flapFairings,6);assert(details.cabinWindows>=76);
+    assert.equal(details.cockpitPanes,key==="e195"?4:6);assert.equal(details.doors,key==="e195"?6:8);assert.equal(details.fanBlades,48);assert.equal(details.flapFairings,6);assert(details.cabinWindows>=74);
     const lights=details.lights;
     assert(lights.find(l=>l.label==="port-red").position[0]<0);assert(lights.find(l=>l.label==="starboard-green").position[0]>0);
     // Real ray intersections ensure the detail faces outwards and sits above the
@@ -64,12 +64,12 @@ test("detailed airliners retain instancing budgets and correctly sided glazing, 
       const hit=new Raycaster(center.clone().addScaledVector(normal,.10),normal.clone().negate(),0,.3).intersectObject(model)[0];
       assert.equal(hit?.object.name,"airliner-glass",`${key}: hidden glazing at ${i}`);
     }
-    const engineZ=key==="a320"?-2.3:-2.9;
+    const engineZ=key==="e195"?-1.8:key.startsWith("a32")?-2.3:-2.9;
     for(const side of [-1,1]) {
       // Sample inside the throat away from the spinner: the forward-facing fan
       // must be visible through an open inlet, not hidden by a cylinder end cap.
-      const radius=.6,angle=.15;
-      const ray=new Raycaster(new Vector3(side*5.5+Math.cos(angle)*radius,-1.55+Math.sin(angle)*radius,engineZ-3),new Vector3(0,0,1));
+      const radius=key==="e195"?.4:.6,angle=.15;
+      const ray=new Raycaster(new Vector3(side*(key==="e195"?4.4:5.5)+Math.cos(angle)*radius,(key==="e195"?-1.25:-1.55)+Math.sin(angle)*radius,engineZ-3),new Vector3(0,0,1));
       const hit=ray.intersectObject(model)[0];assert.equal(hit?.object.name,"airliner-metal");
       assert(hit.point.z>engineZ-1.5&&hit.point.z<engineZ-1.3);
     }

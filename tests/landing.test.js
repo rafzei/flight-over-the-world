@@ -30,7 +30,7 @@ function descend(r,{sink=1.5,pitch=3,roll=0,heading=332,gear=1,speed=r.gear.spee
 }
 
 test('737 and A320 touch down on their main wheels, settle all wheels, brake and stay stopped',()=>{
-  for(const key of ['b738','a320']){
+  for(const key of ['b738','a320','a321','e195']){
     const r=rig(key);descend(r);assert(r.system.grounded);assert.equal(r.system.touchdown.quality,'smooth');
     assert(Math.abs(Math.min(...r.system.feet(r.plane).map(w=>w.point.y)))<1e-6);
     r.plane.throttle=0;
@@ -100,7 +100,7 @@ test('gear travels over three simulation seconds and freezes while paused',()=>{
 });
 
 test('generated struts reach the actual airframe and stay connected while retracting',()=>{
-  for(const key of ['b738','a320']){
+  for(const key of ['b738','a320','a321','e195']){
     const model=createAirliner(key),wrapper=new Group();
     model.position.sub(new Box3().setFromObject(model).getCenter(new Vector3()));wrapper.add(model);
     const gear=attachLandingGear(wrapper,model,key),contacts=gear.points().map(w=>w.point.toArray());
