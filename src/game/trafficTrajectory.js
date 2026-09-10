@@ -25,7 +25,7 @@ export function estimateMotion(samples) {
 export function buildTrajectory(sample, motion, approach = { phase: "cruise" }) {
   const knots = [];
   const runway = approach.runway, p = runway ? runwayCoordinates(sample, runway) : null;
-  const landing = approach.phase === "final" && approach.confidence >= .85 && p.along < 0 && p.height > 6 &&
+  const landing = sample.altitudeSource !== "baro" && approach.phase === "final" && approach.confidence >= .85 && p.along < 0 && p.height > 6 &&
     Math.abs(p.cross) < 250 && Math.abs(headingDelta(motion.heading, runway.heading)) < 12;
   const touchdownAlong = runway ? Math.min(250, runway.length * .15) : 0;
   const touchdownTime = landing ? (touchdownAlong - p.along) / Math.max(1, motion.speed) : Infinity;
@@ -57,8 +57,11 @@ export function buildTrajectory(sample, motion, approach = { phase: "cruise" }) 
       const midSpeed = clamp(motion.speed + motion.acceleration * 15 * (1 - Math.exp(-mid / 15)), Math.min(25, motion.speed), 1500);
       const point = destination(lat, lon, midHeading, midSpeed * STEP); lat = point.lat; lon = point.lon;
     }
-    const floor = runway && ["approach", "final", "landing-estimate"].includes(phase) ? runway.elevation + 6 : Math.min(-430, sample.altitudeM);
+    // Keep the measured starting altitude, including below-sea-level airfields.
+    // A pressure-altitude fallback cannot support an inferred touchdown.
+    const floor = Math.min(sample.altitudeM, runway && ["approach", "final", "landing-estimate"].includes(phase) ? runway.elevation + 6 : 0);
     if (altitude < floor) { altitude = floor; vertical = 0; }
+    if (seconds === 0) { lat = sample.latitudeDeg; lon = sample.longitudeDeg; }
     knots.push({ latitudeDeg: lat, longitudeDeg: lon, altitudeM: altitude, velocityMps: actualSpeed,
       trueTrackDeg: actualHeading, verticalRateMps: vertical, bankDeg: landing ? 0 : clamp(Math.atan(speed * turn * DEG / 9.81) / DEG, -25, 25), phase });
   }

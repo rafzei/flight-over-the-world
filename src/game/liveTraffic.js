@@ -25,7 +25,7 @@ export function createLiveTraffic({ scene, camera, mapRoot, mobile = false, base
       if (!response.ok) throw new Error("Runway catalogue unavailable");
       const data = await response.json();
       if (disposed) return;
-      if (!tracks.loadRunways(data)) throw new Error("Invalid runway catalogue");
+      if (!tracks.loadRunways(data, mode === "live" ? feed.serverTime() : Date.now() / 1000)) throw new Error("Invalid runway catalogue");
       runwayStatus = "ready";
     } catch {
       if (!disposed) { runwayStatus = "unavailable"; runwayRetryAt = performance.now() + 60000; }

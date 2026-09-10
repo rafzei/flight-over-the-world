@@ -4,7 +4,7 @@ import { moveGeo, thermalCenter } from "./weather.js";
 
 export class WeatherVisuals {
   constructor(scene) {
-    this.clouds = new InstancedMesh(new SphereGeometry(1,16,10), new MeshLambertMaterial({ color:0xe6edf3, transparent:true, opacity:.82, depthWrite:false }), 320);
+    this.clouds = new InstancedMesh(new SphereGeometry(1,16,10), new MeshLambertMaterial({ color:0xe6edf3, transparent:true, opacity:.9, depthWrite:false }), 320);
     this.columns = new InstancedMesh(new CylinderGeometry(1,1,1,20,1,true), new MeshBasicMaterial({ color:0x6ef2c4, transparent:true, opacity:.10, depthWrite:false, wireframe:true }), 64);
     this.clouds.name = "weather-cumulus"; this.columns.name = "thermal-guides";
     for(const mesh of [this.clouds,this.columns]) {
@@ -29,9 +29,9 @@ export class WeatherVisuals {
         // Five overlapping lobes form a flat-ish cloud base at the plume top.
         // Positions stay geographic as the camera moves or circles underneath.
         for(let i=0;i<5;i++) {
-          const angle=i*2.4, size=cell.radius*(.72+(i===0?.65:0))*cell.cloudAmount;
-          const p=moveGeo(center.lat,center.lon,Math.cos(angle)*cell.radius*.8,Math.sin(angle)*cell.radius*.8);
-          instance(this.clouds,clouds++,p.lat,p.lon,top+size*.28,size,size*.46,size*.85);
+          const angle=i*2.4, size=cell.radius*(i===0?1.05:.62+.08*(i%3))*cell.cloudAmount;
+          const p=moveGeo(center.lat,center.lon,Math.cos(angle)*cell.radius*(i===0?0:.72),Math.sin(angle)*cell.radius*(i===0?0:.72));
+          instance(this.clouds,clouds++,p.lat,p.lon,top+size*(i===0?.68:.34),size,size*(i===0?.85:.64),size*.85);
         }
       }
       if(markers && cell.strength>.5 && cell.distance<6500 && plane.height<cell.ground+cell.cloudBase) {

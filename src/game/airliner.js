@@ -57,6 +57,7 @@ export function createAirliner(key = "b738") {
   let rings = airbus
     ? [[-1,.025],[-.989,.20],[-.967,.41],[-.935,.66],[-.89,.88],[-.83,.985],[-.75,1],[.59,1],[.72,.90],[.83,.67],[.93,.31],[1,.015]]
     : [[-1,.015],[-.985,.105],[-.955,.27],[-.92,.46],[-.875,.70],[-.83,.90],[-.77,.99],[-.73,1],[.57,1],[.72,.89],[.83,.60],[.93,.26],[1,.015]];
+  if (embraer) rings = [[-1,.045],[-.99,.19],[-.965,.43],[-.925,.68],[-.875,.9],[-.82,1],[-.74,1],[.6,1],[.74,.86],[.85,.56],[.95,.22],[1,.015]];
   if (key === "a321") rings = rings.map(([z, r]) => [z < -.5 ? -1 + (z + 1) * 37.57 / spec.length : z > .5 ? 1 - (1 - z) * 37.57 / spec.length : z, r]);
   function bodyAt(z) {
     const t = z / half;
@@ -194,7 +195,7 @@ export function createAirliner(key = "b738") {
 
     const doorZ=key === "a321" ? [-half+5.1,-7.3,7.5,half-5.25] : [-half+5.1,half-5.25];
     const exitZ=key === "a321" ? [] : embraer ? [.1] : airbus?[-.2,1.0]:[-.65,.6];
-    for(let z=-half+6.35;z<half-6;z+=.61) {
+    for(let z=-half+6.35;z<half-6;z+=embraer?.80:airbus?.78:.61) {
       if(exitZ.some(e=>Math.abs(z-e)<.42) || doorZ.some(e=>Math.abs(z-e)<.64))continue;
       skinPanel(side,roundedOutline(.48,z,.45,.29,.085));features.cabinWindows++;
     }

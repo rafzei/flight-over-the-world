@@ -34,17 +34,19 @@ export class LandingSystem {
     for(const field of ['lat','lon','height','heading','pitch','roll'])plane[field]=before[field]+(plane[field]-before[field])*first.fraction;
     if(first.name==='body')return this.failure(plane,this.gear.extension<.98?'Gear-up landing':'Fuselage or wing strike');
     if(!this.runway.contains(first.point,{landing:true,margin:1}))return this.failure(plane,'Touchdown outside the landing zone');
-    if(first.name==='nose'&&!hits.some(h=>h.name==='main'&&Math.abs(h.fraction-first.fraction)<.04))return this.failure(plane,'Nose wheel first — flare before touchdown');
     const sink=Math.max(0,(from.y-to.y)/dt),yaw=Math.abs(angle(plane.heading-this.runway.definition.heading*DEG));
-    if(Math.abs(plane.roll)>7*DEG)return this.failure(plane,'Too much bank at touchdown');
+    if(Math.abs(plane.roll)>10*DEG)return this.failure(plane,'Too much bank at touchdown');
     const surfacePitch = plane.pitch - (this.runway.groundPitch || 0);
-    if(surfacePitch<-.8*DEG||surfacePitch>11*DEG)return this.failure(plane,'Unsafe pitch at touchdown');
-    if(yaw>12*DEG)return this.failure(plane,'Not aligned with the runway');
-    if(plane.speed<this.gear.speed*.68||plane.speed>this.gear.speed*1.4)return this.failure(plane,'Unsafe landing speed');
-    if(sink>4.5)return this.failure(plane,'Hard impact — landing gear failed');
+    if(surfacePitch<-2.5*DEG||surfacePitch>13*DEG)return this.failure(plane,'Unsafe pitch at touchdown');
+    // A nearly level arrival can brush the nose wheel just before the mains.
+    // Compare wheel clearance in metres so forgiveness is frame-rate independent.
+    if(first.name==='nose'&&!this.feet(plane).some(w=>w.name==='main'&&w.point.y<=.65))return this.failure(plane,'Nose wheel first — flare before touchdown');
+    if(yaw>17*DEG)return this.failure(plane,'Not aligned with the runway');
+    if(plane.speed<this.gear.speed*.6||plane.speed>this.gear.speed*1.5)return this.failure(plane,'Unsafe landing speed');
+    if(sink>6)return this.failure(plane,'Hard impact — landing gear failed');
     this.align(plane);
     this.touchdown={sink,speed:plane.speed,along:-first.point.z,quality:sink>2.5?'firm':'smooth'};
-    if(sink>3.2){plane.verticalSpeed=sink*.4;this.bounceTime=.35;this.status='bounced';return {handled:true};}
+    if(sink>4.2){plane.verticalSpeed=sink*.3;this.bounceTime=.35;this.status='bounced';return {handled:true};}
     this.grounded=true;plane.verticalSpeed=0;this.status='rollout';this.groundTime=0;this.touchdown.pitch=plane.pitch;
     return {handled:true};
   }

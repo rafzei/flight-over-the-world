@@ -37,3 +37,21 @@ test("instanced spheres use camera-relative positions, frustum and fog range, wi
   spheres.hide(); assert.equal(spheres.mesh.count, 0);
   spheres.dispose(); assert.equal(scene.getObjectByName("opensky-traffic"), undefined);
 });
+
+test("traffic banks towards a turn and keeps runway-level models at real size", () => {
+  const scene = new Scene(), map = new Matrix4().makeRotationX(-Math.PI / 2);
+  const camera = new PerspectiveCamera(60, 1.5, 1, 1e8);
+  earthPosition(0, 0, 1000, map, camera.position);
+  const contact = { icao24: "abc123", latitudeDeg: .05, longitudeDeg: 0, altitudeM: 106, freshness: 1,
+    trueTrackDeg: 0, bankDeg: 20, velocityMps: 70, verticalRateMps: 0, aircraft: { typeCode: "B738" }, approach: { runway: { elevation: 100 } } };
+  const position = earthPosition(.05 * Math.PI / 180, 0, contact.altitudeM, map);
+  const up = earthPosition(.05 * Math.PI / 180, 0, contact.altitudeM + 1, map).sub(position).normalize();
+  camera.up.copy(up); camera.lookAt(position); camera.updateMatrixWorld();
+  const spheres = new TrafficSpheres(scene);
+  spheres.update([contact], camera, map, new FogExp2(0xffffff, .00007), 1080);
+  assert.equal(spheres.visible.length, 1); assert.equal(spheres.visible[0].modelScale, 1);
+  const transform = new Matrix4(); spheres.airliners.get("b738")[0].getMatrixAt(0, transform);
+  const rightWing = new Vector3(1, 0, 0).transformDirection(transform);
+  assert(rightWing.dot(up) < -.3, "a right turn must lower the right wing");
+  spheres.dispose();
+});

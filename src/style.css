@@ -261,6 +261,7 @@ button, .mode-card, .scope-btn {
 }
 #traffic-toggle[aria-pressed="true"]::before { content: ""; display: inline-block; width: 9px; height: 9px; margin-right: 7px; background: #ff3535; border-radius: 50%; }
 #traffic-status { margin: 5px 0 7px; color: var(--muted); }
+#traffic-approaches { margin: 8px 0; font-size: 12px; line-height: 1.5; white-space: pre-line; }
 #traffic-panel summary { cursor: pointer; }
 #traffic-panel label { display: block; margin-top: 10px; }
 #traffic-panel select { max-width: 150px; font: inherit; }

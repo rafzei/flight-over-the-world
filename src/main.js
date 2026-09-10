@@ -3265,9 +3265,15 @@ function updateFlightPhysics(dt) {
     left -= step;
     if (canCrash) {
       if (before) {
+        const incomingVerticalSpeed = plane.verticalSpeed;
         const result = landingSystem.resolve(plane, before, step);
         if (result.crash) { flightPosition(planePos); crash(planePos); return; }
-        if (result.handled) { plane.weatherVertical = 0; continue; }
+        if (result.handled) {
+          // Runway protection can handle an airborne step without changing its
+          // velocity. Only wheel contact/bounce replaces the air-relative state.
+          if (landingSystem.grounded || plane.verticalSpeed !== incomingVerticalSpeed) plane.weatherVertical = 0;
+          continue;
+        }
       }
       flightPosition(_flightTo);
       WGS84_ELLIPSOID.getCartographicToNormal(plane.lat, plane.lon, _flightUp);

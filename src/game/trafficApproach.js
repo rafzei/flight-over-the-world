@@ -15,7 +15,7 @@ export class TrafficRunways {
     for (const row of data.runways) {
       if (!Array.isArray(row) || row.length !== 9 || !row.slice(3).every(finite)) continue;
       const [id, airport, ident, lat, lon, heading, length, width, elevation] = row;
-      if (typeof id !== "string" || typeof airport !== "string" || typeof ident !== "string" || Math.abs(lat) > 90 || Math.abs(lon) > 180 || length < 500) continue;
+      if (typeof id !== "string" || typeof airport !== "string" || typeof ident !== "string" || Math.abs(lat) > 90 || Math.abs(lon) > 180 || heading < 0 || heading >= 360 || length < 500 || width <= 0 || elevation < -500 || elevation > 6000) continue;
       const key = `${Math.floor(lat)}:${Math.floor(lon)}`;
       if (!this.cells.has(key)) this.cells.set(key, []);
       this.cells.get(key).push({ id, airport, ident, lat, lon, heading, length, width, elevation }); this.count++;
@@ -52,15 +52,18 @@ export function classifyApproach(sample, motion, runways, previous = null) {
     if (speed > 100 && runway.length < 1600) continue;
     const p = runwayCoordinates(sample, runway), distance = -p.along;
     const yaw = Math.abs(headingDelta(motion.heading, runway.heading));
-    if (distance < -300 || distance > 25000 || p.height < -80 || p.height > 1700 || yaw > 22 ||
+    if (distance < -300 || distance > 25000 || p.height < 6 || p.height > 1700 || yaw > 22 ||
         Math.abs(p.cross) > Math.max(runway.width * 2, Math.min(650, Math.max(150, distance * .09)))) continue;
     const glide = Math.atan2(Math.max(0, p.height - 15), Math.max(300, distance)) / DEG;
     if (glide > 8 || (distance > 4000 && glide < .8)) continue;
     const score = yaw / 22 + Math.abs(p.cross) / 600 + Math.abs(glide - 3) / 6 - (previous?.runway?.id === runway.id ? .3 : 0);
     if (score < bestScore) {
       bestScore = score;
+      const matches = previous?.runway?.id === runway.id && ["approach", "final"].includes(previous.phase);
+      const repeated = matches && previous.observedAt < sample.timePosition && sample.timePosition - previous.observedAt <= 120;
       best = { phase: distance < 6000 ? "final" : "approach", runway, distanceM: Math.max(0, distance),
-        confidence: previous?.runway?.id === runway.id ? .9 : .65,
+        confidence: matches && previous.observedAt === sample.timePosition ? previous.confidence : repeated ? .9 : .65,
+        observedAt: sample.timePosition,
         touchdownInSeconds: Math.max(0, distance) / Math.max(1, speed) };
     }
   }

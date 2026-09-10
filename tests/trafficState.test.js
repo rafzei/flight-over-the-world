@@ -46,18 +46,19 @@ test("coverage encloses requested circles at equator, poles and date line with c
   assert.deepEqual([25, 26, 100, 101, 400, 401].map(area => creditCost({ lamin: 0, lamax: 1, lomin: 0, lomax: area })), [1, 2, 2, 3, 3, 4]);
 });
 
-test("tracks cap prediction, handle missing motion, stale disappearance and out-of-order updates", () => {
+test("tracks keep predicting through gaps, fade before expiry and reject out-of-order updates", () => {
   const tracks = new TrafficTracks();
   tracks.ingest({ aircraft: [sample(), sample({ icao24: "abc124", timePosition: 750 })] }, 1000);
   assert.equal(tracks.tracks.size, 1);
   tracks.ingest({ aircraft: [sample({ timePosition: 999, altitudeM: 50 })] }, 1001);
   assert.equal(tracks.positions(1010)[0].altitudeM, 1020);
-  const capped = tracks.positions(1045)[0];
-  assert.equal(capped.altitudeM, 1060); assert.equal(capped.freshness, .5);
-  assert(Math.abs(distanceM({ lat: 0, lon: 0 }, { lat: capped.latitudeDeg, lon: capped.longitudeDeg }) - 6000) < .01);
+  const predicted = tracks.positions(1045)[0];
+  assert.equal(predicted.altitudeM, 1090); assert.equal(predicted.freshness, 1); assert(predicted.estimated);
+  assert(Math.abs(distanceM({ lat: 0, lon: 0 }, { lat: predicted.latitudeDeg, lon: predicted.longitudeDeg }) - 9000) < .01);
   assert.equal(tracks.positions(1045, { prediction: false })[0].longitudeDeg, 0);
-  assert.equal(tracks.positions(1060).length, 0);
-  tracks.positions(1091); assert.equal(tracks.tracks.size, 0);
+  assert.equal(tracks.positions(1150)[0].freshness, .5);
+  assert.equal(tracks.positions(1180).length, 0);
+  tracks.positions(1241); assert.equal(tracks.tracks.size, 0);
   const still = predictPosition(sample({ velocityMps: null, trueTrackDeg: null, verticalRateMps: null }), 1030);
   assert.equal(still.longitudeDeg, 0); assert.equal(still.altitudeM, 1000);
 });

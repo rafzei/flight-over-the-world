@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Matrix4, PerspectiveCamera, Scene } from 'three';
+import { Matrix4, PerspectiveCamera, Scene, Vector3 } from 'three';
 import { solarPosition } from '../src/game/dayNight.js';
 import { windAt, sampleWeather, thermalCenter, moveGeo } from '../src/game/weather.js';
 import { WeatherVisuals } from '../src/game/weatherVisuals.js';
@@ -8,6 +8,8 @@ import { PlaneController } from '../src/game/plane.js';
 import { SailplaneController } from '../src/game/sailplane.js';
 import { BalloonController } from '../src/game/balloon.js';
 import { DroneController } from '../src/game/vehicleControllers.js';
+import { LunarController } from '../src/game/lunarController.js';
+import { ecefToGeodetic, localBasis } from '../src/game/spacePhysics.js';
 const utcMs=Date.parse('2026-06-21T11:00:00Z'), solar=solarPosition(utcMs);
 const location={lat:52.23*Math.PI/180,lon:21.01*Math.PI/180,height:1100,ground:100,utcMs,solar};
 const input={roll:0,pitch:0,throttle:.5};
@@ -78,4 +80,16 @@ test('clouds and optional thermal guides have geographic positions and stay with
   assert(Math.abs(first.elements[12]-second.elements[12]-1000)<.5);assert.equal(visuals.columns.count,0);
   visuals.update(weather,location,camera,map,{hidden:true});assert.equal(visuals.clouds.count,0);
   visuals.dispose();assert.equal(scene.children.length,0);
+});
+
+test('rocket wind acts through atmospheric drag in the local east direction, with no force in space',()=>{
+  const p=new LunarController(52,21,1000,0,{vertical:true,cruise:0});
+  const calm=p._acceleration(0,new Vector3());
+  p.weather={north:0,east:15,up:0};
+  const gust=p._acceleration(0,new Vector3()).sub(calm);
+  const {lat,lon}=ecefToGeodetic(p.positionInertial);
+  assert(gust.dot(localBasis(lat,lon).east)>0);
+  p.height=30000;p.rebaseFromGeodetic();
+  const above=p._acceleration(0,new Vector3());p.weather=null;
+  assert(above.distanceTo(p._acceleration(0,new Vector3()))<1e-12);
 });

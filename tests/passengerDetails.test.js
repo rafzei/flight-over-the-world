@@ -52,7 +52,7 @@ test("detailed airliners retain instancing budgets and correctly sided glazing, 
     const details=model.userData.aircraftDetails;
     assert.equal(model.children.length,6);assert(model.children.every(node=>node.isMesh));
     assert(model.children.reduce((sum,node)=>sum+node.geometry.attributes.position.count/3,0)<22_000);
-    assert.equal(details.cockpitPanes,key==="e195"?4:6);assert.equal(details.doors,key==="e195"?6:8);assert.equal(details.fanBlades,48);assert.equal(details.flapFairings,6);assert(details.cabinWindows>=74);
+    assert.equal(details.cockpitPanes,key==="e195"?4:6);assert.equal(details.doors,key==="e195"?6:8);assert.equal(details.fanBlades,48);assert.equal(details.flapFairings,6);assert(details.cabinWindows>=(key==="e195"?56:key==="a320"?58:76));
     const lights=details.lights;
     assert(lights.find(l=>l.label==="port-red").position[0]<0);assert(lights.find(l=>l.label==="starboard-green").position[0]>0);
     // Real ray intersections ensure the detail faces outwards and sits above the

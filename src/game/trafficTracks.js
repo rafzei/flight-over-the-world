@@ -9,9 +9,13 @@ export function predictPosition(sample, time, prediction = true) {
 export class TrafficTracks {
   constructor({ limit = 2000, runways = new TrafficRunways() } = {}) { this.tracks = new Map(); this.limit = limit; this.runways = runways; }
   clear() { this.tracks.clear(); }
-  loadRunways(data) {
+  loadRunways(data, now = this.lastTime) {
     if (!this.runways.load(data)) return false;
-    for (const track of this.tracks.values()) this.forecast(track);
+    for (const track of this.tracks.values()) {
+      const displayed = this.current(track, now);
+      this.forecast(track);
+      this.correct(track, displayed, now);
+    }
     return true;
   }
   forecast(track) {
@@ -20,7 +24,16 @@ export class TrafficTracks {
     track.trajectory = buildTrajectory(sample, motion, track.approach);
   }
   current(track, now) { return applyCorrection(trajectoryPosition(track.trajectory, now), track.correction, now); }
+  correct(track, displayed, now) {
+    const target = trajectoryPosition(track.trajectory, now);
+    const error = distanceM({ lat: displayed.latitudeDeg, lon: displayed.longitudeDeg }, { lat: target.latitudeDeg, lon: target.longitudeDeg });
+    track.correction = { at: now, duration: Math.max(3, Math.min(20, error / Math.max(20, target.velocityMps * .3))),
+      lat: displayed.latitudeDeg - target.latitudeDeg, lon: wrapLongitude(displayed.longitudeDeg - target.longitudeDeg),
+      altitude: displayed.altitudeM - target.altitudeM, heading: headingDelta(displayed.trueTrackDeg, target.trueTrackDeg),
+      bank: displayed.bankDeg - target.bankDeg };
+  }
   ingest(snapshot, now) {
+    this.lastTime = now;
     // Ground reports are authoritative; a missing row is not a landing.
     for (const id of snapshot.removedIds || []) this.tracks.delete(id);
     for (const sample of (snapshot.aircraft || []).slice(0, this.limit)) {
@@ -49,14 +62,7 @@ export class TrafficTracks {
       track.samples.push({ ...sample });
       if (track.samples.length > 8) track.samples.shift();
       this.forecast(track);
-      if (displayed) {
-        const target = trajectoryPosition(track.trajectory, now);
-        const error = distanceM({ lat: displayed.latitudeDeg, lon: displayed.longitudeDeg }, { lat: target.latitudeDeg, lon: target.longitudeDeg });
-        track.correction = { at: now, duration: Math.max(3, Math.min(20, error / Math.max(20, target.velocityMps * .3))),
-          lat: displayed.latitudeDeg - target.latitudeDeg, lon: wrapLongitude(displayed.longitudeDeg - target.longitudeDeg),
-          altitude: displayed.altitudeM - target.altitudeM, heading: headingDelta(displayed.trueTrackDeg, target.trueTrackDeg),
-          bank: displayed.bankDeg - target.bankDeg };
-      }
+      if (displayed) this.correct(track, displayed, now);
     }
     this.prune(now);
   }
@@ -64,6 +70,7 @@ export class TrafficTracks {
     for (const [id, track] of this.tracks) if (now - track.samples.at(-1).timePosition > TRAFFIC.removeSeconds) this.tracks.delete(id);
   }
   positions(now, { prediction = true } = {}) {
+    this.lastTime = now;
     this.prune(now);
     const result = [];
     for (const track of this.tracks.values()) {
@@ -72,7 +79,7 @@ export class TrafficTracks {
       const position = prediction ? this.current(track, now) : { ...latest, phase: track.approach.phase, approach: track.approach };
       const fade = Math.max(0, (age - TRAFFIC.fadeSeconds) / (TRAFFIC.hideSeconds - TRAFFIC.fadeSeconds));
       result.push({ ...position, ageSeconds: age, freshness: 1 - fade * fade * (3 - 2 * fade),
-        estimated: prediction && age > TRAFFIC.freshSeconds, motionInferred: track.trajectory.motion.inferred,
+        estimated: prediction && (age > TRAFFIC.freshSeconds || position.phase === "landing-estimate"), motionInferred: track.trajectory.motion.inferred,
         uncertaintyM: prediction ? Math.round(25 + age * 5 + age * age * .04) : 0 });
     }
     return result;

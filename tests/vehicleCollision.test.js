@@ -7,6 +7,7 @@ import { WGS84_ELLIPSOID } from "3d-tiles-renderer";
 import { Group, Matrix4, Mesh, MeshBasicMaterial, PlaneGeometry, Raycaster, Vector3 } from "three";
 import { createVehicleCollisionDetector, raycastTerrain } from "../src/game/vehicleCollision.js";
 import { earthPosition } from "../src/game/trafficVisibility.js";
+import { PlaneController } from "../src/game/plane.js";
 
 const up = new Vector3(0, 1, 0);
 const v = (x, y, z = 0) => new Vector3(x, y, z);
@@ -117,6 +118,23 @@ test("real flight physics stops and crashes on the first impact at transformed E
     assert(Math.abs(lla.height) < .001);
     assert.equal(context.crashGraceUntil, 0, "descent must not renew invulnerability");
   }
+});
+
+test("runway protection does not accumulate air-mass lift and wind displacement is swept for collisions", () => {
+  const {context}=flight({height:1000});
+  context.plane=new PlaneController(.9*180/Math.PI,.3*180/Math.PI,1000,0);
+  const reference=new PlaneController(.9*180/Math.PI,.3*180/Math.PI,1000,0);
+  context.ctrl={roll:0,pitch:0,throttle:.5,approach:true,approachSpeed:40,weather:{north:0,east:0,up:2}};
+  context.flightPose=()=>({});
+  context.landingSystem={gear:{},grounded:false,resolve:()=>({handled:true}),protects:()=>false};
+  for(let i=0;i<120;i++){context.updateFlightPhysics(1/60);reference.update(1/60,context.ctrl);}
+  assert(Math.abs(context.plane.height-reference.height)<1e-9);
+  assert.equal(context.plane.weatherVertical,2);
+  const falling=flight({height:60}).context;
+  falling.plane=new PlaneController(.9*180/Math.PI,.3*180/Math.PI,60,0);
+  // Deliberately extreme test wind makes a missed sweep observable in one frame.
+  falling.ctrl={roll:0,pitch:0,throttle:.5,weather:{north:0,east:0,up:-2000}};
+  falling.updateFlightPhysics(.05);assert(falling.crashed);assert(falling.plane.height>=4.49);
 });
 
 test("spawn grace expires even below ground, and newly loaded terrain ends penetration", () => {
