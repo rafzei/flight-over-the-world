@@ -136,7 +136,7 @@ export function createCombatDrone() {
     const x=s*1.35;
     block(.25,.53,.45,steel,s*.98,-.51,.2,.05);
     const mount=cylinder(.24,.24,.27,frame,x,-.71,.13);mount.rotation.z=Math.PI/2;
-    // Merge each gun pod separately, so the whole assembly can turn below its mount.
+    // Keep each gun housing fixed below its mount; only the barrel group spins.
     const pod = new Group(); drone.add(pod); buildParent = pod;
     block(.96,.7,1.35,frame,x,-1.03,.12,.16);
     block(1.08,.28,.8,panel,x,-.78,.37,.15);
@@ -167,7 +167,7 @@ export function createCombatDrone() {
     mergeBody(pod);
     pod.position.set(-x,1.04,-.13); turret.add(pod);
     turret.position.set(x,-1.04,.13); drone.add(turret);
-    cannons.push({ turret, barrels: guns, muzzles, direction: s });
+    cannons.push({ turret, barrels: guns, muzzles });
     buildParent = body;
     for(let i=0;i<3;i++) wire([[s*.75,-.3,-.3],[s*(.92+i*.075),-.65,-.48],[x-s*.15,-.78,-.67]]);
     wire([[s*.88,-.2,.47],[s*1.02,-.69,.67],[x,-.73,.6]]);

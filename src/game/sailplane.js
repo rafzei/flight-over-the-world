@@ -8,7 +8,7 @@ import { PlaneController } from "./plane.js";
 export const SAILPLANE_SPEC = Object.freeze({
   create: createSailplane, wingspan: 18, cruise: 28, boost: 75, brake: 19,
   cam: [0, 5, 21], name: "Sailplane", flightModel: "sailplane", sound: "wind",
-  desc: "Unpowered glider · 18 m wings · trim 100 km/h · dive to gain speed",
+  desc: "Unpowered glider · 18 m wings · grass landings · Cessna aerotow",
 });
 
 // Closed, tapered airfoil built from spanwise sections: x, y, leading edge, chord.

@@ -92,7 +92,7 @@ test("accelerated integration preserves an unpowered Earth orbit", () => {
   assert.ok(Math.abs((energy - energy0) / energy0) < .00002);
 });
 
-test("both rockets travel from Earth to the moving lunar surface through actual integrated motion", () => {
+test("lunar guidance supports both body orientations through actual integrated motion", () => {
   for (const vertical of [true, false]) {
     // Opposite-side launch requires a safe dogleg around Earth, not a straight
     // chord through the planet. Warsaw verifies the regular playable start.

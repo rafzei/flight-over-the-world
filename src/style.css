@@ -149,6 +149,35 @@ button, .mode-card, .scope-btn {
   z-index: 2;
 }
 
+#flight-clock {
+  position: absolute;
+  left: 212px;
+  bottom: 28px;
+  width: 234px;
+  padding: 10px 13px;
+  border: 1px solid rgba(243, 234, 214, .18);
+  border-radius: 6px;
+  background: rgba(18, 14, 10, .82);
+  color: var(--paper);
+  font-variant-numeric: tabular-nums;
+}
+#flight-clock[hidden] { display: none; }
+.flight-clock-face { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.flight-clock-face time { font-size: 25px; line-height: 1.25; letter-spacing: .035em; }
+[data-clock-phase] { color: var(--gold); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+[data-clock-zone] { margin-top: 4px; font-size: 11px; overflow-wrap: anywhere; }
+[data-clock-detail] { margin-top: 4px; color: var(--muted); font-size: 10px; }
+#flight-clock[data-phase="Night"] [data-clock-phase] { color: #b6d0ff; }
+@media (max-width: 1000px), (pointer: coarse) {
+  #flight-clock { left: auto; right: 12px; bottom: max(310px, calc(env(safe-area-inset-bottom) + 294px)); width: min(216px, calc(100vw - 152px)); padding: 8px 10px; }
+  .flight-clock-face time { font-size: 21px; }
+  .flight-clock-face { gap: 6px; }
+  .space-overview #flight-clock { bottom: max(16px, env(safe-area-inset-bottom)); right: 12px; }
+}
+@media (min-width: 721px) and (max-width: 1000px) and (pointer: fine) {
+  #flight-clock { right: 64px; }
+}
+
 #landing-panel { position: absolute; pointer-events: auto; top: 22px; right: 22px; width: 315px; padding: 12px; border: 1px solid #ffffff30; border-radius: 6px; background: #120e0add; font-size: 12px; }
 #landing-panel[hidden] { display: none; }
 #landing-panel strong { display: block; color: #ffd986; }
@@ -156,6 +185,11 @@ button, .mode-card, .scope-btn {
 #landing-panel button { font: inherit; color: var(--paper); background: #ffffff12; border: 1px solid #ffffff35; border-radius: 4px; padding: 8px; cursor: pointer; }
 #landing-panel button:disabled { opacity: .55; cursor: default; }
 #wheel-brake { touch-action: none; user-select: none; }
+#sailplane-actions { margin-top: 12px; border-top: 1px solid #ffffff25; line-height: 1.5; }
+#sailplane-actions[hidden], #tow-release[hidden] { display: none; }
+#sailplane-actions p { margin: 9px 0; }
+#tow-status { color: var(--gold); }
+#sailplane-actions button { margin: 3px 4px 0 0; }
 #space-panel { position: absolute; pointer-events: auto; top: 22px; right: 22px; width: min(370px, calc(100vw - 44px)); max-height: calc(100dvh - 190px); overflow: auto; padding: 12px; border: 1px solid #ffffff30; border-radius: 6px; background: #120e0aeb; font-size: 12px; }
 #space-panel[hidden], #space-map-help[hidden] { display: none; }
 #space-panel { z-index: 5; }

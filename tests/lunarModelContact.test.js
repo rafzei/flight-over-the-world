@@ -26,7 +26,7 @@ async function rocketGeometry() {
   return (await new GLTFLoader().parseAsync(result.buffer.slice(result.byteOffset, result.byteOffset + result.length), "")).scene;
 }
 
-test("lunar contact clearance matches the actual scaled Falcon and Rocket base geometry", async () => {
+test("lunar contact clearance matches scaled geometry for both body orientations", async () => {
   const originalDocument = globalThis.document;
   // Only canvas decoration calls are stubbed; Falcon mesh geometry is real.
   globalThis.document = { createElement: () => ({ width: 0, height: 0, getContext: () => new Proxy({}, { get: () => () => {}, set: () => true }) }) };

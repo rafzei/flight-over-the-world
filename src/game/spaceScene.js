@@ -84,7 +84,7 @@ export class SpaceScene {
     if (enabled) this.resetOverview = true;
   }
 
-  update({ camera, mapMatrix, moonECEF, sunECEF, altitude, active, observerECEF, siderealAngle = 0 }) {
+  update({ camera, mapMatrix, moonECEF, sunECEF, altitude, active, observerECEF, siderealAngle = 0, moonSiderealAngle = siderealAngle }) {
     const mapOrientation = new Quaternion().setFromRotationMatrix(mapMatrix);
     const spin = new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), siderealAngle);
     if (this.overview) {
@@ -101,7 +101,7 @@ export class SpaceScene {
     this.earth.quaternion.copy(this.ecefOrientation);
     // Tidal lock: local +X (the centre of the map) always faces Earth.
     const x = moonECEF.clone().negate().normalize();
-    const z = inertialToECEF(MOON_ORBIT_NORMAL, siderealAngle / SPACE_CONSTANTS.EARTH_ANGULAR_SPEED);
+    const z = inertialToECEF(MOON_ORBIT_NORMAL, moonSiderealAngle / SPACE_CONSTANTS.EARTH_ANGULAR_SPEED);
     const y = z.clone().cross(x).normalize(); z.crossVectors(x, y).normalize();
     this.moonOrientation.setFromRotationMatrix(new Matrix4().makeBasis(x, y, z));
     this.moon.position.copy(this.moonWorld);
@@ -212,7 +212,7 @@ export class SpaceScene {
   render(renderer, scene, camera) {
     const clear = renderer.autoClear;
     renderer.autoClear = false;
-    renderer.setClearColor(this.overview ? 0x010208 : 0x8ec8e8);
+    renderer.setClearColor(this.overview ? 0x010208 : scene.fog?.color ?? 0x8ec8e8);
     renderer.clear();
     if (!this.overview) {
       camera.layers.set(1);

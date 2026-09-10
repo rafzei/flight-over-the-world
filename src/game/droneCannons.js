@@ -69,7 +69,8 @@ export function createDroneCannons(scene, { onShot, onImpact } = {}) {
 
   function aim(entry, age) {
     for (const cannon of entry.cannons) {
-      cannon.turret.rotation.y = cannon.direction * Math.PI * 2 * age / BURST_SECONDS;
+      // The barrel group's local Z axis runs through the center of the gun.
+      // Spin only the barrels; the housing and firing direction stay fixed.
       cannon.barrels.rotation.z = age * Math.PI * 40;
     }
   }

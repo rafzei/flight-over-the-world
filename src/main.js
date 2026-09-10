@@ -46,6 +46,9 @@ import { setLoader, hideLoader } from "./game/hud.js";
 import { createPlaneMesh } from "./game/plane.js";
 import { createVehicleController } from "./game/vehicleControllers.js";
 import { SAILPLANE_SPEC, updateSailplane } from "./game/sailplane.js";
+import { GrassFields } from "./game/grassFields.js";
+import { GrassLanding, checkTowPath } from "./game/grassLanding.js";
+import { SailplaneTow, TowVisuals, parseTowSnapshot } from "./game/sailplaneTow.js";
 import { createFalcon9, falconState, releaseDragon, resetFalcon9, updateDragon } from "./game/falcon9.js";
 import { FlightCamera, FLIGHT_CAMERAS } from "./game/flightCamera.js";
 import { applyRotorState, spinRotors } from "./game/rotors.js";
@@ -60,8 +63,10 @@ import { createVehicleGroundShadows } from "./game/vehicleGroundShadows.js";
 import { createVehicleCollisionDetector, raycastTerrain } from "./game/vehicleCollision.js";
 import { createCarousel } from "./game/menuPreview.js";
 import { createSky } from "./game/sky.js";
+import { solarPosition, localSolarState, createTerrainDayNight } from "./game/dayNight.js";
+import { createFlightClock } from "./game/flightClock.js";
 import { SpaceScene, SPACE_RENDER_SCALE } from "./game/spaceScene.js";
-import { SPACE_CONSTANTS, moonPositionECEF, sunDirectionInertial, inertialToECEF, ecefToInertial } from "./game/spacePhysics.js";
+import { SPACE_CONSTANTS, moonPositionECEF } from "./game/spacePhysics.js";
 import { createMagnetosphereOverlay, classifySpaceEnvironment } from "./game/magnetosphere.js";
 import { createAirliner } from "./game/airliner.js";
 import { AirportRunways, DEFAULT_APPROACH } from "./game/airportRunways.js";
@@ -255,12 +260,12 @@ const PLANES = {
     brake: 120,
     cam: [0, 6, 20],
     name: "Rocket",
-    desc: "Earth–Moon rocket · inertial flight · assisted lunar guidance",
+    desc: "Fast aircraft – cruise 790, max 5000 km/h",
     sound: "rocket",
     contrailOptions: { wingAxes: ["x", "y"] },
     exhaust: true,
     prepare: prepareRocket,
-    flightModel: "lunar",
+    flightModel: "plane",
   },
   drone: {
     create: createCombatDrone,
@@ -304,11 +309,18 @@ let spaceScene, magnetosphere;
 let solarPressure = 2;
 const spaceMoon = new Vector3(), spaceSun = new Vector3(), spaceObserver = new Vector3();
 const physicalSunWorld = new Vector3();
+const earthCentreWorld = new Vector3();
+const terrainDayNight = createTerrainDayNight();
+const flightClock = createFlightClock(document.getElementById('flight-clock'));
+let solar = solarPosition(), localSun;
 let spaceTime = 0;
 let liveTraffic;
 const airportRunways = new AirportRunways();
 let selectedApproach = DEFAULT_APPROACH;
 const landingSystem = new LandingSystem(airportRunways.get(selectedApproach));
+const grassFields = new GrassFields();
+const grassLanding = new GrassLanding(grassFields);
+const sailplaneTow = new SailplaneTow();
 let landingBrake = false;
 let vehicleGroundShadows;
 let fighterMissiles;
@@ -2163,6 +2175,7 @@ function pushMatePose(id, data) {
     controlPitch: poseControl(data.controlPitch, data.pitch / 0.4),
     throttle: Number.isFinite(data.throttle) ? Math.max(0, Math.min(1, data.throttle)) : .6,
     airbrake: Number.isFinite(data.airbrake) ? Math.max(0, Math.min(1, data.airbrake)) : 0,
+    tow: data.plane === "sailplane" ? parseTowSnapshot(data.tow) : null,
     dragonReleased: data.dragonReleased === true,
   });
   if (track.samples.length > 24)
@@ -2746,6 +2759,7 @@ async function init() {
     const maxAniso = Math.min(16, renderer.capabilities.getMaxAnisotropy());
     tiles.addEventListener("load-model", ({ scene }) => {
       sharpenTileTextures(scene, isMobile ? Math.min(8, maxAniso) : maxAniso);
+      terrainDayNight.add(scene);
       vehicleGroundShadows.addTerrain(scene);
     });
     tiles.addEventListener("dispose-model", ({ scene }) => vehicleGroundShadows.removeTerrain(scene));
@@ -2900,6 +2914,7 @@ function loadPlane(key) {
 
 function disposeMate(id) {
   const mate = mp.mates.get(id);
+  mate?.towVisuals?.dispose();
   droneCannons?.removeVehicle(mate?.mesh);
   lastDroneBurstSeq.delete(id);
   fighterMissiles?.removeVehicle(mate?.mesh);
@@ -2919,6 +2934,7 @@ function disposeAllMates() {
 
 function hideAllMates() {
   for (const mate of mp.mates.values()) {
+    mate.towVisuals?.dispose();
     if (mate.mesh) mate.mesh.visible = false;
     if (mate.marker) mate.marker.visible = false;
   }
@@ -2979,18 +2995,19 @@ function loadMate(id, key) {
     scene.remove(cur.mesh);
     disposeModelResources(placeholder);
     scene.add(wrapper);
-    mp.mates.set(id, { mesh: wrapper, key, marker: cur.marker });
+    mp.mates.set(id, { mesh: wrapper, key, marker: cur.marker, towVisuals: cur.towVisuals });
   }).catch((err) => {
     console.error(`Could not load peer vehicle ${key}`, err);
   });
 }
 
 function resetFlight(latDeg, lonDeg) {
+  sailplaneTow.reset(); grassLanding.reset();
   toggleSpaceMap(false);
   spaceTime = 0;
   document.getElementById("space-warp").value = "1";
   landingSystem.reset();
-  if (mode === "landing") landingSystem.runway = airportRunways.get(selectedApproach);
+  if (mode === "landing" || landingSystem.runway.isGrass) landingSystem.runway = airportRunways.get(selectedApproach);
   planeMesh?.userData.landingGear?.reset();
   if (planeMesh?.userData.landingGear && !planeMesh.userData.landingGear.fixed && mode !== "landing") planeMesh.userData.landingGear.extension = planeMesh.userData.landingGear.target = 0;
   landingBrake = false;
@@ -3208,14 +3225,16 @@ function updateFlightPhysics(dt) {
   while (left > 0) {
     const step = Math.min(1 / 60, left);
     if (canCrash && landingSystem?.gear && landingSystem.grounded) {
-      const result = landingSystem.roll(plane, step, ctrl);
+      if (landingSystem.runway.isGrass && grassLanding.reason) { flightPosition(planePos); crash(planePos); return; }
+      const result = plane.isSailplane && sailplaneTow.attached ? sailplaneTow.step(step, plane, landingSystem) : landingSystem.roll(plane, step, ctrl);
       left -= step;
       if (result.crash) { flightPosition(planePos); crash(planePos); return; }
       continue;
     }
     const before = landingSystem?.gear ? flightPose(plane) : null;
     if (canCrash) flightPosition(_flightFrom);
-    plane.update(step, ctrl);
+    if (plane.isSailplane && sailplaneTow.attached) sailplaneTow.step(step, plane, landingSystem);
+    else plane.update(step, ctrl);
     left -= step;
     if (canCrash) {
       if (before) {
@@ -3252,6 +3271,7 @@ function updateFlightPhysics(dt) {
 function crash(point = planePos) {
   if (crashed) return;
   crashed = true;
+  sailplaneTow.reset();
   const up = WGS84_ELLIPSOID.getCartographicToNormal(plane.lat, plane.lon, new Vector3())
     .transformDirection(tiles.group.matrixWorld);
   explosions.push(createExplosion(scene, point.clone(), { up }));
@@ -4048,6 +4068,12 @@ window.addEventListener("keydown", (e) => {
     if (k === "g" && !crashed && !finished) {
       e.preventDefault(); planeMesh?.userData.landingGear?.toggle(landingSystem.grounded); return;
     }
+    if (k === "h" && plane?.isSailplane && !crashed && !finished) {
+      e.preventDefault(); callSailplaneTow(); return;
+    }
+    if (k === "l" && plane?.isSailplane && !crashed && !finished) {
+      e.preventDefault(); sailplaneTow.release(plane, landingSystem); return;
+    }
     if (k === "enter" && selectedPlane === "falcon9" && !crashed && !finished && !freeMap.open) {
       e.preventDefault();
       deployDragon();
@@ -4084,6 +4110,16 @@ el.mpOnline?.addEventListener("click", () => {
 window.addEventListener("blur", () => stopTalk());
 window.addEventListener("blur", () => { landingBrake = false; keys.delete("b"); });
 document.getElementById("gear-toggle")?.addEventListener("click", () => { if (!paused && !crashed) planeMesh?.userData.landingGear?.toggle(landingSystem.grounded); });
+function callSailplaneTow() {
+  if (!plane?.isSailplane || menuOpen || paused || guessOpen || leaveOpen || crashed || finished || freeMap.open) return;
+  if (sailplaneTow.call(plane, landingSystem, () => checkTowPath(plane, landingSystem.runway, grassFields, probeColumn))) {
+    setThrottleLever(0); landingBrake = false;
+  }
+}
+document.getElementById("tow-call")?.addEventListener("click", callSailplaneTow);
+document.getElementById("tow-release")?.addEventListener("click", () => {
+  if (!menuOpen && !paused && !guessOpen && !leaveOpen && !crashed && !finished) sailplaneTow.release(plane, landingSystem);
+});
 const brakeButton = document.getElementById("wheel-brake");
 brakeButton?.addEventListener("pointerdown", e => { if (paused || crashed) return; landingBrake = true; brakeButton.setPointerCapture(e.pointerId); });
 for (const event of ["pointerup", "pointercancel", "lostpointercapture"]) brakeButton?.addEventListener(event, () => { landingBrake = false; });
@@ -4143,8 +4179,8 @@ function updateSpaceHud() {
   warp.closest("label").hidden = !d;
   warp.disabled = crashed;
   if (d) warp.value = String(d.timeWarp);
-  const environment = classifySpaceEnvironment(ecefToInertial(spaceObserver, spaceTime), {
-    sunDirection: spaceSun, siderealTime: spaceTime * SPACE_CONSTANTS.EARTH_ANGULAR_SPEED, solarPressure,
+  const environment = classifySpaceEnvironment(spaceObserver.clone().applyAxisAngle(new Vector3(0, 0, 1), solar.siderealAngle), {
+    sunDirection: spaceSun, siderealTime: solar.siderealAngle, solarPressure,
   });
   document.getElementById("space-environment").textContent = `${environment.label}${environment.zoneLabels.length ? " · " + environment.zoneLabels.join(" · ") : ""}\nFrom Earth centre: ${(environment.centerMeters / SPACE_CONSTANTS.EARTH_MEAN_RADIUS).toFixed(2)} Rₑ · altitude: ${distance(environment.altitudeMeters)}`;
 }
@@ -4213,6 +4249,7 @@ function setThrottleLever(v) {
 }
 
 function throttleTarget() {
+  if (sailplaneTow.attached) return 0;
   if (plane?.isSailplane) {
     if (keys.has("control")) return 1;
     if (keys.has("shift")) return 0;
@@ -4447,7 +4484,10 @@ window.__foeDebug = () => ({
   cameraMode: FLIGHT_CAMERAS[flightCamera.mode].name,
   traffic: liveTraffic?.debug(),
   spaceSky: sky?.uniforms.uSpace.value,
+  daylight: localSun ? { ...localSun, utc: new Date(solar.utcMs).toISOString(), siderealAngle: solar.siderealAngle } : null,
+  flightClock: flightClock.diagnostics(),
   landing: plane ? landingSystem.diagnostics(plane) : null,
+  sailplane: plane?.isSailplane ? { grassMap: grassFields.status, grass: !!landingSystem.runway.isGrass, towPhase: sailplaneTow.phase, tow: sailplaneTow.snapshot(), reason: sailplaneTow.reason } : null,
   space: plane?.isLunar ? plane.diagnostics() : null,
   spaceMap: spaceScene?.overview,
   moonRenderPosition: spaceScene?.moonWorld.toArray(),
@@ -4521,8 +4561,12 @@ function tickFrame() {
   ctrl.airbrake = plane.isSailplane ? throttleShown : 0;
   landingSystem.gear = planeMesh?.userData.landingGear || null;
   if (flying && landingSystem.gear) {
-    const nextRunway = airportRunways.choose(plane, { current: landingSystem.runway, locked: landingSystem.grounded || landingSystem.bounceTime > 0, preferred: mode === "landing" ? selectedApproach : null });
-    if (nextRunway !== landingSystem.runway) { landingSystem.reset(); landingSystem.runway = nextRunway; }
+    if (plane.isSailplane && frameCount % 120 === 0 && plane.height - groundAlt < 700) void grassFields.update(plane);
+    const onGrass = grassLanding.update(plane, landingSystem, probeColumn, dt);
+    if (!onGrass && !(landingSystem.runway.isGrass && sailplaneTow.attached)) {
+      const nextRunway = airportRunways.choose(plane, { current: landingSystem.runway.isGrass ? null : landingSystem.runway, locked: landingSystem.grounded || landingSystem.bounceTime > 0, preferred: mode === "landing" ? selectedApproach : null });
+      if (nextRunway !== landingSystem.runway) { landingSystem.reset(); landingSystem.runway = nextRunway; }
+    }
   }
   const activeRunway = landingSystem.runway;
   const nearRunway = landingSystem.gear && landingSystem.near(plane);
@@ -4541,6 +4585,8 @@ function tickFrame() {
   landingSystem.gear?.update(flying ? dt : 0, plane.speed, landingSystem.grounded, landingSystem.touchdown?.sink || 0);
 
   if (flying) {
+    if (sailplaneTow.attached && landingSystem.grounded && ctrl.wheelBrake) sailplaneTow.release(plane, landingSystem);
+    sailplaneTow.update(dt, plane, landingSystem);
     updateFlightPhysics(dt);
     flying = !crashed;
   }
@@ -4549,7 +4595,7 @@ function tickFrame() {
   if ((!menuOpen || awaitingSnap) && plane.height < 100000) airportRunways.updateVisuals(plane);
   const landingPanel = document.getElementById("landing-panel");
   if (landingPanel) {
-    landingPanel.hidden = menuOpen || paused || guessOpen || leaveOpen || freeMap.open || !landingSystem.gear || (!nearRunway && mode !== "landing");
+    landingPanel.hidden = menuOpen || paused || guessOpen || leaveOpen || freeMap.open || !landingSystem.gear || (!plane.isSailplane && !nearRunway && mode !== "landing");
     if (!landingPanel.hidden && frameCount % 8 === 0) {
       const d = landingSystem.diagnostics(plane);
       const status = d.reason || (d.status === "stopped" ? "LANDED · aircraft stopped on its wheels" : d.status === "rollout" ? `ON WHEELS · hold B to brake · ${Math.round(d.runwayRemainingM)} m left` : d.status === "bounced" ? "BOUNCE · stabilize and flare gently" : `${d.airportId} RWY ${d.ident} · ${Math.max(0,d.distanceToThresholdM/1000).toFixed(1)} km to threshold`);
@@ -4559,13 +4605,26 @@ function tickFrame() {
       gearButton.textContent = landingSystem.gear.fixed ? "Fixed landing gear" : `G · Gear ${d.gearDown ? "DOWN" : d.gearExtension < .02 ? "UP" : "moving…"}`;
       gearButton.disabled = landingSystem.grounded || landingSystem.gear.fixed || crashed;
       brakeButton.textContent = ctrl.wheelBrake ? "BRAKING" : "Hold B · Wheel brakes";
+      document.getElementById("sailplane-actions").hidden = !plane.isSailplane;
+      if (plane.isSailplane) {
+        if (activeRunway.isGrass) document.getElementById("landing-status").textContent = d.grounded ? (d.status === "stopped" ? "ON GRASS · ready for tow" : "ON GRASS · hold B to stop") : "GRASS FIELD · keep wings level and flare gently";
+        else if (!nearRunway) {
+          document.getElementById("landing-status").textContent = "GLIDING · choose a flat grass field";
+          document.getElementById("landing-details").textContent = `${Math.round(plane.kmh)} km/h · sink ${(-plane.verticalSpeed).toFixed(1)} m/s`;
+        }
+        document.getElementById("grass-field-status").textContent = grassFields.status === "loading" ? "Checking grass fields nearby…" : grassFields.status === "unavailable" ? "Grass map unavailable · retrying shortly. Airport landings still work." : "Grass landings: flat, open fields · B to stop · call Cessna to fly again";
+        document.getElementById("tow-status").textContent = sailplaneTow.reason;
+        document.getElementById("tow-call").disabled = !landingSystem.grounded || plane.speed >= .5 || sailplaneTow.busy || crashed;
+        document.getElementById("tow-release").hidden = !sailplaneTow.busy;
+        document.getElementById("tow-release").textContent = sailplaneTow.attached ? "L · Release tow rope" : "L · Cancel tow";
+      }
     }
   }
 
   // dźwięk silnika — obroty z przepustnicy i prędkości, opływ z prędkości
   const speed01 = plane.speed / plane.boost;
   const rpm01 = Math.min(1, Math.max(0.15, 0.22 + plane.throttle * 0.78));
-  updateEngineSound(flying, rpm01, speed01, PLANES[selectedPlane].sound);
+  updateEngineSound(flying, sailplaneTow.busy ? .75 : rpm01, speed01, sailplaneTow.busy ? "plane" : PLANES[selectedPlane].sound);
   if (plane.isSailplane) updateSailplane(planeMesh, plane.airbrake);
   updateMusic();
 
@@ -4582,6 +4641,7 @@ function tickFrame() {
   if (plane.isLunar) planeQuat.copy(plane.orientationECEF).premultiply(new Quaternion().setFromRotationMatrix(tiles.group.matrixWorld));
   planeMesh.position.copy(planePos);
   planeMesh.quaternion.copy(planeQuat);
+  sailplaneTow.render(scene, frameAt, planeMesh, flying ? dt : 0, !menuOpen && !guessOpen && !crashed);
   if (planeMesh.userData.prop) {
     planeMesh.userData.prop.rotation.z += plane.speed * dt * 1.6;
   }
@@ -4607,7 +4667,7 @@ function tickFrame() {
     const status = droneCannons?.status(planeMesh);
     el.droneFire.hidden = selectedPlane !== "drone" || !flying || leaveOpen || pendingSnap || awaitingSnap || freeMap.open;
     el.droneFire.disabled = !status?.canFire;
-    el.droneFire.textContent = status?.firing ? "Firing 360° burst…" : status?.canFire ? "Enter · Fire 360° burst" : "Cannons readying…";
+    el.droneFire.textContent = status?.firing ? "Firing burst…" : status?.canFire ? "Enter · Fire burst" : "Cannons readying…";
   }
   for (const mate of mp.mates.values()) {
     if (mate.mesh) spinRotors(mate.mesh, dt, plane.speed);
@@ -4635,6 +4695,7 @@ function tickFrame() {
         controlPitch: ctrl.pitch,
         throttle: plane.throttle,
         airbrake: plane.airbrake ?? 0,
+        tow: plane.isSailplane ? sailplaneTow.snapshot() : null,
         dragonReleased: !!falconState(planeMesh)?.released,
       });
     }
@@ -4686,6 +4747,12 @@ function tickFrame() {
       const kmh = (from.kmh ?? 0) + ((to.kmh ?? 0) - (from.kmh ?? 0)) * u;
       updateCombatDrone(mate.mesh, paused ? 0 : dt, kmh / (PLANES[mate.key].boost * 3.6), true);
       if (mate.key === "sailplane") updateSailplane(mate.mesh, (from.airbrake ?? 0) + ((to.airbrake ?? 0) - (from.airbrake ?? 0)) * u);
+      if (mate.key === "sailplane" && to.tow) {
+        mate.towVisuals ??= new TowVisuals();
+        const tow = { ...to.tow };
+        if (from.tow) for (const key of ["lat", "lon", "height", "heading", "pitch"]) tow[key] = from.tow[key] + (to.tow[key] - from.tow[key]) * u;
+        mate.towVisuals.update(scene, frameAt, mate.mesh, tow, paused ? 0 : dt);
+      } else mate.towVisuals?.dispose();
       const mateVertical = PLANES[mate.key].vertical;
       const mateThrottle = to.throttle ?? .6;
       updateRocketExhaust(mate.mesh, dt, mateVertical ? mateThrottle * 15000 : kmh, !paused && (!mateVertical || mateThrottle > .02));
@@ -4749,21 +4816,23 @@ function tickFrame() {
   }
   sky.mesh.position.copy(camPos);
   sky.mesh.quaternion.copy(skyQuat);
-  sky.update(plane.height, clock.elapsedTime, scene.fog);
+  solar = solarPosition(Date.now());
+  localSun = localSolarState(solar, plane.lat, plane.lon, plane.height);
+  sky.update(plane.height, clock.elapsedTime, scene.fog, localSun);
   moonPositionECEF(spaceTime, spaceMoon);
-  sunDirectionInertial(spaceTime, spaceSun);
+  spaceSun.copy(solar.sunInertial);
   WGS84_ELLIPSOID.getCartographicToPosition(plane.lat, plane.lon, plane.height, spaceObserver);
-  const sunECEF = inertialToECEF(spaceSun, spaceTime);
+  const sunECEF = solar.sunECEF;
   const mapOrientation = new Quaternion().setFromRotationMatrix(tiles.group.matrixWorld);
   physicalSunWorld.copy(sunECEF).applyQuaternion(mapOrientation);
   sky.uniforms.uSunDir.value.copy(physicalSunWorld).applyQuaternion(skyQuat.clone().invert());
   const stars = sky.mesh.getObjectByName("space-stars");
-  if (stars) stars.quaternion.copy(skyQuat).invert().multiply(mapOrientation).multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), -spaceTime * SPACE_CONSTANTS.EARTH_ANGULAR_SPEED));
+  if (stars) stars.quaternion.copy(skyQuat).invert().multiply(mapOrientation).multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), -solar.siderealAngle));
   spaceScene.update({ camera, mapMatrix: tiles.group.matrixWorld, moonECEF: spaceMoon, sunECEF,
     altitude: plane.height, active: !menuOpen, observerECEF: spaceObserver,
-    siderealAngle: spaceTime * SPACE_CONSTANTS.EARTH_ANGULAR_SPEED });
+    siderealAngle: solar.siderealAngle, moonSiderealAngle: spaceTime * SPACE_CONSTANTS.EARTH_ANGULAR_SPEED });
   magnetosphere.setVisible(!menuOpen && spaceScene.overview && document.getElementById("magnetosphere-toggle").checked);
-  magnetosphere.update({ sunDirection: spaceSun, siderealTime: spaceTime * SPACE_CONSTANTS.EARTH_ANGULAR_SPEED,
+  magnetosphere.update({ sunDirection: spaceSun, siderealTime: solar.siderealAngle,
     time: spaceTime, solarPressure, orientation: spaceScene.inertialOrientation, metersToWorld: SPACE_RENDER_SCALE });
   if (frameCount % 4 === 0) updateSpaceHud();
 
@@ -4772,12 +4841,18 @@ function tickFrame() {
   document.body.classList.toggle("in-space", !menuOpen && inSpace);
   document.body.classList.toggle("space-overview", !menuOpen && spaceScene.overview);
   if (plane.height >= 100000) hidePlaceBadge();
-  ambientLight.intensity = inSpace ? .14 : 1.15;
+  ambientLight.intensity = inSpace ? .14 : localSun.ambientIntensity;
+  ambientLight.position.set(0, 1, 0).applyQuaternion(skyQuat);
   ambientLight.color.set(inSpace ? 0xc8d6ef : 0xbfd8ee);
   ambientLight.groundColor.set(inSpace ? 0xc8d6ef : 0x5a7048);
-  sun.intensity = inSpace ? 2.8 : 2;
-  sun.color.set(inSpace ? 0xffffff : 0xfff2dd);
-  sun.castShadow = !isMobile && !inSpace;
+  sun.intensity = inSpace ? 2.8 * localSun.sunlight : localSun.sunIntensity;
+  if (inSpace) sun.color.set(0xffffff);
+  else sun.color.copy(sky.uniforms.uSunColor.value);
+  sun.castShadow = !isMobile && !inSpace && localSun.sunlight > .01;
+  scene.environmentIntensity = inSpace ? .08 : localSun.environmentIntensity;
+  terrainDayNight.update(physicalSunWorld, earthCentreWorld.setFromMatrixPosition(tiles.group.matrixWorld));
+  flightClock.update({ utcMs: solar.utcMs, latDeg: plane.latDeg, lonDeg: plane.lonDeg, phase: localSun.phase, inSpace,
+    hidden: menuOpen || guessOpen || leaveOpen || freeMap.open });
   sun.target.position.copy(planePos);
   sun.target.updateMatrixWorld();
 
@@ -4998,7 +5073,7 @@ function tickFrame() {
     camera,
     up: shadowUp,
     sunDirection: shadowSunDirection,
-    active: !menuOpen && !pendingSnap && !awaitingSnap && plane.height < 100000,
+    active: !menuOpen && !pendingSnap && !awaitingSnap && plane.height < 100000 && localSun.sunlight > .05,
   });
   liveTraffic?.update({
     active: !menuOpen && !paused && !guessOpen && !leaveOpen && !crashed && !finished && !pendingSnap && !awaitingSnap && !freeMap.open && !window.__ctxLost && plane.height < 100000,

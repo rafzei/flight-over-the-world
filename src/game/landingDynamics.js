@@ -53,9 +53,10 @@ export class LandingSystem {
     const brake=ctrl.wheelBrake?1:0;
     if(plane.isSailplane){plane.throttle=0;plane.airbrake+=((ctrl.airbrake||0)-plane.airbrake)*(1-Math.exp(-4*dt));}
     else plane.throttle+=(Math.max(0,Math.min(1,ctrl.throttle))-plane.throttle)*(1-Math.exp(-3*dt));
-    const resistance=.12+.00025*plane.speed*plane.speed+brake*4.2;
-    plane.speed=Math.max(0,plane.speed+(plane.throttle*3.8-resistance)*dt);
-    if(plane.speed<.35&&plane.throttle<.04)plane.speed=0;
+    const resistance=(this.runway.isGrass?.45:.12)+.00025*plane.speed*plane.speed+brake*4.2;
+    const towPull=plane.isSailplane?Math.max(0,Math.min(3,ctrl.towAcceleration||0)):0;
+    plane.speed=Math.max(0,plane.speed+(plane.throttle*3.8+towPull-resistance)*dt);
+    if(plane.speed<.35&&plane.throttle<.04&&!towPull)plane.speed=0;
     const turn=ctrl.roll*.65*(plane.speed/(plane.speed+3))/(1+plane.speed/10);
     if(Math.abs(turn*plane.speed)>6)return this.failure(plane,'Lost directional control');
     plane.heading+=turn*dt;

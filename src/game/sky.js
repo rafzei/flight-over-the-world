@@ -1,6 +1,6 @@
 import { BackSide, BufferGeometry, Color, Float32BufferAttribute, Mesh, Points, PointsMaterial, ShaderMaterial, SphereGeometry, Vector3 } from "three";
 
-// jedno stałe kierunkowe "słońce" świata — używane i przez światło, i przez niebo
+// Defaults for standalone previews; flight supplies the live solar direction.
 export const SUN_DIR = new Vector3(-0.52, 0.62, 0.26).normalize();
 export const MOON_DIR = new Vector3(0.60, 0.42, -0.52).normalize();
 export const SPACE_SKY_ALTITUDE_M = 20_000;
@@ -14,6 +14,9 @@ export function spaceSkyBlend(altitudeM) {
 // Horyzont ma DOKŁADNIE kolor mgły (w przestrzeni liniowej, przez ten sam
 // tone mapping ACES co teren), więc nie ma żadnej przerwy ani poświaty.
 export function createSky(fogColorHex, { simple = false, physicalBodies = false } = {}) {
+  const dayZenith = new Color(0x2a63b8), dayMid = new Color(0x7db3e2), dayHorizon = new Color(fogColorHex);
+  const nightZenith = new Color(0x02040d), nightMid = new Color(0x080e20), nightHorizon = new Color(0x121b2e);
+  const sunsetHorizon = new Color(0xb86542), sunsetSun = new Color(0xff9455), daySun = new Color(0xfff2dd);
   const uniforms = {
     uZenith: { value: new Color(0x2a63b8) },
     uMid: { value: new Color(0x7db3e2) },
@@ -24,6 +27,9 @@ export function createSky(fogColorHex, { simple = false, physicalBodies = false 
     uSpace: { value: 0 },
     uAirglow: { value: 1 },
     uMoonDir: { value: MOON_DIR },
+    uDaylight: { value: 1 },
+    uTwilight: { value: 0 },
+    uSunVisibility: { value: 1 },
   };
 
   const mat = new ShaderMaterial({
@@ -49,6 +55,9 @@ export function createSky(fogColorHex, { simple = false, physicalBodies = false 
       uniform float uSpace;
       uniform float uAirglow;
       uniform vec3 uMoonDir;
+      uniform float uDaylight;
+      uniform float uTwilight;
+      uniform float uSunVisibility;
 
       vec3 spaceSky(vec3 d) {
         vec3 col = vec3(0.0005, 0.001, 0.003);
@@ -108,7 +117,8 @@ export function createSky(fogColorHex, { simple = false, physicalBodies = false 
 
         // słońce: tarcza + poświata
         float s = max(dot(d, uSunDir), 0.0);
-        col += uSunColor * (pow(s, 1400.0) * 8.0 + pow(s, 48.0) * 0.25 + pow(s, 6.0) * 0.05);
+        col += uSunColor * (pow(s, 1400.0) * 8.0 + pow(s, 48.0) * 0.25 + pow(s, 6.0) * 0.05) * uSunVisibility;
+        col += vec3(0.45, 0.095, 0.025) * uTwilight * pow(s, 3.0) * exp(-abs(h) * 7.0);
 
         ${simple ? "" : `
         // chmury — rzut kierunku na płaszczyznę, dryf w czasie
@@ -122,6 +132,7 @@ export function createSky(fogColorHex, { simple = false, physicalBodies = false 
           float shade = fbm(cuv * 2.6 + 8.7);
           vec3 cloud = mix(vec3(0.60, 0.64, 0.70), vec3(1.18, 1.14, 1.07), smoothstep(0.3, 0.9, shade));
           cloud += uSunColor * pow(s, 4.0) * 0.22;
+          cloud *= mix(vec3(0.006, 0.010, 0.020), vec3(1.0), uDaylight);
           col = mix(col, cloud, cov * fade * 0.85);
         }
         `}
@@ -153,13 +164,32 @@ export function createSky(fogColorHex, { simple = false, physicalBodies = false 
   starGeometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
   starGeometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
   const starMaterial = new PointsMaterial({ size: 1.6, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0, depthTest: true, depthWrite: false, fog: false, toneMapped: false });
+  const starUp = { value: new Vector3(0, 1, 0) };
+  starMaterial.onBeforeCompile = shader => {
+    shader.uniforms.starUp = starUp;
+    shader.uniforms.uSpace = uniforms.uSpace;
+    shader.vertexShader = 'uniform vec3 starUp;\nvarying float vStarHeight;\n' + shader.vertexShader;
+    shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvStarHeight = dot(normalize(mat3(modelMatrix) * position), starUp);');
+    shader.fragmentShader = 'uniform float uSpace;\nvarying float vStarHeight;\n' + shader.fragmentShader;
+    shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', 'diffuseColor.a *= mix(smoothstep(0.0, 0.08, vStarHeight), 1.0, uSpace);\n#include <opaque_fragment>');
+  };
   const stars = new Points(starGeometry, starMaterial); stars.name = "space-stars"; stars.frustumCulled = false; stars.visible = false; stars.renderOrder = -99; stars.raycast = () => {}; mesh.add(stars);
   return { mesh, uniforms,
-    update(altitudeM, elapsedSeconds, fog) {
+    update(altitudeM, elapsedSeconds, fog, solar) {
       const blend = spaceSkyBlend(Number.isFinite(altitudeM) ? altitudeM : 0);
+      const daylight = solar?.daylight ?? 1, twilight = solar?.twilight ?? 0;
+      uniforms.uDaylight.value = daylight;
+      uniforms.uTwilight.value = twilight;
+      uniforms.uSunVisibility.value = solar?.sunlight ?? 1;
+      uniforms.uZenith.value.copy(nightZenith).lerp(dayZenith, daylight);
+      uniforms.uMid.value.copy(nightMid).lerp(dayMid, daylight);
+      uniforms.uHorizon.value.copy(nightHorizon).lerp(dayHorizon, daylight).lerp(sunsetHorizon, twilight * .45);
+      uniforms.uSunColor.value.copy(sunsetSun).lerp(daySun, Math.max(0, Math.min(1, (solar?.elevation ?? 30) / 25)));
       uniforms.uSpace.value = blend;
       uniforms.uAirglow.value = Math.max(0, Math.min(1, (120000 - altitudeM) / 100000));
-      stars.visible = blend > 0; starMaterial.opacity = blend;
+      starMaterial.opacity = Math.max(blend, solar?.stars ?? 0);
+      stars.visible = starMaterial.opacity > 0;
+      starUp.value.set(0, 1, 0).applyQuaternion(mesh.quaternion);
       uniforms.uTime.value = elapsedSeconds;
       if (fog?.isFogExp2) {
         fog.density = 0.00007 * (1 - blend) + 0.00000015 * blend;

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Matrix4, PerspectiveCamera, Raycaster, Scene, Vector3 } from 'three';
 import { SpaceScene, SPACE_RENDER_SCALE as SCALE } from '../src/game/spaceScene.js';
 import { SPACE_CONSTANTS as C, MOON_ORBIT_NORMAL, moonPositionECEF, inertialToECEF, sunDirectionInertial } from '../src/game/spacePhysics.js';
+import { solarPosition } from '../src/game/dayNight.js';
 
 // No WebGL or network is needed to check the actual scene geometry/transforms.
 const element = () => ({style:{},addEventListener(){},removeEventListener(){},remove(){},append(){}});
@@ -49,6 +50,24 @@ test('overview exposes west-to-east sidereal spin while its inertial frame keeps
   assert(Math.abs(Math.acos(axis1.y)-C.EARTH_AXIAL_TILT)<1e-9);
   assert(Math.abs(equator0.dot(equator1))<1e-9);
   assert(new Vector3().crossVectors(equator0,equator1).dot(axis1)>.999999);
+});
+
+test('live sunlight illuminates the same geographic point in flight and globe view independently of lunar mission time', t => {
+  const {space, camera, mapMatrix} = sceneFixture(t);
+  const solar = solarPosition(Date.parse('2026-09-10T12:00:00Z'));
+  const observer = solar.sunECEF.clone().multiplyScalar(C.EARTH_EQUATORIAL_RADIUS + 1000000);
+  const missionTime = 34200, moonECEF = moonPositionECEF(missionTime);
+  for (const overview of [false, true]) {
+    space.setOverview(overview);
+    space.update({camera, mapMatrix, moonECEF, sunECEF: solar.sunECEF, altitude: 1000000,
+      active: true, observerECEF: observer, siderealAngle: solar.siderealAngle,
+      moonSiderealAngle: missionTime * C.EARTH_ANGULAR_SPEED});
+    const surfaceNormal = solar.sunECEF.clone().applyQuaternion(space.earth.quaternion);
+    assert(surfaceNormal.dot(space.sun.position.clone().normalize()) > .999999);
+    const pole = new Vector3(0, 0, 1).applyQuaternion(space.moon.quaternion);
+    const expected = inertialToECEF(MOON_ORBIT_NORMAL, missionTime).applyQuaternion(space.ecefOrientation);
+    assert(pole.distanceTo(expected) < 1e-9, 'lunar surface and its pole retain the mission physics frame');
+  }
 });
 
 test('lunar contact patch has outward faces, continuous seam UVs and sub-metre spherical accuracy', t => {

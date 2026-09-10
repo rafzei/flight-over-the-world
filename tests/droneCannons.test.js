@@ -18,26 +18,42 @@ function setup(options = {}) {
   return { model, root, scene, cannons, mounts: model.userData.combatDrone.cannons };
 }
 
-test("both real cannon muzzles sweep all 360 degrees with rotating barrels, independent of frame rate", () => {
+test("both cannons fire forward with barrels spinning around fixed center axes, independent of frame rate", () => {
   for (const fps of [30, 144]) {
-    const shots = [], bearings = [new Set(), new Set()];
+    const shots = [];
     const rig = setup({ onShot(shot) {
       assert(shot.position.distanceTo(shot.muzzle.getWorldPosition(new Vector3())) < 1e-8);
       assert(shot.direction.distanceTo(new Vector3(0, 0, -1).transformDirection(shot.muzzle.matrixWorld)) < 1e-8);
-      const local = shot.direction.clone().applyQuaternion(rig.root.quaternion.clone().invert());
-      const angle = Math.atan2(local.x, -local.z);
-      bearings[shot.cannon].add(Math.round(angle * 24 / Math.PI));
+      const forward = new Vector3(0, 0, -1).transformDirection(rig.root.matrixWorld);
+      assert(shot.direction.distanceTo(forward) < 1e-8, "every bullet follows the drone's forward direction");
       shots.push(shot);
     } });
     rig.root.position.set(6378137, 14, 39); rig.root.rotation.set(.2, .6, -.1);
+    const localMuzzles = mount => mount.muzzles.map(muzzle => rig.root.worldToLocal(muzzle.getWorldPosition(new Vector3())));
+    const center = positions => positions.reduce((sum, position) => sum.add(position), new Vector3()).multiplyScalar(1 / positions.length);
+    const initialMuzzles = rig.mounts.map(localMuzzles);
+    const initialCenters = initialMuzzles.map(center);
+    const spun = [false, false];
     assert.equal(rig.cannons.fire(rig.root), true);
     assert.equal(rig.cannons.fire(rig.root), false, "repeat presses cannot stack bursts");
     assert(shots[0].position.distanceTo(shots[1].position) > 2, "bullets start at separate side guns");
     const firstMuzzles = shots.map(shot => shot.position.clone());
     rig.root.position.x += 5;
-    for (let i = 0; i < Math.ceil(fps * 2.01); i++) rig.cannons.update(1 / fps);
+    for (let i = 0; i < Math.ceil(fps * 2.01); i++) {
+      rig.cannons.update(1 / fps);
+      for (const [index, mount] of rig.mounts.entries()) {
+        const positions = localMuzzles(mount);
+        assert(center(positions).distanceTo(initialCenters[index]) < 1e-8, "the barrel center stays fixed relative to the drone");
+        assert.equal(mount.turret.rotation.y, 0, "the gun housing does not sweep sideways");
+        if (positions[0].distanceTo(initialMuzzles[index][0]) > .01) spun[index] = true;
+        for (const [muzzle, position] of positions.entries()) {
+          assert(Math.abs(position.distanceTo(initialCenters[index]) - initialMuzzles[index][muzzle].distanceTo(initialCenters[index])) < 1e-8,
+            "each muzzle rotates at a constant radius around its own gun's center");
+        }
+      }
+    }
     assert.equal(shots.length, 96);
-    assert(bearings.every(set => set.size === 48), "each cannon covers the full circle");
+    assert(spun.every(Boolean), "both barrel clusters spin during the burst");
     assert(shots[12].position.distanceTo(firstMuzzles[0]) > 1, "firing follows the moving vehicle");
     assert(rig.mounts.every(mount => mount.turret.rotation.y === 0 && mount.barrels.rotation.z === 0));
     assert.equal(rig.cannons.status(rig.root).firing, false);
@@ -51,17 +67,17 @@ test("pause freezes an active burst and tracers; cancellation stops new bullets"
   let shots = 0;
   const { root, scene, cannons, mounts } = setup({ onShot: () => shots++ });
   cannons.fire(root); cannons.update(.1);
-  const count = shots, yaw = mounts[0].turret.rotation.y;
+  const count = shots, spin = mounts[0].barrels.rotation.z;
   const effects = scene.getObjectByName("drone-cannon-effects");
   const positions = [...effects.children[0].geometry.attributes.position.array];
   cannons.update(10, { active: false, visible: false });
-  assert.equal(shots, count); assert.equal(mounts[0].turret.rotation.y, yaw);
+  assert.equal(shots, count); assert.equal(mounts[0].barrels.rotation.z, spin);
   assert.equal(effects.visible, false);
   assert.deepEqual([...effects.children[0].geometry.attributes.position.array], positions);
   cannons.update(.1); assert(shots > count); assert(effects.visible);
   cannons.cancelBurst(root); const stopped = shots;
   cannons.update(.5); assert.equal(shots, stopped);
-  assert(mounts.every(mount => mount.turret.rotation.y === 0));
+  assert(mounts.every(mount => mount.turret.rotation.y === 0 && mount.barrels.rotation.z === 0));
   cannons.dispose(); disposeCombatDrone(root);
 });
 

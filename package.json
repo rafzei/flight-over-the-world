@@ -11,12 +11,15 @@
     "build": "vite build",
     "preview": "vite preview"
   },
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
     "3d-tiles-renderer": "^0.5.2",
     "peerjs": "^1.5.5",
     "three": "^0.170.0",
-    "trystero": "^0.25.4"
+    "trystero": "^0.25.4",
+    "tz-lookup": "^6.1.25"
   },
   "devDependencies": {
     "vite": "^6.2.0"

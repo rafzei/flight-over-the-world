@@ -236,12 +236,17 @@
     </div>
 
     <div id="hud">
+      <section id="flight-clock" aria-label="Time at aircraft position" hidden>
+        <div class="flight-clock-face"><time>--:--:--</time><span data-clock-phase>Live</span></div>
+        <div data-clock-zone></div>
+        <div data-clock-detail></div>
+      </section>
       <section id="space-panel" aria-label="Space flight" hidden>
         <strong id="space-status">Earth–Moon flight</strong>
         <pre id="space-details"></pre>
         <div class="space-actions">
           <button id="moon-guidance" type="button">Fly to Moon</button>
-          <label>Time <select id="space-warp"><option value="1">1×</option><option value="10">10×</option><option value="100">100×</option><option value="1000">1000×</option></select></label>
+          <label>Mission time <select id="space-warp"><option value="1">1×</option><option value="10">10×</option><option value="100">100×</option><option value="1000">1000×</option></select></label>
           <button id="space-map-toggle" type="button" aria-pressed="false">Space map</button>
           <button id="dragon-release" type="button" hidden>Enter · Release Dragon</button>
         </div>
@@ -254,6 +259,7 @@
           <p>Plasmasphere · Inner / Outer Van Allen belts · Magnetopause · Magnetosheath · Bow shock · Magnetotail · Solar wind / IMF</p>
           <p>The boundaries move with solar wind. Earth's magnetic field has no sharp end. Distances use 1 Rₑ = 6,371 km.</p>
           <p>Lunar guidance uses assisted steering and unlimited game propulsion. This is not a real Falcon 9 mission profile.</p>
+          <p>Mission speed controls the spacecraft and Moon. Sunlight and Earth's rotation stay synchronized with real UTC.</p>
           <small>Moon imagery: NASA / GSFC / Arizona State University · Earth: NASA Blue Marble</small>
         </details>
       </section>
@@ -263,6 +269,12 @@
         <pre id="landing-details"></pre>
         <button id="gear-toggle" type="button">G · Gear DOWN</button>
         <button id="wheel-brake" type="button">Hold B · Wheel brakes</button>
+        <div id="sailplane-actions" hidden>
+          <p id="grass-field-status"></p>
+          <p id="tow-status" role="status"></p>
+          <button id="tow-call" type="button" disabled>H · Call Cessna for tow</button>
+          <button id="tow-release" type="button" hidden>L · Release tow rope</button>
+        </div>
       </section>
       <section id="traffic-panel" aria-label="Nearby air traffic" hidden>
         <button id="traffic-toggle" type="button" aria-pressed="true">Live traffic · On</button>
@@ -313,7 +325,7 @@
 
       <div id="map-note" hidden>Map unavailable in this mode</div>
       <button id="missile-fire" type="button" hidden>Enter · Fire missile</button>
-      <button id="drone-fire" type="button" hidden>Enter · Fire 360° burst</button>
+      <button id="drone-fire" type="button" hidden>Enter · Fire burst</button>
     </div>
 
     <div id="touch" class="hidden">
