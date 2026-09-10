@@ -2162,6 +2162,7 @@ function pushMatePose(id, data) {
     controlRoll: poseControl(data.controlRoll, -data.roll / 0.9),
     controlPitch: poseControl(data.controlPitch, data.pitch / 0.4),
     throttle: Number.isFinite(data.throttle) ? Math.max(0, Math.min(1, data.throttle)) : .6,
+    airbrake: Number.isFinite(data.airbrake) ? Math.max(0, Math.min(1, data.airbrake)) : 0,
     dragonReleased: data.dragonReleased === true,
   });
   if (track.samples.length > 24)
@@ -4565,7 +4566,7 @@ function tickFrame() {
   const speed01 = plane.speed / plane.boost;
   const rpm01 = Math.min(1, Math.max(0.15, 0.22 + plane.throttle * 0.78));
   updateEngineSound(flying, rpm01, speed01, PLANES[selectedPlane].sound);
-  updateSailplane(planeMesh, plane.airbrake);
+  if (plane.isSailplane) updateSailplane(planeMesh, plane.airbrake);
   updateMusic();
 
   // pozycja i orientacja samolotu
@@ -4633,6 +4634,7 @@ function tickFrame() {
         controlRoll: ctrl.roll,
         controlPitch: ctrl.pitch,
         throttle: plane.throttle,
+        airbrake: plane.airbrake ?? 0,
         dragonReleased: !!falconState(planeMesh)?.released,
       });
     }
@@ -4683,6 +4685,7 @@ function tickFrame() {
       updateFighterSurfaces(mate.mesh, paused ? 0 : dt, mateRoll, matePitch);
       const kmh = (from.kmh ?? 0) + ((to.kmh ?? 0) - (from.kmh ?? 0)) * u;
       updateCombatDrone(mate.mesh, paused ? 0 : dt, kmh / (PLANES[mate.key].boost * 3.6), true);
+      if (mate.key === "sailplane") updateSailplane(mate.mesh, (from.airbrake ?? 0) + ((to.airbrake ?? 0) - (from.airbrake ?? 0)) * u);
       const mateVertical = PLANES[mate.key].vertical;
       const mateThrottle = to.throttle ?? .6;
       updateRocketExhaust(mate.mesh, dt, mateVertical ? mateThrottle * 15000 : kmh, !paused && (!mateVertical || mateThrottle > .02));

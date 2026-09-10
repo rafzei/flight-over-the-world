@@ -51,8 +51,8 @@ export function createSailplane() {
   canopy.scale.set(.315, .38, 1.05);
   const spoilers = [];
   for (const side of [-1, 1]) {
-    add("glider-wing", wingGeometry([[.23, .13, -1.05, 1.35], [3.5, .24, -.96, 1.05], [7.8, .43, -.52, .46], [9, .58, -.35, .23]], side), white);
-    add("glider-wingtip", wingGeometry([[8.5, .516, -.42, .326], [9, .582, -.351, .233]], side), orange);
+    add("glider-wing", wingGeometry([[.23, .13, -1.05, 1.35], [3.5, .24, -.96, 1.05], [7.8, .43, -.52, .46], [8.5, .518, -.421, .326]], side), white);
+    add("glider-wingtip", wingGeometry([[8.5, .518, -.421, .326], [9, .58, -.35, .23]], side), orange);
     add("glider-tailplane", wingGeometry([[0, 1.23, 2.3, .77], [1.35, 1.27, 2.64, .34]], side), white);
     const spoiler = add("glider-airbrake", new BoxGeometry(1.65, .24, .055), orange, [side * 3.1, .21, -.38]);
     spoiler.visible = false; spoilers.push(spoiler);

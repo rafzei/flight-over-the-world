@@ -43,6 +43,7 @@ Nine vehicles are available in single player and multiplayer:
 | Vehicle | Cruise / max speed | Flight characteristics and features |
 | --- | --- | --- |
 | **Piper PA-28** | ~170 / 470 km/h | Light propeller aircraft with animated propeller, authored surface panels, refined glazing and navigation lights. |
+| **Sailplane** | ~100 km/h trim / 270 km/h dive limit | Unpowered 18 m glider with tapered wings, a glazed canopy, T-tail, fixed central and tail wheels, animated airbrakes and wind sound. |
 | **Dash 8 Q400** | ~270 / 670 km/h | Regional turboprop with two animated propellers, cabin windows, panel seams and navigation lights. |
 | **Cessna Citation** | ~330 / 900 km/h | Business jet with refined glazing, metal surfaces and navigation lights. |
 | **Boeing 737-800** | ~830 / 970 km/h | Original twin-engine airliner with framed cockpit panes, doors, cargo hatches, fan blades, flattened nacelles, wing panels and blue livery. |
@@ -53,6 +54,8 @@ Nine vehicles are available in single player and multiplayer:
 | **SpaceX Falcon 9** | Thrust-controlled; no fixed speed cap | Upright game spacecraft with nine engine nozzles and assisted Earth–Moon travel. Press `Enter` below 80 km Earth altitude to release Dragon with its red-and-white parachute. |
 
 Aircraft speeds are game settings, not real-world specifications. Aircraft can exceed their nominal maximum in a dive. Both rockets inherit Earth's eastward surface velocity and accelerate under thrust; the HUD uses speed relative to Earth near the launch site. In space, the flight panel identifies the distance and speed relative to the Moon.
+
+The sailplane starts airborne and gradually descends. `W` lowers the nose to gain speed; `S` trades speed for height, with a stall and descent if held too long. `A` / `D` bank and turn. The **AIRBRK** slider (or mouse wheel) controls aerodynamic brakes: `Ctrl` temporarily extends them, `Shift` retracts them, and `,` / `.` set retracted / fully extended. There is no engine or boost. Airbrakes steepen the descent; use `B` for wheel braking after touchdown. The glider supports **Land**, free flight and multiplayer; restart for another flight after stopping. This simplified model has no thermals or tow launch.
 
 The drone uses `A` / `D` to turn, even at zero forward speed, and `W` / `S` to descend / climb while powered. Its throttle controls horizontal speed and rotor lift: at zero throttle it brakes and falls towards the ground; adding power restores altitude control. Falcon 9 uses `W` / `S` to tilt and `A` / `D` to turn; throttle controls thrust, so cutting it lets gravity pull the rocket down. The released Dragon descends separately while you continue controlling Falcon 9. The on-screen **Release Dragon** button also works on touch devices.
 
