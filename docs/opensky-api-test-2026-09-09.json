@@ -1,0 +1,93 @@
+{
+  "startedAt": "2026-09-09T11:36:58.528Z",
+  "mode": "oauth-client-credentials",
+  "bbox": {
+    "lamin": 51.8,
+    "lomin": 20.4,
+    "lamax": 52.7,
+    "lomax": 21.8,
+    "areaSquareDegrees": 1.26
+  },
+  "plannedStateRequests": 2,
+  "expectedStateCreditCost": 2,
+  "dailyAllowance": 4000,
+  "auth": {
+    "httpStatus": 200,
+    "durationMs": 430,
+    "tokenType": "Bearer",
+    "expiresInSeconds": 1800
+  },
+  "snapshots": [
+    {
+      "receivedAt": "2026-09-09T11:36:59.329Z",
+      "httpStatus": 200,
+      "durationMs": 368,
+      "serverDate": "Wed, 09 Sep 2026 11:36:59 GMT",
+      "remainingCredits": 3999,
+      "retryAfterSeconds": null,
+      "retryAfter": null,
+      "payloadBytes": 1429,
+      "apiTime": 1788953814,
+      "apiTimeIso": "2026-09-09T11:36:54.000Z",
+      "localClockMinusApiSeconds": 5.3,
+      "totalStates": 11,
+      "malformedRows": 0,
+      "airborneStates": 11,
+      "onGroundStates": 0,
+      "renderableAirborneStates": 11,
+      "freshAirborneStatesWithin30s": 7,
+      "missingPositionOrAltitudeAirborne": 0,
+      "usingGeoAltitude": 11,
+      "usingBaroFallback": 0,
+      "positionAgeSeconds": {
+        "median": 0,
+        "p95": 136,
+        "max": 243
+      },
+      "categoryCounts": {
+        "0": 9,
+        "1": 1,
+        "4": 1
+      }
+    },
+    {
+      "receivedAt": "2026-09-09T11:37:14.541Z",
+      "httpStatus": 200,
+      "durationMs": 211,
+      "serverDate": "Wed, 09 Sep 2026 11:37:14 GMT",
+      "remainingCredits": 3998,
+      "retryAfterSeconds": null,
+      "retryAfter": null,
+      "payloadBytes": 1302,
+      "apiTime": 1788953831,
+      "apiTimeIso": "2026-09-09T11:37:11.000Z",
+      "localClockMinusApiSeconds": 3.5,
+      "totalStates": 10,
+      "malformedRows": 0,
+      "airborneStates": 10,
+      "onGroundStates": 0,
+      "renderableAirborneStates": 10,
+      "freshAirborneStatesWithin30s": 6,
+      "missingPositionOrAltitudeAirborne": 0,
+      "usingGeoAltitude": 10,
+      "usingBaroFallback": 0,
+      "positionAgeSeconds": {
+        "median": 0,
+        "p95": 153,
+        "max": 260
+      },
+      "categoryCounts": {
+        "0": 9,
+        "1": 1
+      }
+    }
+  ],
+  "motion": {
+    "matchedAircraft": 10,
+    "aircraftWithNewPositionTime": 6,
+    "aircraftMovedOver10m": 6,
+    "observedRemainingCreditDelta": 1
+  },
+  "error": null,
+  "finishedAt": "2026-09-09T11:37:14.542Z"
+}

@@ -1,0 +1,16 @@
+services:
+  traffic:
+    build:
+      context: .
+      dockerfile: Dockerfile.traffic
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"
+    environment:
+      OPEN_SKY_CLIENT_ID: ${OPEN_SKY_CLIENT_ID:?Set OPEN_SKY_CLIENT_ID}
+      OPEN_SKY_CLIENT_SECRET: ${OPEN_SKY_CLIENT_SECRET:?Set OPEN_SKY_CLIENT_SECRET}
+      TRAFFIC_ALLOWED_ORIGINS: ${TRAFFIC_ALLOWED_ORIGINS:?Set the exact frontend HTTPS origin}
+    volumes:
+      - traffic-budget:/data
+volumes:
+  traffic-budget:

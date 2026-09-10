@@ -1,0 +1,2043 @@
+{
+  "updated": "2026-09-09",
+  "sources": {
+    "ourAirports": "https://ourairports.com/data/",
+    "openStreetMap": "https://www.openstreetmap.org/copyright",
+    "osmTimestamp": "2026-06-01T08:52:28Z"
+  },
+  "excluded": {
+    "PL-0272": "Disused museum runway at Kraków-Czyżyny",
+    "PL-0273": "Former Sochaczew military runway; no current flying operations verified",
+    "EPNA": "Nadarzyce military training range, not an operational aerodrome"
+  },
+  "omissions": [],
+  "runways": [
+    {
+      "id": "EPAR-16-34",
+      "airportId": "EPAR",
+      "airportName": "Arłamów Airfield",
+      "municipality": "Wola Korzeniecka",
+      "lat": 49.6634984,
+      "lon": 22.5124634,
+      "heading": 167.499,
+      "length": 1194.2,
+      "width": 35.1,
+      "elevation": 478.48,
+      "surface": "ASP",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "16",
+          "threshold": 0.0
+        },
+        {
+          "ident": "34",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPAR/",
+        "ourairports:runway:249997",
+        "https://www.openstreetmap.org/way/303365286"
+      ]
+    },
+    {
+      "id": "EPBC-10R-28L",
+      "airportId": "EPBC",
+      "airportName": "Warsaw Babice Airport",
+      "municipality": "Warsaw",
+      "lat": 52.2704313,
+      "lon": 20.8980446,
+      "heading": 102.632,
+      "length": 1292.6,
+      "width": 89.9,
+      "elevation": 139.55,
+      "surface": "CON",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "10R",
+          "threshold": 0.0
+        },
+        {
+          "ident": "28L",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPBC/",
+        "ourairports:runway:238268",
+        "https://www.openstreetmap.org/way/5088516"
+      ]
+    },
+    {
+      "id": "EPBK-09R-27L",
+      "airportId": "EPBK",
+      "airportName": "Białystok-Krywlany Airfield",
+      "municipality": "Białystok",
+      "lat": 53.1010976,
+      "lon": 23.1633183,
+      "heading": 91.8335,
+      "length": 1326.3,
+      "width": 30.0,
+      "elevation": 188.01,
+      "surface": "asphalt",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "09R",
+          "threshold": 0
+        },
+        {
+          "ident": "27L",
+          "threshold": 0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPBK/",
+        "https://www.openstreetmap.org/way/958211700"
+      ]
+    },
+    {
+      "id": "EPBO-10-28",
+      "airportId": "EPBO",
+      "airportName": "Borsk Airfield",
+      "municipality": "Borsk",
+      "lat": 53.9533093,
+      "lon": 17.9349214,
+      "heading": 106.8536,
+      "length": 1737.9,
+      "width": 40.0,
+      "elevation": 177.04,
+      "surface": "asphalt",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "10",
+          "threshold": 0
+        },
+        {
+          "ident": "28",
+          "threshold": 0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/PL-0004/",
+        "https://www.openstreetmap.org/way/189513857"
+      ]
+    },
+    {
+      "id": "EPBY-08-26",
+      "airportId": "EPBY",
+      "airportName": "Ignacy Jan Paderewski Bydgoszcz Airport",
+      "municipality": "Bydgoszcz",
+      "lat": 53.0952406,
+      "lon": 17.959179,
+      "heading": 82.0065,
+      "length": 2492.5,
+      "width": 59.7,
+      "elevation": 106.93,
+      "surface": "CON",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "08",
+          "threshold": 0.0
+        },
+        {
+          "ident": "26",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPBY/",
+        "ourairports:runway:238253",
+        "https://www.openstreetmap.org/way/899502898"
+      ]
+    },
+    {
+      "id": "EPCD-18L-36R",
+      "airportId": "EPCD",
+      "airportName": "Depułtycze Królewskie Airfield",
+      "municipality": "Królewskie",
+      "lat": 51.086772,
+      "lon": 23.4396773,
+      "heading": 190.555,
+      "length": 1020.9,
+      "width": 29.9,
+      "elevation": 252.02,
+      "surface": "CON",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "18L",
+          "threshold": 0.0
+        },
+        {
+          "ident": "36R",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPCD/",
+        "ourairports:runway:520643",
+        "https://www.openstreetmap.org/way/1159219431"
+      ]
+    },
+    {
+      "id": "EPCE-07-25",
+      "airportId": "EPCE",
+      "airportName": "Cewice Naval Air Base",
+      "municipality": "Siemirowice",
+      "lat": 54.4135097,
+      "lon": 17.7446633,
+      "heading": 76.0091,
+      "length": 2487.4,
+      "width": 51.8,
+      "elevation": 184.05,
+      "surface": "ASP",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "07",
+          "threshold": 0.0
+        },
+        {
+          "ident": "25",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPCE/",
+        "ourairports:runway:238265",
+        "https://www.openstreetmap.org/way/165136056"
+      ]
+    },
+    {
+      "id": "EPDA-04-22",
+      "airportId": "EPDA",
+      "airportName": "Darłówo Naval Air Base",
+      "municipality": "Darłowo",
+      "lat": 54.4028417,
+      "lon": 16.3499626,
+      "heading": 42.5558,
+      "length": 587.9,
+      "width": 30.0,
+      "elevation": 38.05,
+      "surface": "asphalt",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "04",
+          "threshold": 0
+        },
+        {
+          "ident": "22",
+          "threshold": 0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPDA/",
+        "https://www.openstreetmap.org/way/304317477"
+      ]
+    },
+    {
+      "id": "EPDE-12-30",
+      "airportId": "EPDE",
+      "airportName": "Deblin Military Air Base",
+      "municipality": "Dęblin",
+      "lat": 51.556869,
+      "lon": 21.8765527,
+      "heading": 120.7463,
+      "length": 2484.0,
+      "width": 60.0,
+      "elevation": 154.18,
+      "surface": "ASP",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "12",
+          "threshold": 0.0
+        },
+        {
+          "ident": "30",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPDE/",
+        "ourairports:runway:238260",
+        "https://www.openstreetmap.org/way/958213896"
+      ]
+    },
+    {
+      "id": "EPGD-11-29",
+      "airportId": "EPGD",
+      "airportName": "Gdańsk Lech Wałęsa Airport",
+      "municipality": "Gdańsk",
+      "lat": 54.3810537,
+      "lon": 18.4521283,
+      "heading": 112.9436,
+      "length": 2783.2,
+      "width": 45.1,
+      "elevation": 172.16,
+      "surface": "ASP",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "11",
+          "threshold": 0.0
+        },
+        {
+          "ident": "29",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPGD/",
+        "ourairports:runway:238278",
+        "https://www.openstreetmap.org/way/160714960"
+      ]
+    },
+    {
+      "id": "EPGL-08R-26L",
+      "airportId": "EPGL",
+      "airportName": "Gliwice-Trynek Airfield",
+      "municipality": "Gliwice",
+      "lat": 50.2671943,
+      "lon": 18.6663791,
+      "heading": 87.4441,
+      "length": 883.9,
+      "width": 22.9,
+      "elevation": 296.82,
+      "surface": "Ashpalt",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "08R",
+          "threshold": 0.0
+        },
+        {
+          "ident": "26L",
+          "threshold": 100.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPGL/",
+        "ourairports:runway:260196",
+        "https://www.openstreetmap.org/way/767371912"
+      ]
+    },
+    {
+      "id": "EPGY-09-27",
+      "airportId": "EPGY",
+      "airportName": "Grądy Airfield",
+      "municipality": "Grądy",
+      "lat": 52.837323,
+      "lon": 21.7716962,
+      "heading": 95.5948,
+      "length": 802.2,
+      "width": 24,
+      "elevation": 159.05,
+      "surface": "asphalt",
+      "lighted": false,
+      "widthEstimated": true,
+      "ends": [
+        {
+          "ident": "09",
+          "threshold": 0
+        },
+        {
+          "ident": "27",
+          "threshold": 0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPGY/",
+        "https://www.openstreetmap.org/way/97818058"
+      ]
+    },
+    {
+      "id": "EPKA-11R-29L",
+      "airportId": "EPKA",
+      "airportName": "Kielce-Masłów Airfield",
+      "municipality": "Kielce",
+      "lat": 50.8986448,
+      "lon": 20.7236717,
+      "heading": 110.2247,
+      "length": 1153.0,
+      "width": 29.9,
+      "elevation": 342.85,
+      "surface": "asphalt concrete",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "11R",
+          "threshold": 0.0
+        },
+        {
+          "ident": "29L",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPKA/",
+        "ourairports:runway:260199",
+        "https://www.openstreetmap.org/way/777203351"
+      ]
+    },
+    {
+      "id": "EPKB-09-27",
+      "airportId": "EPKB",
+      "airportName": "Kazimierz Biskupi Airfield",
+      "municipality": "Kazimierz Biskupi",
+      "lat": 52.3193018,
+      "lon": 18.1621903,
+      "heading": 91.1629,
+      "length": 637.9,
+      "width": 20,
+      "elevation": 145.03,
+      "surface": "asphalt",
+      "lighted": false,
+      "widthEstimated": true,
+      "ends": [
+        {
+          "ident": "09",
+          "threshold": 0
+        },
+        {
+          "ident": "27",
+          "threshold": 0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPKB/",
+        "https://www.openstreetmap.org/way/140751974"
+      ]
+    },
+    {
+      "id": "EPKG-07-25",
+      "airportId": "EPKG",
+      "airportName": "Kołobrzeg-Bagicz Airfield",
+      "municipality": "Bagicz",
+      "lat": 54.1992219,
+      "lon": 15.6775816,
+      "heading": 75.4149,
+      "length": 888.9,
+      "width": 39.9,
+      "elevation": 42.01,
+      "surface": "Concrete",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "07",
+          "threshold": 0.0
+        },
+        {
+          "ident": "25",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/PL-0002/",
+        "ourairports:runway:608865",
+        "https://www.openstreetmap.org/way/966141288"
+      ]
+    },
+    {
+      "id": "EPKK-07-25",
+      "airportId": "EPKK",
+      "airportName": "Kraków John Paul II International Airport",
+      "municipality": "Balice",
+      "lat": 50.0753999,
+      "lon": 19.7680992,
+      "heading": 77.7637,
+      "length": 2520.1,
+      "width": 59.7,
+      "elevation": 276.4,
+      "surface": "CON",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "07",
+          "threshold": 0.0
+        },
+        {
+          "ident": "25",
+          "threshold": 239.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPKK/",
+        "ourairports:runway:238291",
+        "https://www.openstreetmap.org/way/5098325"
+      ]
+    },
+    {
+      "id": "EPKM-05L-23R",
+      "airportId": "EPKM",
+      "airportName": "Katowice-Muchowiec Airfield",
+      "municipality": "Katowice",
+      "lat": 50.2348248,
+      "lon": 19.0276537,
+      "heading": 49.4129,
+      "length": 1149.8,
+      "width": 29.9,
+      "elevation": 310.23,
+      "surface": "CON",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "05L",
+          "threshold": 0.0
+        },
+        {
+          "ident": "23R",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPKM/",
+        "ourairports:runway:238272",
+        "https://www.openstreetmap.org/way/29432710"
+      ]
+    },
+    {
+      "id": "EPKN-11-29",
+      "airportId": "EPKN",
+      "airportName": "Opole-Kamień Śląski Airfield",
+      "municipality": "Kamień Śląski",
+      "lat": 50.5330059,
+      "lon": 18.0703222,
+      "heading": 112.3646,
+      "length": 1200.0,
+      "width": 60.0,
+      "elevation": 235.56,
+      "surface": "CON",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "11",
+          "threshold": 0.0
+        },
+        {
+          "ident": "29",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPKN/",
+        "ourairports:runway:238273",
+        "https://www.openstreetmap.org/way/325112078"
+      ]
+    },
+    {
+      "id": "EPKR-11R-29L",
+      "airportId": "EPKR",
+      "airportName": "Krosno Airfield",
+      "municipality": "Krosno",
+      "lat": 49.6809985,
+      "lon": 21.7381203,
+      "heading": 112.0919,
+      "length": 1060.2,
+      "width": 29.9,
+      "elevation": 315.11,
+      "surface": "ASP",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "11R",
+          "threshold": 0.0
+        },
+        {
+          "ident": "29L",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPKR/",
+        "ourairports:runway:260201",
+        "https://www.openstreetmap.org/way/958868402"
+      ]
+    },
+    {
+      "id": "EPKS-12-30",
+      "airportId": "EPKS",
+      "airportName": "Krzesiny Military Air Base",
+      "municipality": "Poznań",
+      "lat": 52.3371908,
+      "lon": 16.9504153,
+      "heading": 117.9312,
+      "length": 2493.0,
+      "width": 59.7,
+      "elevation": 117.91,
+      "surface": "CON",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "12",
+          "threshold": 0.0
+        },
+        {
+          "ident": "30",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPKS/",
+        "ourairports:runway:238267",
+        "https://www.openstreetmap.org/way/28396247"
+      ]
+    },
+    {
+      "id": "EPKT-08-26",
+      "airportId": "EPKT",
+      "airportName": "Katowice Wojciech Korfanty International Airport",
+      "municipality": "Katowice",
+      "lat": 50.4760497,
+      "lon": 19.059568,
+      "heading": 90.1767,
+      "length": 3191.3,
+      "width": 45.1,
+      "elevation": 330.66,
+      "surface": "CON",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "08",
+          "threshold": 0.0
+        },
+        {
+          "ident": "26",
+          "threshold": 322.5
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPKT/",
+        "ourairports:runway:238275",
+        "https://www.openstreetmap.org/way/319339120"
+      ]
+    },
+    {
+      "id": "EPKW-13-31",
+      "airportId": "EPKW",
+      "airportName": "Bielsko-Biała Kaniów Airfield",
+      "municipality": "Kaniów",
+      "lat": 49.9447856,
+      "lon": 19.0143426,
+      "heading": 132.6267,
+      "length": 988.8,
+      "width": 29.9,
+      "elevation": 285.55,
+      "surface": "ASP",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "13",
+          "threshold": 0.0
+        },
+        {
+          "ident": "31",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPKW/",
+        "ourairports:runway:342659",
+        "https://www.openstreetmap.org/way/99190763"
+      ]
+    },
+    {
+      "id": "EPLB-07-25",
+      "airportId": "EPLB",
+      "airportName": "Lublin Airport",
+      "municipality": "Lublin",
+      "lat": 51.2375809,
+      "lon": 22.6956008,
+      "heading": 77.0395,
+      "length": 2563.1,
+      "width": 45.1,
+      "elevation": 227.63,
+      "surface": "ASPHALT",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "07",
+          "threshold": 0.0
+        },
+        {
+          "ident": "25",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPLB/",
+        "ourairports:runway:309486",
+        "https://www.openstreetmap.org/way/257520222"
+      ]
+    },
+    {
+      "id": "EPLK-10-28",
+      "airportId": "EPLK",
+      "airportName": "Łask Air Base",
+      "municipality": "Łask",
+      "lat": 51.5550026,
+      "lon": 19.1619814,
+      "heading": 107.337,
+      "length": 2991.3,
+      "width": 60.0,
+      "elevation": 223.06,
+      "surface": "CON",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "10",
+          "threshold": 0.0
+        },
+        {
+          "ident": "28",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPLK/",
+        "ourairports:runway:238270",
+        "https://www.openstreetmap.org/way/325093824"
+      ]
+    },
+    {
+      "id": "EPLL-07-25",
+      "airportId": "EPLL",
+      "airportName": "Łódź Władysław Reymont Airport",
+      "municipality": "Łódź",
+      "lat": 51.7162303,
+      "lon": 19.3722377,
+      "heading": 70.584,
+      "length": 2482.3,
+      "width": 45.1,
+      "elevation": 215.44,
+      "surface": "ASPH-CONC",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "07",
+          "threshold": 295.0
+        },
+        {
+          "ident": "25",
+          "threshold": 310.9
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPLL/",
+        "ourairports:runway:238277",
+        "https://www.openstreetmap.org/way/8041521"
+      ]
+    },
+    {
+      "id": "EPLU-13L-31R",
+      "airportId": "EPLU",
+      "airportName": "Lubin Airfield",
+      "municipality": "",
+      "lat": 51.425919,
+      "lon": 16.1906558,
+      "heading": 130.3545,
+      "length": 999.1,
+      "width": 29.9,
+      "elevation": 191.06,
+      "surface": "ASP",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "13L",
+          "threshold": 0.0
+        },
+        {
+          "ident": "31R",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPLU/",
+        "ourairports:runway:238290",
+        "https://www.openstreetmap.org/way/618981803"
+      ]
+    },
+    {
+      "id": "EPLY-10-28",
+      "airportId": "EPLY",
+      "airportName": "Leźnica Wielka Air Base",
+      "municipality": "Leźnica Wielka",
+      "lat": 52.0076568,
+      "lon": 19.1263557,
+      "heading": 103.8272,
+      "length": 2479.8,
+      "width": 60.0,
+      "elevation": 153.87,
+      "surface": "ASP",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "10",
+          "threshold": 0.0
+        },
+        {
+          "ident": "28",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPLY/",
+        "ourairports:runway:507288",
+        "https://www.openstreetmap.org/way/96135267"
+      ]
+    },
+    {
+      "id": "EPMB-07-25",
+      "airportId": "EPMB",
+      "airportName": "Malbork Królewo Air Base",
+      "municipality": "Królewo",
+      "lat": 54.0242407,
+      "lon": 19.1150924,
+      "heading": 79.0877,
+      "length": 2500.0,
+      "width": 50.0,
+      "elevation": 39.88,
+      "surface": "CON",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "07",
+          "threshold": 0.0
+        },
+        {
+          "ident": "25",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPMB/",
+        "ourairports:runway:238254",
+        "https://www.openstreetmap.org/way/459595669"
+      ]
+    },
+    {
+      "id": "EPMI-12-30",
+      "airportId": "EPMI",
+      "airportName": "Miroslawiec Military Air Base",
+      "municipality": "Mirosławiec",
+      "lat": 53.4014444,
+      "lon": 16.0673217,
+      "heading": 124.8452,
+      "length": 2496.3,
+      "width": 45.1,
+      "elevation": 184.96,
+      "surface": "CON",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "12",
+          "threshold": 0.0
+        },
+        {
+          "ident": "30",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPMI/",
+        "ourairports:runway:238255",
+        "https://www.openstreetmap.org/way/122083562"
+      ]
+    },
+    {
+      "id": "EPML-08R-26L",
+      "airportId": "EPML",
+      "airportName": "Mielec Airfield",
+      "municipality": "Mielec",
+      "lat": 50.3223212,
+      "lon": 21.444224,
+      "heading": 90.2197,
+      "length": 2489.4,
+      "width": 45.1,
+      "elevation": 200.51,
+      "surface": "CON",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "08R",
+          "threshold": 188.1
+        },
+        {
+          "ident": "26L",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPML/",
+        "ourairports:runway:238282",
+        "https://www.openstreetmap.org/way/687448308"
+      ]
+    },
+    {
+      "id": "EPML-17-35",
+      "airportId": "EPML",
+      "airportName": "Mielec Airfield",
+      "municipality": "Mielec",
+      "lat": 50.3267453,
+      "lon": 21.4532167,
+      "heading": 180.1862,
+      "length": 662.0,
+      "width": 25.0,
+      "elevation": 199.59,
+      "surface": "CON",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "17",
+          "threshold": 0.0
+        },
+        {
+          "ident": "35",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPML/",
+        "ourairports:runway:238283",
+        "https://www.openstreetmap.org/way/370445030"
+      ]
+    },
+    {
+      "id": "EPMM-09-27",
+      "airportId": "EPMM",
+      "airportName": "Minsk Mazowiecki Military Air Base",
+      "municipality": "",
+      "lat": 52.1955849,
+      "lon": 21.6378024,
+      "heading": 90.2503,
+      "length": 2472.4,
+      "width": 42.7,
+      "elevation": 205.99,
+      "surface": "CON",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "09",
+          "threshold": 0.0
+        },
+        {
+          "ident": "27",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPMM/",
+        "ourairports:runway:238256",
+        "https://www.openstreetmap.org/way/32060235"
+      ]
+    },
+    {
+      "id": "EPMO-08-26",
+      "airportId": "EPMO",
+      "airportName": "Warsaw Modlin Airport",
+      "municipality": "Nowy Dwór Mazowiecki",
+      "lat": 52.4495091,
+      "lon": 20.6336765,
+      "heading": 81.2176,
+      "length": 2494.3,
+      "width": 44.8,
+      "elevation": 138.02,
+      "surface": "ASP",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "08",
+          "threshold": 0.0
+        },
+        {
+          "ident": "26",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPMO/",
+        "ourairports:runway:238269",
+        "https://www.openstreetmap.org/way/8034012"
+      ]
+    },
+    {
+      "id": "EPNM-08-26",
+      "airportId": "EPNM",
+      "airportName": "Nowe Miasto nad Pilicą Airfield",
+      "municipality": "Nowe Miasto nad Pilicą",
+      "lat": 51.6249646,
+      "lon": 20.5190076,
+      "heading": 75.9627,
+      "length": 2384.3,
+      "width": 60.0,
+      "elevation": 191.06,
+      "surface": "concrete:plates",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "08",
+          "threshold": 806.6
+        },
+        {
+          "ident": "26",
+          "threshold": 0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPNM/",
+        "https://www.openstreetmap.org/way/11779294"
+      ]
+    },
+    {
+      "id": "EPOD-09L-27R",
+      "airportId": "EPOD",
+      "airportName": "Olsztyn-Dajtki Airfield",
+      "municipality": "Olsztyn",
+      "lat": 53.7741973,
+      "lon": 20.4070553,
+      "heading": 94.616,
+      "length": 847.5,
+      "width": 23.0,
+      "elevation": 167.89,
+      "surface": "ASP",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "09L",
+          "threshold": 0.0
+        },
+        {
+          "ident": "27R",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPOD/",
+        "ourairports:runway:260208",
+        "https://www.openstreetmap.org/way/93029694"
+      ]
+    },
+    {
+      "id": "EPOK-08-26",
+      "airportId": "EPOK",
+      "airportName": "Oksywie Air Base / Gdynia-Kosakowo Airfield",
+      "municipality": "Kosakowo",
+      "lat": 54.5870992,
+      "lon": 18.5144894,
+      "heading": 88.2195,
+      "length": 576.1,
+      "width": 30.5,
+      "elevation": 78.89,
+      "surface": "ASP",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "08",
+          "threshold": 0.0
+        },
+        {
+          "ident": "26",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPOK/",
+        "ourairports:runway:238263",
+        "https://www.openstreetmap.org/way/914488037"
+      ]
+    },
+    {
+      "id": "EPOK-13-31",
+      "airportId": "EPOK",
+      "airportName": "Oksywie Air Base / Gdynia-Kosakowo Airfield",
+      "municipality": "Kosakowo",
+      "lat": 54.5877448,
+      "lon": 18.5037948,
+      "heading": 136.3776,
+      "length": 2492.4,
+      "width": 59.4,
+      "elevation": 77.98,
+      "surface": "CON",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "13",
+          "threshold": 0.0
+        },
+        {
+          "ident": "31",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPOK/",
+        "ourairports:runway:238264",
+        "https://www.openstreetmap.org/way/52596323"
+      ]
+    },
+    {
+      "id": "EPPG-10L-28R",
+      "airportId": "EPPG",
+      "airportName": "Kąkolewo Airport",
+      "municipality": "Kąkolewo",
+      "lat": 52.2365593,
+      "lon": 16.2326996,
+      "heading": 106.1662,
+      "length": 1190,
+      "width": 29.9,
+      "elevation": 129.49,
+      "surface": "Concrete",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "10L",
+          "threshold": 0
+        },
+        {
+          "ident": "28R",
+          "threshold": 0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/PL-0074/",
+        "ourairports:runway:598149",
+        "https://www.openstreetmap.org/way/191827720",
+        "https://www.lotniskokakolewo.pl/en/aviation/for-pilots/"
+      ]
+    },
+    {
+      "id": "EPPI-03-21",
+      "airportId": "EPPI",
+      "airportName": "Piła Airfield",
+      "municipality": "Piła",
+      "lat": 53.161019,
+      "lon": 16.7004647,
+      "heading": 34.9358,
+      "length": 2357.4,
+      "width": 59.4,
+      "elevation": 113.94,
+      "surface": "PEM",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "03",
+          "threshold": 0.0
+        },
+        {
+          "ident": "21",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPPI/",
+        "ourairports:runway:238259",
+        "https://www.openstreetmap.org/way/30150286"
+      ]
+    },
+    {
+      "id": "EPPO-10-28",
+      "airportId": "EPPO",
+      "airportName": "Poznań-Ławica Airport",
+      "municipality": "Poznań",
+      "lat": 52.4249578,
+      "lon": 16.8060974,
+      "heading": 107.5676,
+      "length": 2483.6,
+      "width": 50.0,
+      "elevation": 129.18,
+      "surface": "ASP",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "10",
+          "threshold": 0.0
+        },
+        {
+          "ident": "28",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPPO/",
+        "ourairports:runway:238287",
+        "https://www.openstreetmap.org/way/22969774"
+      ]
+    },
+    {
+      "id": "EPPR-09-27",
+      "airportId": "EPPR",
+      "airportName": "Pruszcz Gdański Air Base",
+      "municipality": "Pruszcz Gdański",
+      "lat": 54.2485876,
+      "lon": 18.6656883,
+      "heading": 99.7359,
+      "length": 624.8,
+      "width": 45.1,
+      "elevation": 38.96,
+      "surface": "ASP",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "09",
+          "threshold": 0.0
+        },
+        {
+          "ident": "27",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPPR/",
+        "ourairports:runway:238257",
+        "https://www.openstreetmap.org/way/527589277"
+      ]
+    },
+    {
+      "id": "EPPT-03-21",
+      "airportId": "EPPT",
+      "airportName": "Piotrków Trybunalski-Bujny Airfield",
+      "municipality": "Piotrków Trybunalski",
+      "lat": 51.3789195,
+      "lon": 19.6849059,
+      "heading": 31.6478,
+      "length": 954.7,
+      "width": 18.0,
+      "elevation": 240.13,
+      "surface": "CON",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "03",
+          "threshold": 0.0
+        },
+        {
+          "ident": "21",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPPT/",
+        "ourairports:runway:316308",
+        "https://www.openstreetmap.org/way/176355704"
+      ]
+    },
+    {
+      "id": "EPPW-10L-28R",
+      "airportId": "EPPW",
+      "airportName": "Powidz Military Air Base",
+      "municipality": "Powidz",
+      "lat": 52.3859648,
+      "lon": 17.8287061,
+      "heading": 107.4196,
+      "length": 2720.8,
+      "width": 29.9,
+      "elevation": 146.86,
+      "surface": "CON",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "10L",
+          "threshold": 0.0
+        },
+        {
+          "ident": "28R",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPPW/",
+        "ourairports:runway:238252",
+        "https://www.openstreetmap.org/way/91093272"
+      ]
+    },
+    {
+      "id": "EPPW-10R-28L",
+      "airportId": "EPPW",
+      "airportName": "Powidz Military Air Base",
+      "municipality": "Powidz",
+      "lat": 52.3837816,
+      "lon": 17.8274889,
+      "heading": 107.3991,
+      "length": 3502.6,
+      "width": 60.0,
+      "elevation": 145.64,
+      "surface": "CON",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "10R",
+          "threshold": 0.0
+        },
+        {
+          "ident": "28L",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPPW/",
+        "ourairports:runway:238251",
+        "https://www.openstreetmap.org/way/91093277"
+      ]
+    },
+    {
+      "id": "EPRA-07-25",
+      "airportId": "EPRA",
+      "airportName": "Warsaw Radom Airport",
+      "municipality": "Radom",
+      "lat": 51.38651,
+      "lon": 21.1977306,
+      "heading": 75.0065,
+      "length": 2501.3,
+      "width": 45.1,
+      "elevation": 224.59,
+      "surface": "ASP",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "07",
+          "threshold": 0.0
+        },
+        {
+          "ident": "25",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPRA/",
+        "ourairports:runway:238258",
+        "https://www.openstreetmap.org/way/911395486"
+      ]
+    },
+    {
+      "id": "EPRJ-08R-26L",
+      "airportId": "EPRJ",
+      "airportName": "Rzeszów Sports Airfield",
+      "municipality": "Nowa Wieś",
+      "lat": 50.1041445,
+      "lon": 22.0407681,
+      "heading": 89.5994,
+      "length": 896.5,
+      "width": 29.9,
+      "elevation": 233.12,
+      "surface": "ASPH",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "08R",
+          "threshold": 0.0
+        },
+        {
+          "ident": "26L",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPRJ/",
+        "ourairports:runway:334807",
+        "https://www.openstreetmap.org/way/118415833"
+      ]
+    },
+    {
+      "id": "EPRU-08-26",
+      "airportId": "EPRU",
+      "airportName": "Częstochowa-Rudniki Airport",
+      "municipality": "Rudniki",
+      "lat": 50.883734,
+      "lon": 19.1890383,
+      "heading": 83.0734,
+      "length": 1976.7,
+      "width": 60.0,
+      "elevation": 297.13,
+      "surface": "CON",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "08",
+          "threshold": 0.0
+        },
+        {
+          "ident": "26",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPRU/",
+        "ourairports:runway:238247",
+        "https://www.openstreetmap.org/way/957660378"
+      ]
+    },
+    {
+      "id": "EPRZ-09-27",
+      "airportId": "EPRZ",
+      "airportName": "Rzeszów-Jasionka Airport",
+      "municipality": "Jasionka",
+      "lat": 50.1102321,
+      "lon": 22.0013701,
+      "heading": 91.2637,
+      "length": 3205.8,
+      "width": 44.8,
+      "elevation": 244.7,
+      "surface": "CON",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "09",
+          "threshold": 0.0
+        },
+        {
+          "ident": "27",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPRZ/",
+        "ourairports:runway:238286",
+        "https://www.openstreetmap.org/way/561273080"
+      ]
+    },
+    {
+      "id": "EPSC-13-31",
+      "airportId": "EPSC",
+      "airportName": "Solidarity Szczecin–Goleniów Airport",
+      "municipality": "Szczecin(Glewice)",
+      "lat": 53.5920638,
+      "lon": 14.8879547,
+      "heading": 130.9318,
+      "length": 2488.9,
+      "width": 60.0,
+      "elevation": 70.97,
+      "surface": "ASP",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "13",
+          "threshold": 0.0
+        },
+        {
+          "ident": "31",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPSC/",
+        "ourairports:runway:238276",
+        "https://www.openstreetmap.org/way/27194855"
+      ]
+    },
+    {
+      "id": "EPSN-11-29",
+      "airportId": "EPSN",
+      "airportName": "Swidwin Military Air Base",
+      "municipality": "",
+      "lat": 53.7945834,
+      "lon": 15.8086271,
+      "heading": 110.8042,
+      "length": 2477.1,
+      "width": 57.9,
+      "elevation": 152.04,
+      "surface": "CON",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "11",
+          "threshold": 0.0
+        },
+        {
+          "ident": "29",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPSN/",
+        "ourairports:runway:238248",
+        "https://www.openstreetmap.org/way/193435149"
+      ]
+    },
+    {
+      "id": "EPSU-08-26",
+      "airportId": "EPSU",
+      "airportName": "Suwałki Airfield",
+      "municipality": "Suwałki",
+      "lat": 54.0734457,
+      "lon": 22.883631,
+      "heading": 83.7568,
+      "length": 1301.5,
+      "width": 29.9,
+      "elevation": 212.09,
+      "surface": "ASP",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "08",
+          "threshold": 0.0
+        },
+        {
+          "ident": "26",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPSU/",
+        "ourairports:runway:506783",
+        "https://www.openstreetmap.org/way/958211171"
+      ]
+    },
+    {
+      "id": "EPSY-01-19",
+      "airportId": "EPSY",
+      "airportName": "Olsztyn-Mazury Airport",
+      "municipality": "Szymany",
+      "lat": 53.4712726,
+      "lon": 20.931766,
+      "heading": 18.4411,
+      "length": 2486.3,
+      "width": 44.8,
+      "elevation": 168.5,
+      "surface": "CON",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "01",
+          "threshold": 0.0
+        },
+        {
+          "ident": "19",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPSY/",
+        "ourairports:runway:238250",
+        "https://www.openstreetmap.org/way/958204234"
+      ]
+    },
+    {
+      "id": "EPTM-11-29",
+      "airportId": "EPTM",
+      "airportName": "Tomaszów Mazowiecki Military Air Base",
+      "municipality": "Nowy Glinnik",
+      "lat": 51.5883861,
+      "lon": 20.0842438,
+      "heading": 115.7172,
+      "length": 1977.8,
+      "width": 60.0,
+      "elevation": 209.04,
+      "surface": "ASP",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "11",
+          "threshold": 0.0
+        },
+        {
+          "ident": "29",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPTM/",
+        "ourairports:runway:249996",
+        "https://www.openstreetmap.org/way/46918808"
+      ]
+    },
+    {
+      "id": "EPTO-10-28",
+      "airportId": "EPTO",
+      "airportName": "Toruń Airfield",
+      "municipality": "Toruń",
+      "lat": 53.0304195,
+      "lon": 18.5382046,
+      "heading": 104.7407,
+      "length": 1227.6,
+      "width": 57.0,
+      "elevation": 84.99,
+      "surface": "CON",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "10",
+          "threshold": 0.0
+        },
+        {
+          "ident": "28",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPTO/",
+        "ourairports:runway:238280",
+        "https://www.openstreetmap.org/way/928888991"
+      ]
+    },
+    {
+      "id": "EPWA-11-29",
+      "airportId": "EPWA",
+      "airportName": "Warsaw Chopin Airport",
+      "municipality": "Warsaw",
+      "lat": 52.1714546,
+      "lon": 20.9467203,
+      "heading": 114.569,
+      "length": 2791.4,
+      "width": 50.0,
+      "elevation": 145.34,
+      "surface": "ASPH",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "11",
+          "threshold": 0.0
+        },
+        {
+          "ident": "29",
+          "threshold": 499.9
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPWA/",
+        "ourairports:runway:238288",
+        "https://www.openstreetmap.org/way/7654240"
+      ]
+    },
+    {
+      "id": "EPWA-15-33",
+      "airportId": "EPWA",
+      "airportName": "Warsaw Chopin Airport",
+      "municipality": "Warsaw",
+      "lat": 52.1785665,
+      "lon": 20.9559148,
+      "heading": 151.809,
+      "length": 3682.7,
+      "width": 59.7,
+      "elevation": 142.59,
+      "surface": "ASPH",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "15",
+          "threshold": 0.0
+        },
+        {
+          "ident": "33",
+          "threshold": 661.4
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPWA/",
+        "ourairports:runway:238289",
+        "https://www.openstreetmap.org/way/7654237"
+      ]
+    },
+    {
+      "id": "EPWR-11-29",
+      "airportId": "EPWR",
+      "airportName": "Copernicus Wrocław Airport",
+      "municipality": "Wrocław",
+      "lat": 51.1088962,
+      "lon": 16.8655208,
+      "heading": 116.0029,
+      "length": 2537.1,
+      "width": 44.8,
+      "elevation": 158.44,
+      "surface": "CONC-ASPH",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "11",
+          "threshold": 0.0
+        },
+        {
+          "ident": "29",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPWR/",
+        "ourairports:runway:238284",
+        "https://www.openstreetmap.org/way/24162551"
+      ]
+    },
+    {
+      "id": "EPZG-06-24",
+      "airportId": "EPZG",
+      "airportName": "Zielona Góra-Babimost Airport",
+      "municipality": "Nowe Kramsko",
+      "lat": 52.1337375,
+      "lon": 15.7821781,
+      "heading": 64.5809,
+      "length": 2467.2,
+      "width": 60.0,
+      "elevation": 94.13,
+      "surface": "CON",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "06",
+          "threshold": 0.0
+        },
+        {
+          "ident": "24",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/EPZG/",
+        "ourairports:runway:238274",
+        "https://www.openstreetmap.org/way/24880401"
+      ]
+    },
+    {
+      "id": "PL-0001-11R-29L",
+      "airportId": "PL-0001",
+      "airportName": "Poznań-Bednary Airfield",
+      "municipality": "Pobiedziska",
+      "lat": 52.5369428,
+      "lon": 17.2024022,
+      "heading": 104.6543,
+      "length": 1900.1,
+      "width": 30.2,
+      "elevation": 138.94,
+      "surface": "CON",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "11R",
+          "threshold": 0.0
+        },
+        {
+          "ident": "29L",
+          "threshold": 0.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/PL-0001/",
+        "ourairports:runway:316425",
+        "https://www.openstreetmap.org/way/50701733"
+      ]
+    },
+    {
+      "id": "PL-0007-09-27",
+      "airportId": "PL-0007",
+      "airportName": "Chojna Airfield",
+      "municipality": "Chojna",
+      "lat": 52.9395515,
+      "lon": 14.4225981,
+      "heading": 91.9356,
+      "length": 1092.3,
+      "width": 40.0,
+      "elevation": 92.0,
+      "surface": "concrete:plates",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "09",
+          "threshold": 0
+        },
+        {
+          "ident": "27",
+          "threshold": 0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/PL-0007/",
+        "https://www.openstreetmap.org/way/177804326"
+      ]
+    },
+    {
+      "id": "PL-0076-06-24",
+      "airportId": "PL-0076",
+      "airportName": "Żerniki Gądki Airfield",
+      "municipality": "Żerniki",
+      "lat": 52.3210259,
+      "lon": 17.0368732,
+      "heading": 58.9375,
+      "length": 654.3,
+      "width": 18.0,
+      "elevation": 114.25,
+      "surface": "Brick",
+      "lighted": true,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "06",
+          "threshold": 116.4
+        },
+        {
+          "ident": "24",
+          "threshold": 107.0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/PL-0076/",
+        "ourairports:runway:307626",
+        "https://www.openstreetmap.org/way/55457524"
+      ]
+    },
+    {
+      "id": "PL-0078-05-23",
+      "airportId": "PL-0078",
+      "airportName": "Lipki Wielkie Airfield",
+      "municipality": "Lipki Wielkie",
+      "lat": 52.7134041,
+      "lon": 15.5064459,
+      "heading": 48.4691,
+      "length": 791.3,
+      "width": 25.0,
+      "elevation": 35.0,
+      "surface": "asphalt",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "05",
+          "threshold": 0
+        },
+        {
+          "ident": "23",
+          "threshold": 0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/PL-0078/",
+        "https://www.openstreetmap.org/way/175034701"
+      ]
+    },
+    {
+      "id": "PL-0080-10-28",
+      "airportId": "PL-0080",
+      "airportName": "Szczecinek-Wilcze Laski Airfield",
+      "municipality": "Wilcze Laski",
+      "lat": 53.5955724,
+      "lon": 16.7146641,
+      "heading": 101.021,
+      "length": 1259.4,
+      "width": 30.0,
+      "elevation": 35.0,
+      "surface": "asphalt",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "10",
+          "threshold": 0
+        },
+        {
+          "ident": "28",
+          "threshold": 0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/PL-0080/",
+        "https://www.openstreetmap.org/way/250220653"
+      ]
+    },
+    {
+      "id": "PL-0087-06-24",
+      "airportId": "PL-0087",
+      "airportName": "Zator",
+      "municipality": "",
+      "lat": 49.9587955,
+      "lon": 19.3986148,
+      "heading": 66.9136,
+      "length": 696.3,
+      "width": 21.5,
+      "elevation": 35.0,
+      "surface": "asphalt",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "06",
+          "threshold": 0
+        },
+        {
+          "ident": "24",
+          "threshold": 0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/PL-0087/",
+        "https://www.openstreetmap.org/way/958877758"
+      ]
+    },
+    {
+      "id": "PL-0100-10-28",
+      "airportId": "PL-0100",
+      "airportName": "Śmiłowo Henryk Stokłosa Airfield",
+      "municipality": "Jeziorki",
+      "lat": 53.1455928,
+      "lon": 16.8762127,
+      "heading": 100.4167,
+      "length": 789.4,
+      "width": 20,
+      "elevation": 35.0,
+      "surface": "asphalt",
+      "lighted": false,
+      "widthEstimated": true,
+      "ends": [
+        {
+          "ident": "10",
+          "threshold": 0
+        },
+        {
+          "ident": "28",
+          "threshold": 0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/PL-0100/",
+        "https://www.openstreetmap.org/way/200597834"
+      ]
+    },
+    {
+      "id": "PL-0169-03-21",
+      "airportId": "PL-0169",
+      "airportName": "Rytel-Uboga Airstrip",
+      "municipality": "Rytel",
+      "lat": 53.7377683,
+      "lon": 17.8293569,
+      "heading": 24.8011,
+      "length": 495.1,
+      "width": 27.0,
+      "elevation": 159.05,
+      "surface": "paved",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "03",
+          "threshold": 0
+        },
+        {
+          "ident": "21",
+          "threshold": 0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/PL-0169/",
+        "https://www.openstreetmap.org/way/292294404"
+      ]
+    },
+    {
+      "id": "PL-0182-17-35",
+      "airportId": "PL-0182",
+      "airportName": "Czersk Świecki",
+      "municipality": "",
+      "lat": 53.5795184,
+      "lon": 18.483749,
+      "heading": 163.3593,
+      "length": 375.6,
+      "width": 25.0,
+      "elevation": 35.0,
+      "surface": "asphalt",
+      "lighted": false,
+      "widthEstimated": false,
+      "ends": [
+        {
+          "ident": "17",
+          "threshold": 0
+        },
+        {
+          "ident": "35",
+          "threshold": 0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/PL-0182/",
+        "https://www.openstreetmap.org/way/173817161"
+      ]
+    },
+    {
+      "id": "PL-0184-07-25",
+      "airportId": "PL-0184",
+      "airportName": "Krośniewice Airstrip",
+      "municipality": "",
+      "lat": 52.2553658,
+      "lon": 19.1474673,
+      "heading": 86.2997,
+      "length": 515.6,
+      "width": 12,
+      "elevation": 35.0,
+      "surface": "asphalt",
+      "lighted": false,
+      "widthEstimated": true,
+      "ends": [
+        {
+          "ident": "07",
+          "threshold": 0
+        },
+        {
+          "ident": "25",
+          "threshold": 0
+        }
+      ],
+      "sources": [
+        "https://ourairports.com/airports/PL-0184/",
+        "https://www.openstreetmap.org/way/302687829"
+      ]
+    }
+  ]
+}

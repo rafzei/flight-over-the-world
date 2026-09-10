@@ -6,6 +6,7 @@ import { parseAst } from "rollup/parseAst";
 import { WGS84_ELLIPSOID } from "3d-tiles-renderer";
 import { Group, Matrix4, Mesh, MeshBasicMaterial, PlaneGeometry, Raycaster, Vector3 } from "three";
 import { createVehicleCollisionDetector, raycastTerrain } from "../src/game/vehicleCollision.js";
+import { earthPosition } from "../src/game/trafficVisibility.js";
 
 const up = new Vector3(0, 1, 0);
 const v = (x, y, z = 0) => new Vector3(x, y, z);
@@ -87,7 +88,7 @@ function flight({ groundHeight = 0, height = 40, vertical = false, lat = .9, lon
   let now = 10000;
   const impacts = [];
   const context = vm.createContext({
-    WGS84_ELLIPSOID, raycastTerrain, tiles: { group }, raycaster: new Raycaster(),
+    WGS84_ELLIPSOID, earthPosition, raycastTerrain, landingSystem: null, tiles: { group }, raycaster: new Raycaster(),
     plane: { lat, lon, height, update(dt) { this.height -= 2400 * dt; } },
     planePos: new Vector3(), ctrl: {}, PLANES: { vehicle: { vertical } }, selectedPlane: "vehicle",
     pendingSnap: false, awaitingSnap: false, crashGraceUntil: 0, groundAlt: 120, crashed: false,

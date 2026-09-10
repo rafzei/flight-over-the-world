@@ -21,12 +21,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm install --no-audit --no-fund
+      - run: npm test
       - run: npm run build
         env:
           VITE_CESIUM_ION_KEY: ${{ secrets.VITE_CESIUM_ION_KEY }}
           VITE_CESIUM_ION_KEYS: ${{ secrets.VITE_CESIUM_ION_KEYS }}
           VITE_GOOGLE_MAPS_KEY: ${{ secrets.VITE_GOOGLE_MAPS_KEY }}
           VITE_GOOGLE_TILES_KEYS: ${{ secrets.VITE_GOOGLE_TILES_KEYS }}
+          VITE_TRAFFIC_API_BASE: ${{ vars.VITE_TRAFFIC_API_BASE }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

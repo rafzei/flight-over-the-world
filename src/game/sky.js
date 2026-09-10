@@ -1,19 +1,29 @@
-import { BackSide, Color, Mesh, ShaderMaterial, SphereGeometry, Vector3 } from "three";
+import { BackSide, BufferGeometry, Color, Float32BufferAttribute, Mesh, Points, PointsMaterial, ShaderMaterial, SphereGeometry, Vector3 } from "three";
 
 // jedno stałe kierunkowe "słońce" świata — używane i przez światło, i przez niebo
 export const SUN_DIR = new Vector3(-0.52, 0.62, 0.26).normalize();
+export const MOON_DIR = new Vector3(0.60, 0.42, -0.52).normalize();
+export const SPACE_SKY_ALTITUDE_M = 20_000;
+const SPACE_FOG_COLOR = new Color(0x02040b);
+export function spaceSkyBlend(altitudeM) {
+  const t = Math.max(0, Math.min(1, (altitudeM - SPACE_SKY_ALTITUDE_M) / 2000));
+  return t * t * (3 - 2 * t);
+}
 
 // Proceduralne niebo: gradient zenit→horyzont + tarcza słońca + chmury FBM.
 // Horyzont ma DOKŁADNIE kolor mgły (w przestrzeni liniowej, przez ten sam
 // tone mapping ACES co teren), więc nie ma żadnej przerwy ani poświaty.
-export function createSky(fogColorHex, { simple = false } = {}) {
+export function createSky(fogColorHex, { simple = false, physicalBodies = false } = {}) {
   const uniforms = {
     uZenith: { value: new Color(0x2a63b8) },
     uMid: { value: new Color(0x7db3e2) },
     uHorizon: { value: new Color(fogColorHex) },
-    uSunDir: { value: SUN_DIR },
+    uSunDir: { value: SUN_DIR.clone() },
     uSunColor: { value: new Color(0xfff2dd) },
     uTime: { value: 0 },
+    uSpace: { value: 0 },
+    uAirglow: { value: 1 },
+    uMoonDir: { value: MOON_DIR },
   };
 
   const mat = new ShaderMaterial({
@@ -36,6 +46,31 @@ export function createSky(fogColorHex, { simple = false } = {}) {
       uniform vec3 uSunDir;
       uniform vec3 uSunColor;
       uniform float uTime;
+      uniform float uSpace;
+      uniform float uAirglow;
+      uniform vec3 uMoonDir;
+
+      vec3 spaceSky(vec3 d) {
+        vec3 col = vec3(0.0005, 0.001, 0.003);
+        col += uHorizon * pow(1.0 - abs(d.y), 36.0) * 0.035 * uAirglow;
+        float sunAngle = acos(clamp(dot(d, uSunDir), -1.0, 1.0));
+        float aa = max(fwidth(sunAngle), 0.0003);
+        col += uSunColor * (18.0 * (1.0 - smoothstep(0.012, 0.012 + aa, sunAngle)) + 0.6 * exp(-sunAngle * 48.0));
+        // Artistic Moon direction, with a shaded surface and dark maria.
+        vec3 right = normalize(cross(vec3(0.0, 1.0, 0.0), uMoonDir));
+        vec3 up = cross(uMoonDir, right);
+        vec2 p = vec2(dot(d, right), dot(d, up)) / 0.026;
+        float r = length(p), edge = max(fwidth(r), 0.01);
+        if (${physicalBodies ? 'false' : 'true'} && dot(d, uMoonDir) > 0.99 && r < 1.0 + edge) {
+          vec3 normal = normalize(right * p.x + up * p.y - uMoonDir * sqrt(max(0.0, 1.0 - r * r)));
+          float shade = 0.16 + 0.84 * max(0.0, dot(normal, uSunDir));
+          float maria = 0.70 + 0.18 * sin(p.x * 15.0 + sin(p.y * 12.0)) * sin(p.y * 19.0);
+          float crater = smoothstep(0.22, 0.40, length(p - vec2(-0.25, 0.12)));
+          vec3 moon = vec3(0.72, 0.76, 0.82) * shade * maria * mix(0.56, 1.0, crater);
+          col = mix(col, moon, 1.0 - smoothstep(1.0 - edge, 1.0 + edge, r));
+        }
+        return col;
+      }
 
       ${simple ? "" : `
       float hash(vec2 p) {
@@ -91,6 +126,7 @@ export function createSky(fogColorHex, { simple = false } = {}) {
         }
         `}
 
+        if (uSpace > 0.0) col = mix(col, spaceSky(d), uSpace);
         gl_FragColor = vec4(col, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -101,5 +137,35 @@ export function createSky(fogColorHex, { simple = false } = {}) {
   const mesh = new Mesh(new SphereGeometry(5e6, simple ? 16 : 48, simple ? 12 : 24), mat);
   mesh.frustumCulled = false;
   mesh.renderOrder = -100;
-  return { mesh, uniforms };
+  // Uniform directions on a sphere avoid equirectangular star streaks at the poles.
+  let seed = 737320;
+  const random = () => { seed = (Math.imul(1664525, seed) + 1013904223) >>> 0; return seed / 4294967296; };
+  const positions = [], colors = [], direction = new Vector3(), starColor = new Color();
+  for (let i = 0; i < (simple ? 2800 : 6000); i++) {
+    const y = random() * 2 - 1, phi = random() * Math.PI * 2, r = Math.sqrt(1 - y * y);
+    direction.set(r * Math.cos(phi), y, r * Math.sin(phi));
+    if (direction.dot(SUN_DIR) > .9995 || direction.dot(MOON_DIR) > .9995) continue;
+    positions.push(...direction.multiplyScalar(4.9e6).toArray());
+    starColor.setHex(random() > .8 ? 0xffe1af : random() > .4 ? 0xffffff : 0xb6d0ff).multiplyScalar(.3 + random() * .7);
+    colors.push(starColor.r, starColor.g, starColor.b);
+  }
+  const starGeometry = new BufferGeometry();
+  starGeometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
+  starGeometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
+  const starMaterial = new PointsMaterial({ size: 1.6, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0, depthTest: true, depthWrite: false, fog: false, toneMapped: false });
+  const stars = new Points(starGeometry, starMaterial); stars.name = "space-stars"; stars.frustumCulled = false; stars.visible = false; stars.renderOrder = -99; stars.raycast = () => {}; mesh.add(stars);
+  return { mesh, uniforms,
+    update(altitudeM, elapsedSeconds, fog) {
+      const blend = spaceSkyBlend(Number.isFinite(altitudeM) ? altitudeM : 0);
+      uniforms.uSpace.value = blend;
+      uniforms.uAirglow.value = Math.max(0, Math.min(1, (120000 - altitudeM) / 100000));
+      stars.visible = blend > 0; starMaterial.opacity = blend;
+      uniforms.uTime.value = elapsedSeconds;
+      if (fog?.isFogExp2) {
+        fog.density = 0.00007 * (1 - blend) + 0.00000015 * blend;
+        fog.color.copy(uniforms.uHorizon.value).lerp(SPACE_FOG_COLOR, blend);
+      }
+    },
+    dispose() { mesh.removeFromParent(); mesh.geometry.dispose(); mat.dispose(); starGeometry.dispose(); starMaterial.dispose(); },
+  };
 }
