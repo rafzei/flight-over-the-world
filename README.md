@@ -34,11 +34,11 @@ Fly over photorealistic Earth – guess the region, find your way home, or just 
 - **Guess the region** – one minute of flight, then mark on the map where you are (Poland / Europe / World).
 - **Fly home** – start ~30 km from the address you enter, 10 minutes to get back.
 - **Free flight** – pick a city and fly. Land on paved runways across Poland without changing modes; the game detects the runway and approach direction automatically.
-- **Land** – choose an airport and runway direction from the Polish catalogue (64 airports, 68 runways). Start 6 km before the threshold, aligned with a 3° approach and landing gear down. Available for Piper, Q400, Citation, Boeing 737, Airbus A320 and Fighter. Choose a light aircraft for short or narrow strips.
+- **Land** – choose an airport and runway direction from the Polish catalogue (64 airports, 68 runways). Start 6 km before the threshold, aligned with a 3° approach and landing gear down. Available for Piper, Q400, Citation, Boeing 737, Embraer E195LR, Airbus A321/A320 and Fighter. Choose a light aircraft for short or narrow strips.
 
 ## Vehicles
 
-Eleven vehicles are available in single player and multiplayer:
+Thirteen vehicles are available in single player and multiplayer:
 
 | Vehicle | Cruise / max speed | Flight characteristics and features |
 | --- | --- | --- |
@@ -47,6 +47,8 @@ Eleven vehicles are available in single player and multiplayer:
 | **Dash 8 Q400** | ~270 / 670 km/h | Regional turboprop with two animated propellers, cabin windows, panel seams and navigation lights. |
 | **Cessna Citation** | ~330 / 900 km/h | Business jet with refined glazing, metal surfaces and navigation lights. |
 | **Boeing 737-800** | ~830 / 970 km/h | Original twin-engine airliner with framed cockpit panes, doors, cargo hatches, fan blades, flattened nacelles, wing panels and blue livery. |
+| **Embraer E195LR** | ~810 / 870 km/h | Narrow regional jet with smaller CF34-style nacelles, 28.73 m wings, four cockpit panes, winglets and red livery. |
+| **Airbus A321** | ~830 / 950 km/h | 44.51 m Airbus with four full-height doors per side, sharklets and blue livery. |
 | **Airbus A320** | ~810 / 950 km/h | Original twin-engine airliner with framed cockpit panes, doors, cargo hatches, fan blades, wing panels and teal livery. |
 | **Fighter** | ~540 / 1510 km/h | Combat jet with moving control surfaces, navigation lights, launchable missiles and wingtip contrails above 1000 km/h. |
 | **Rocket** | ~790 / 5000 km/h | Fast aircraft with standard pitch, bank and throttle controls, four fin trails and high-speed engine exhaust. |
@@ -60,7 +62,7 @@ The sailplane starts airborne and gradually descends. `W` lowers the nose to gai
 
 Gliders can also land on flat grass fields and meadows identified by OpenStreetMap. Terrain probes reject steep or uneven ground, buildings and missing terrain; water and wooded areas do not qualify. Nearby grass polygons load automatically through Overpass and are cached for the session. If that service is unavailable, the flight panel reports it and airport landings remain available.
 
-After stopping, press **H** or **Call Cessna for tow**. The game checks 250 m of grass for the ground run and the climb corridor ahead. A Cessna 172 arrives, attaches a visible tow rope and pulls the glider through an assisted takeoff and climb. **L** or **Release tow rope** disconnects it at any time; it releases automatically at 350 m above the departure field and flies away. **B** cancels a ground tow. Free gliding resumes immediately, with no engine thrust. The tow aircraft and cable are also visible to multiplayer peers; both buttons support touch input. This simplified model has no thermals.
+After stopping, press **H** or **Call Cessna for tow**. The game checks 250 m of grass for the ground run and the climb corridor ahead. A Cessna 172 arrives, attaches a visible tow rope and pulls the glider through an assisted takeoff and climb. **L** or **Release tow rope** disconnects it at any time; it releases automatically at 350 m above the departure field and flies away. **B** cancels a ground tow. Free gliding resumes immediately, with no engine thrust. The tow aircraft and cable are also visible to multiplayer peers; both buttons support touch input. The assisted tow compensates for wind; shared wind and thermals apply after release.
 
 The drone uses `A` / `D` to turn, even at zero forward speed, and `W` / `S` to descend / climb while powered. Its throttle controls horizontal speed and rotor lift: at zero throttle it brakes and falls towards the ground; adding power restores altitude control. Falcon 9 uses `W` / `S` to tilt and `A` / `D` to turn; throttle controls thrust, so cutting it lets gravity pull the rocket down. The released Dragon descends separately while you continue controlling Falcon 9. The on-screen **Release Dragon** button also works on touch devices.
 
@@ -69,6 +71,16 @@ For Falcon 9 staging, press `Enter` twice within 300 ms, or tap **Separate boost
 The first-stage arrangement follows [SpaceX's Falcon 9 overview](https://www.spacex.com/vehicles/falcon-9/): nine Merlin engines, four grid fins at the interstage and four legs stowed against the base until landing. Booster recovery is assisted gameplay with unlimited propellant, using integrated motion and terrain contact.
 
 The **red hot-air balloon** starts airborne. Use the **HEAT** slider or mouse wheel to adjust its burner; approximately 50% maintains height below 2.5 km. Hold `S` / `Shift` to heat and climb, or `W` / `Ctrl` to cool and descend. The envelope warms and cools gradually, so vertical motion responds with a delay. `A` / `D` rotate the basket and camera without steering horizontal drift; change altitude to find a different wind layer. `C` cycles the camera views, including a level view from the basket. The touch stick also controls heating/cooling. Wind is a deterministic game model, not live weather. Terrain impacts retain the game's collision behavior; the balloon is not available in runway landing practice. Its burners, gentle sway and glowing red envelope appear in multiplayer and in the live day/night lighting.
+
+## Wind, clouds and soaring
+
+Weather is a deterministic simulation driven by geographic position, altitude and real UTC, shared across aircraft. It is **not live meteorological data** and needs no weather API key. Wind veers and strengthens with altitude; continuous gusts change ground track without increasing airspeed. Airplanes and drones move through the air mass, balloons follow it with inertia, and Falcon 9 experiences wind through atmospheric drag. Wheels stay on the ground during rollout and parking.
+
+Sunlit thermal cores provide lift with weak surrounding sink, tapering out below cloud base. Heating disappears at night. Circle inside a core in the sailplane to gain height without engine thrust. Cloud bases use a regional height above the observer's terrain datum; nearby terrain and land use are approximations, so these are gameplay thermals rather than a weather forecast. Cumulus lobes have geographic positions at the top of wind-leaning plumes and are visible when flying around or above them.
+
+Open the **Wind / Vario** readout below the local clock for wind **from** true north, gust speed, ground speed, air-mass lift, cloud base (AMSL), and bearing/distance to the nearest active thermal. **Show thermals** toggles optional green guides; the setting is remembered. Vario measures the aircraft's climb, while Air measures the air mass. In the balloon, changing altitude selects a different drift direction. Weather evolves in real UTC while paused, but paused vehicles do not move.
+
+Airliner proportions and visual distinctions were checked against online photographs; see [aircraft reference notes](docs/aircraft-visual-references.md).
 
 ## Earth–Moon flight
 
@@ -82,7 +94,7 @@ Guidance performs a powered ascent, curves around Earth when necessary, tracks t
 
 Falcon 9 is an **assisted game spacecraft with unlimited propellant**. Fuel consumption, life support, radiation damage, upper-stage return-to-Earth guidance and a real Falcon lunar mission profile are not simulated. The Moon follows a mean circular inclined orbit and a mission-relative clock, rather than the current lunar ephemeris. Earth's rotation and sunlight follow real UTC independently of mission time warp. The surface is spherical; the imagery does not provide crater elevation or local terrain relief. Dragon's atmospheric parachute is available only below 80 km above Earth.
 
-Detailed Earth tiles and OpenSky polling stop during deep-space flight. Near objects remain in metres; distant bodies use a separate scaled render scene and individual depth passes to keep both the ship and the Moon stable at large distances. Aircraft and airport landing dynamics continue to use the existing Earth scene. B738/A320 share their detailed six-part geometry between player, menu and instanced traffic models.
+Detailed Earth tiles and OpenSky polling stop during deep-space flight. Near objects remain in metres; distant bodies use a separate scaled render scene and individual depth passes to keep both the ship and the Moon stable at large distances. Aircraft and airport landing dynamics continue to use the existing Earth scene. B738/E195/A321/A320 share their detailed six-part geometry between player, menu and instanced traffic models.
 
 Imagery: [Moon LROC colour map](https://svs.gsfc.nasa.gov/4720/) — NASA/GSFC/Arizona State University; [Earth Blue Marble texture distributed with Three.js r170](https://github.com/mrdoob/three.js/blob/r170/examples/textures/planets/earth_atmos_2048.jpg) — NASA imagery derivative. The bundled 2048-pixel maps are for the globe view, not ground-resolution photography.
 
@@ -184,7 +196,7 @@ Do not commit the key – `.env` is in `.gitignore`. Tiles do not load in the me
 
 ## Live aircraft from OpenSky
 
-Airborne contacts with fresh positions use Boeing 737 or Airbus A320 models when their ICAO type is supported, and red spheres otherwise. They use the globe's real coordinates and altitude, move between API updates, and obey camera direction, terrain depth and the horizon. Visibility follows the scene fog (about 24.7 km at low altitude, capped at 75 km); a larger area is fetched to include approaching aircraft. Traffic is informational and does not collide with the player or weapons. Distant models are enlarged up to 12× to keep their silhouettes readable.
+Airborne contacts with fresh positions use Boeing 737, Embraer E195LR or Airbus A321/A320 models when their ICAO type is supported, and red spheres otherwise. They use the globe's real coordinates and altitude, move between API updates, and obey camera direction, terrain depth and the horizon. Visibility follows the scene fog (about 24.7 km at low altitude, capped at 75 km); a larger area is fetched to include approaching aircraft. Traffic is informational and does not collide with the player or weapons. Distant models are enlarged up to 12× to keep their silhouettes readable.
 
 Add backend credentials to `.env`:
 
@@ -201,7 +213,7 @@ Positions older than 30 seconds are rejected on ingestion; existing tracks predi
 
 OpenSky's state endpoint does not supply aircraft type. The backend resolves each `icao24` with `https://api.adsbdb.com/v0/aircraft/{icao24}`, verifies the returned Mode-S address and caches the ICAO type, registration and model name. Positive results last seven days, missing records one day; outages are retried after a minute. At most six cold lookups are made per snapshot and 30 per minute across the process. The cache is persisted in `.data/aircraft-metadata.json` (`TRAFFIC_METADATA_FILE` overrides it). Metadata lookups use no OpenSky credits, and live positions remain available when that service fails. A cold area may need several polling cycles to identify every contact.
 
-Supported types: Boeing `B731`–`B739`, `B37M`, `B38M`, `B39M`, `B3XM`, and Airbus `A320`/`A20N`. 737 variants share a simplified 737 model with adjusted length; A320neo shares the simplified A320 silhouette. Other Airbus/Boeing types retain their actual type label and a red marker. Callsigns never determine the aircraft model. The menu's 737-800 and A320 use the same original geometry as traffic; no third-party model downloads are needed.
+Supported types: Boeing `B731`–`B739`, `B37M`, `B38M`, `B39M`, `B3XM`, Airbus `A320`/`A20N`, `A321`/`A21N`, and Embraer `E195`. Type/name prefixes also recognize `E195LR`, `ERJ 190-200 LR`, `Airbus A321-231` and `A320neo`. E195-E2/E295 is a different aircraft and remains a marker. 737 variants share a simplified 737 model with adjusted length; A320neo shares the simplified A320 silhouette. Other Airbus/Boeing types retain their actual type label and a red marker. Callsigns never determine the aircraft model. The menu's 737-800, E195LR, A321 and A320 use the same original geometry as traffic; no third-party model downloads are needed.
 
 Useful commands:
 

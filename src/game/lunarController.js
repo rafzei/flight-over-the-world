@@ -186,12 +186,10 @@ export class LunarController extends PlaneController {
       const airVelocity = this.velocityInertial.clone().sub(surfaceVelocityInertial(this.positionInertial));
       if (this.weather && altitude < 24000) {
         const { lat, lon } = ecefToGeodetic(this.positionInertial);
-        const n=this.weather.north, e=this.weather.east, u=this.weather.up;
-        airVelocity.sub(new Vector3(
-          -Math.sin(lat)*Math.cos(lon)*n-Math.sin(lon)*e+Math.cos(lat)*Math.cos(lon)*u,
-          -Math.sin(lat)*Math.sin(lon)*n+Math.cos(lon)*e+Math.cos(lat)*Math.sin(lon)*u,
-          Math.cos(lat)*n+Math.sin(lat)*u,
-        ));
+        const basis = localBasis(lat, lon);
+        airVelocity.addScaledVector(basis.north, -this.weather.north)
+          .addScaledVector(basis.east, -this.weather.east)
+          .addScaledVector(basis.up, -this.weather.up);
       }
       const density = 1.225 * Math.exp(-Math.max(0, altitude) / 8500);
       acceleration.addScaledVector(airVelocity, -.5 * density * airVelocity.length() / 40000);
