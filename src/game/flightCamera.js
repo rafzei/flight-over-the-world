@@ -31,13 +31,14 @@ export class FlightCamera {
     }
   }
 
-  setModel(model, { vertical = false } = {}) {
+  setModel(model, { vertical = false, basket = false } = {}) {
     this.vertical = vertical;
     // Called after orienting, scaling and centering the model, before placing
     // it on Earth. Stay ahead of its nose, including propellers and antennas.
     const bounds = new Box3().setFromObject(model);
     if (!bounds.isEmpty()) {
-      if (vertical) this.noseOffset.set(0, bounds.max.y + .75, 0);
+      if (basket) this.noseOffset.set(0, bounds.min.y + 1.65, -1.1);
+      else if (vertical) this.noseOffset.set(0, bounds.max.y + .75, 0);
       else this.noseOffset.set(0, 0, bounds.min.z - 0.75);
     }
   }

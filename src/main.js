@@ -46,10 +46,13 @@ import { setLoader, hideLoader } from "./game/hud.js";
 import { createPlaneMesh } from "./game/plane.js";
 import { createVehicleController } from "./game/vehicleControllers.js";
 import { SAILPLANE_SPEC, updateSailplane } from "./game/sailplane.js";
+import { BALLOON_SPEC, updateBalloon } from "./game/balloon.js";
 import { GrassFields } from "./game/grassFields.js";
 import { GrassLanding, checkTowPath } from "./game/grassLanding.js";
 import { SailplaneTow, TowVisuals, parseTowSnapshot } from "./game/sailplaneTow.js";
-import { createFalcon9, falconState, releaseDragon, resetFalcon9, updateDragon } from "./game/falcon9.js";
+import { createFalcon9, falconState, releaseDragon, resetDragon, resetFalcon9, updateDragon,
+  releaseBooster, updateBooster, boosterSnapshot, parseBoosterSnapshot, syncBooster } from "./game/falcon9.js";
+import { FalconStageInput } from "./game/boosterRecovery.js";
 import { FlightCamera, FLIGHT_CAMERAS } from "./game/flightCamera.js";
 import { applyRotorState, spinRotors } from "./game/rotors.js";
 import {
@@ -196,6 +199,7 @@ const TERRAIN_ALT = 120; // przybliżona wysokość elipsoidalna nizin
 const ION_GOOGLE_TILES_ASSET = "2275207";
 
 const PLANES = {
+  balloon: BALLOON_SPEC,
   sailplane: SAILPLANE_SPEC,
   pa28: {
     file: asset("models/pa28.glb"),
@@ -295,7 +299,7 @@ const PLANES = {
     exhaustOptions: { axis: "y", ignitionKmh: 0 },
   },
 };
-const PLANE_ORDER = ["pa28", "sailplane", "q400", "citation", "b738", "a320", "jet", "rocket", "drone", "falcon9"];
+const PLANE_ORDER = ["pa28", "sailplane", "q400", "citation", "b738", "a320", "jet", "rocket", "drone", "falcon9", "balloon"];
 
 const HOME_TIME = 600; // 10 min na dolot do domu
 const GUESS_TIME = 60; // 1 min na rozpoznanie terenu
@@ -325,6 +329,7 @@ let landingBrake = false;
 let vehicleGroundShadows;
 let fighterMissiles;
 let droneCannons;
+const falconStageInput = new FalconStageInput({ single: deployDragon, double: deployBooster });
 let missileShotSeq = 0;
 const lastMissileShotSeq = new Map();
 let droneBurstSeq = 0;
@@ -940,7 +945,7 @@ const planePreviewItems = PLANE_ORDER.map((k) => ({
   key: k,
   file: PLANES[k].file,
   create: PLANES[k].create,
-  vertical: PLANES[k].vertical,
+  vertical: PLANES[k].previewVertical ?? PLANES[k].vertical,
   wingspan: PLANES[k].wingspan,
   prepare: PLANES[k].prepare,
 }));
@@ -979,7 +984,11 @@ function selectPlane(i, dir, silent = false) {
       ? hint.node.classList.contains("hint-touch")
         ? "Drag the stick to glide · nose down gains speed, nose up trades speed for height · slide AIRBRK to descend faster"
         : "<kbd>W</kbd> nose down / gain speed · <kbd>S</kbd> nose up / slow down · <kbd>A</kbd><kbd>D</kbd> bank · scroll or drag AIRBRK · <kbd>Ctrl</kbd> airbrakes · <kbd>Shift</kbd> retract airbrakes · <kbd>,</kbd> / <kbd>.</kbd> retract / extend · <kbd>B</kbd> wheel brake · <kbd>C</kbd> camera · <kbd>M</kbd> map · <kbd>Esc</kbd> pause"
-      : hint.html;
+      : selectedPlane === "balloon"
+        ? hint.node.classList.contains("hint-touch")
+          ? "Red hot-air balloon · slide HEAT to warm or cool the envelope · pull the stick to heat, push to cool · wind carries the balloon · C cycles cameras, including basket view"
+          : "<kbd>S</kbd> / <kbd>Shift</kbd> heat to climb · <kbd>W</kbd> / <kbd>Ctrl</kbd> cool to descend · scroll or drag HEAT · <kbd>A</kbd><kbd>D</kbd> rotate basket view · wind controls drift · <kbd>C</kbd> camera · <kbd>M</kbd> map · <kbd>Esc</kbd> pause"
+        : hint.html;
   }
   if (!silent && mp.active && mp.net) {
     mp.net.send({ t: "plane", plane: selectedPlane, from: mp.myId });
@@ -2177,6 +2186,7 @@ function pushMatePose(id, data) {
     airbrake: Number.isFinite(data.airbrake) ? Math.max(0, Math.min(1, data.airbrake)) : 0,
     tow: data.plane === "sailplane" ? parseTowSnapshot(data.tow) : null,
     dragonReleased: data.dragonReleased === true,
+    booster: data.plane === "falcon9" ? parseBoosterSnapshot(data.booster) : null,
   });
   if (track.samples.length > 24)
     track.samples.splice(0, track.samples.length - 24);
@@ -2892,7 +2902,7 @@ function loadPlane(key) {
     box.setFromObject(model);
     model.position.sub(box.getCenter(new Vector3()));
     finishVehicleMaterials(model);
-    flightCamera.setModel(model, { vertical: spec.vertical });
+    flightCamera.setModel(model, { vertical: spec.vertical, basket: spec.flightModel === "balloon" });
     const wrapper = new Group();
     wrapper.add(model);
     const gear = attachLandingGear(wrapper, model, key);
@@ -2901,7 +2911,7 @@ function loadPlane(key) {
     wrapper.userData.key = key;
     applyRotorState(wrapper, true);
     if (spec.exhaust) attachRocketExhaust(wrapper, spec.exhaustOptions);
-    if (!spec.vertical) attachContrails(wrapper, scene, spec.contrailOptions);
+    if (!spec.vertical && !spec.noContrails) attachContrails(wrapper, scene, spec.contrailOptions);
     vehicleGroundShadows?.addVehicle(wrapper);
     scene.remove(planeMesh);
     disposeModelResources(placeholder);
@@ -2990,7 +3000,7 @@ function loadMate(id, key) {
     wrapper.visible = cur.mesh.visible;
     applyRotorState(wrapper, true);
     if (spec.exhaust) attachRocketExhaust(wrapper, spec.exhaustOptions);
-    if (!spec.vertical) attachContrails(wrapper, scene, spec.contrailOptions);
+    if (!spec.vertical && !spec.noContrails) attachContrails(wrapper, scene, spec.contrailOptions);
     vehicleGroundShadows?.addVehicle(wrapper);
     scene.remove(cur.mesh);
     disposeModelResources(placeholder);
@@ -3002,6 +3012,7 @@ function loadMate(id, key) {
 }
 
 function resetFlight(latDeg, lonDeg) {
+  falconStageInput.reset();
   sailplaneTow.reset(); grassLanding.reset();
   toggleSpaceMap(false);
   spaceTime = 0;
@@ -3206,7 +3217,7 @@ function stopAtImpact(hit) {
 
 function updateFlightPhysics(dt) {
   const canCrash = !pendingSnap && !awaitingSnap && performance.now() > crashGraceUntil;
-  const radius = PLANES[selectedPlane].vertical ? 18 : 4.5;
+  const radius = plane.collisionRadius ?? PLANES[selectedPlane].collisionRadius ?? (PLANES[selectedPlane].vertical ? 18 : 4.5);
   if (plane.isLunar) {
     if (canCrash) flightPosition(_flightFrom);
     plane.update(dt, ctrl);
@@ -3701,6 +3712,7 @@ function syncPauseCopy() {
 }
 
 function setLeaveOpen(v) {
+  falconStageInput.reset();
   leaveOpen = v;
   paused = false;
   keys.clear();
@@ -3709,6 +3721,7 @@ function setLeaveOpen(v) {
 }
 
 function setPaused(v) {
+  falconStageInput.reset();
   if (mp.active) {
     setLeaveOpen(v);
     return;
@@ -4074,9 +4087,9 @@ window.addEventListener("keydown", (e) => {
     if (k === "l" && plane?.isSailplane && !crashed && !finished) {
       e.preventDefault(); sailplaneTow.release(plane, landingSystem); return;
     }
-    if (k === "enter" && selectedPlane === "falcon9" && !crashed && !finished && !freeMap.open) {
+    if (k === "enter" && selectedPlane === "falcon9" && !crashed && !finished && !freeMap.open && !pendingSnap && !awaitingSnap) {
       e.preventDefault();
-      deployDragon();
+      falconStageInput.press(performance.now());
       return;
     }
     if (k === "enter" && selectedPlane === "jet") {
@@ -4124,8 +4137,30 @@ const brakeButton = document.getElementById("wheel-brake");
 brakeButton?.addEventListener("pointerdown", e => { if (paused || crashed) return; landingBrake = true; brakeButton.setPointerCapture(e.pointerId); });
 for (const event of ["pointerup", "pointercancel", "lostpointercapture"]) brakeButton?.addEventListener(event, () => { landingBrake = false; });
 
+function deployBooster() {
+  if (selectedPlane !== "falcon9" || menuOpen || paused || guessOpen || leaveOpen || crashed || finished ||
+      freeMap.open || pendingSnap || awaitingSnap || !plane.isLunar || plane.height > 150000) return;
+  const normal = WGS84_ELLIPSOID.getCartographicToNormal(plane.lat, plane.lon, new Vector3()).transformDirection(tiles.group.matrixWorld);
+  const basis = frameAt(plane.lat, plane.lon, plane.height, 0, 0, 0);
+  const velocity = new Vector3(plane.velocity.x, plane.velocity.z, -plane.velocity.y).applyQuaternion(new Quaternion().setFromRotationMatrix(basis));
+  const ground = probeSurface(plane.lat, plane.lon, Math.max(2500, plane.height)) ?? groundAlt;
+  if (plane.height - ground < 60) return;
+  const target = earthPosition(plane.lat, plane.lon, ground, tiles.group.matrixWorld, new Vector3());
+  if (!releaseBooster(planeMesh, scene, velocity, normal, { target, shadows: vehicleGroundShadows })) return;
+  // Recenter the controlled upper stage without moving any visible geometry
+  // or resetting its inherited velocity and inertial attitude.
+  const ecef = planeMesh.position.clone().applyMatrix4(tiles.group.matrixWorld.clone().invert()), pose = {};
+  WGS84_ELLIPSOID.getPositionToCartographic(ecef, pose);
+  plane.lat = pose.lat; plane.lon = pose.lon; plane.height = pose.height;
+  plane.rebaseFromGeodetic({ preserveVelocity: true });
+  plane.surfaceClearance = plane.collisionRadius = falconState(planeMesh).upperClearance;
+  flightCamera.setModel(falconState(planeMesh).parent, { vertical: true });
+  camInit = false;
+}
+document.getElementById("booster-release")?.addEventListener("click", () => { falconStageInput.reset(); deployBooster(); });
+
 function deployDragon() {
-  if (selectedPlane !== "falcon9" || menuOpen || paused || guessOpen || leaveOpen || crashed || finished || freeMap.open) return;
+  if (selectedPlane !== "falcon9" || menuOpen || paused || guessOpen || leaveOpen || crashed || finished || freeMap.open || pendingSnap || awaitingSnap) return;
   if (plane.isLunar && plane.height > 80000) return;
   // Controller stores east/north/up; the level flight frame is east/up/south.
   const v = plane.velocity;
@@ -4134,7 +4169,7 @@ function deployDragon() {
   const up = new Vector3(0, 1, 0).applyQuaternion(skyQuat);
   releaseDragon(planeMesh, scene, velocity, up, vehicleGroundShadows);
 }
-el.dragonRelease?.addEventListener("click", deployDragon);
+el.dragonRelease?.addEventListener("click", () => { falconStageInput.reset(); deployDragon(); });
 
 function toggleSpaceMap(enabled = !spaceScene?.overview) {
   if (!spaceScene) return;
@@ -4273,8 +4308,8 @@ function tickThrottle(dt) {
 function syncThrottleUi() {
   const gliding = !!plane?.isSailplane;
   const label = el.throttle?.querySelector("span");
-  if (label) label.textContent = gliding ? "AIRBRK" : "THR";
-  el.throttleRail?.setAttribute("aria-label", gliding ? "Airbrakes" : "Throttle");
+  if (label) label.textContent = gliding ? "AIRBRK" : plane?.isBalloon ? "HEAT" : "THR";
+  el.throttleRail?.setAttribute("aria-label", gliding ? "Airbrakes" : plane?.isBalloon ? "Balloon burner heat" : "Throttle");
   if (el.throttleKnob) {
     el.throttleKnob.style.bottom = `${throttleShown * 100}%`;
   }
@@ -4486,6 +4521,7 @@ window.__foeDebug = () => ({
   spaceSky: sky?.uniforms.uSpace.value,
   daylight: localSun ? { ...localSun, utc: new Date(solar.utcMs).toISOString(), siderealAngle: solar.siderealAngle } : null,
   flightClock: flightClock.diagnostics(),
+  balloon: plane?.isBalloon ? { heat: plane.heat, burner: plane.throttle, climbMps: plane.verticalSpeed, northMps: plane.northSpeed, eastMps: plane.eastSpeed } : null,
   landing: plane ? landingSystem.diagnostics(plane) : null,
   sailplane: plane?.isSailplane ? { grassMap: grassFields.status, grass: !!landingSystem.runway.isGrass, towPhase: sailplaneTow.phase, tow: sailplaneTow.snapshot(), reason: sailplaneTow.reason } : null,
   space: plane?.isLunar ? plane.diagnostics() : null,
@@ -4536,6 +4572,8 @@ function tickFrame() {
   scene.updateMatrixWorld();
 
   let flying = !menuOpen && !paused && !guessOpen && !crashed && !finished;
+  if (flying && !leaveOpen && !freeMap.open && !pendingSnap && !awaitingSnap) falconStageInput.update(performance.now());
+  else falconStageInput.reset();
 
   // sterowanie lotnicze: W / góra = drążek od siebie = nos w dół
   const keyRoll =
@@ -4607,7 +4645,10 @@ function tickFrame() {
       brakeButton.textContent = ctrl.wheelBrake ? "BRAKING" : "Hold B · Wheel brakes";
       document.getElementById("sailplane-actions").hidden = !plane.isSailplane;
       if (plane.isSailplane) {
-        if (activeRunway.isGrass) document.getElementById("landing-status").textContent = d.grounded ? (d.status === "stopped" ? "ON GRASS · ready for tow" : "ON GRASS · hold B to stop") : "GRASS FIELD · keep wings level and flare gently";
+        if (activeRunway.isGrass) {
+          document.getElementById("landing-status").textContent = d.grounded ? (d.status === "stopped" ? "ON GRASS · ready for tow" : "ON GRASS · hold B to stop") : "GRASS FIELD · keep wings level and flare gently";
+          document.getElementById("landing-details").textContent = `${Math.round(plane.kmh)} km/h · sink ${d.sinkMps.toFixed(1)} m/s\nWheels above grass ${Math.max(0, d.wheelClearanceM).toFixed(1)} m`;
+        }
         else if (!nearRunway) {
           document.getElementById("landing-status").textContent = "GLIDING · choose a flat grass field";
           document.getElementById("landing-details").textContent = `${Math.round(plane.kmh)} km/h · sink ${(-plane.verticalSpeed).toFixed(1)} m/s`;
@@ -4617,13 +4658,17 @@ function tickFrame() {
         document.getElementById("tow-call").disabled = !landingSystem.grounded || plane.speed >= .5 || sailplaneTow.busy || crashed;
         document.getElementById("tow-release").hidden = !sailplaneTow.busy;
         document.getElementById("tow-release").textContent = sailplaneTow.attached ? "L · Release tow rope" : "L · Cancel tow";
+        if (sailplaneTow.attached) {
+          document.getElementById("landing-status").textContent = d.grounded ? "AEROTOW · accelerating behind Cessna" : "AEROTOW · climbing behind Cessna";
+          document.getElementById("landing-details").textContent = `${Math.round(plane.kmh)} km/h · climb ${Math.max(0, plane.verticalSpeed).toFixed(1)} m/s\n${Math.max(0, Math.round(plane.height - sailplaneTow.groundHeight))} m above departure field · auto release at 350 m`;
+        }
       }
     }
   }
 
   // dźwięk silnika — obroty z przepustnicy i prędkości, opływ z prędkości
   const speed01 = plane.speed / plane.boost;
-  const rpm01 = Math.min(1, Math.max(0.15, 0.22 + plane.throttle * 0.78));
+  const rpm01 = plane.isBalloon ? plane.throttle : Math.min(1, Math.max(0.15, 0.22 + plane.throttle * 0.78));
   updateEngineSound(flying, sailplaneTow.busy ? .75 : rpm01, speed01, sailplaneTow.busy ? "plane" : PLANES[selectedPlane].sound);
   if (plane.isSailplane) updateSailplane(planeMesh, plane.airbrake);
   updateMusic();
@@ -4647,10 +4692,24 @@ function tickFrame() {
   }
   spinRotors(planeMesh, dt, plane.speed);
   updateCombatDrone(planeMesh, flying ? dt : 0, plane.throttle, flying);
+  updateBalloon(planeMesh, flying ? dt : 0, plane.throttle);
   updateFighterSurfaces(planeMesh, paused ? 0 : dt, flying ? ctrl.roll : 0, flying ? ctrl.pitch : 0);
   const verticalRocket = PLANES[selectedPlane].vertical;
   updateRocketExhaust(planeMesh, dt, plane.isLunar ? plane.throttle * 15000 : plane.kmh, flying && (!plane.isLunar || plane.throttle > .02));
   updateDragon(planeMesh, dt, tiles.group, flying && plane.height < 80000, !menuOpen && !guessOpen && plane.height < 80000);
+  updateBooster(planeMesh, dt, tiles.group, { active: !menuOpen && !paused && !guessOpen,
+    visible: !menuOpen && !guessOpen, timeWarp: plane.effectiveTimeWarp ?? 1 });
+  const boosterButton = document.getElementById("booster-release"), boosterStatus = document.getElementById("booster-status");
+  const falcon = selectedPlane === "falcon9" ? falconState(planeMesh) : null;
+  boosterButton.hidden = !verticalRocket || !flying || freeMap.open;
+  boosterButton.disabled = !falcon || falcon.boosterReleased || pendingSnap || awaitingSnap || plane.height > 150000 || plane.height - groundAlt < 60;
+  boosterButton.textContent = falcon?.boosterReleased ? "Booster separated" : "Enter ×2 · Separate booster";
+  boosterStatus.hidden = !falcon?.recovery;
+  if (falcon?.recovery) {
+    const recovery = falcon.recovery;
+    const labels = { separation: "SEPARATION", boostback: "BOOSTBACK BURN", entry: "RETURNING", "landing-burn": "LANDING BURN", landed: "BOOSTER LANDED", failed: "BOOSTER LOST" };
+    boosterStatus.textContent = `${labels[recovery.phase]} · ${Math.max(0, recovery.height).toFixed(0)} m · legs ${Math.round(recovery.legs * 100)}%`;
+  }
   if (el.dragonRelease) {
     el.dragonRelease.hidden = !verticalRocket || !flying || freeMap.open || plane.height > 80000;
     const released = !!falconState(planeMesh)?.released;
@@ -4697,6 +4756,7 @@ function tickFrame() {
         airbrake: plane.airbrake ?? 0,
         tow: plane.isSailplane ? sailplaneTow.snapshot() : null,
         dragonReleased: !!falconState(planeMesh)?.released,
+        booster: selectedPlane === "falcon9" ? boosterSnapshot(planeMesh, tiles.group.matrixWorld) : null,
       });
     }
   }
@@ -4746,6 +4806,7 @@ function tickFrame() {
       updateFighterSurfaces(mate.mesh, paused ? 0 : dt, mateRoll, matePitch);
       const kmh = (from.kmh ?? 0) + ((to.kmh ?? 0) - (from.kmh ?? 0)) * u;
       updateCombatDrone(mate.mesh, paused ? 0 : dt, kmh / (PLANES[mate.key].boost * 3.6), true);
+      updateBalloon(mate.mesh, paused ? 0 : dt, to.throttle ?? .5);
       if (mate.key === "sailplane") updateSailplane(mate.mesh, (from.airbrake ?? 0) + ((to.airbrake ?? 0) - (from.airbrake ?? 0)) * u);
       if (mate.key === "sailplane" && to.tow) {
         mate.towVisuals ??= new TowVisuals();
@@ -4754,13 +4815,15 @@ function tickFrame() {
         mate.towVisuals.update(scene, frameAt, mate.mesh, tow, paused ? 0 : dt);
       } else mate.towVisuals?.dispose();
       const mateVertical = PLANES[mate.key].vertical;
+      if (mateVertical && to.booster) syncBooster(mate.mesh, scene, to.booster, tiles.group.matrixWorld, vehicleGroundShadows);
+      else if (mateVertical && falconState(mate.mesh)?.boosterReleased) resetFalcon9(mate.mesh);
       const mateThrottle = to.throttle ?? .6;
       updateRocketExhaust(mate.mesh, dt, mateVertical ? mateThrottle * 15000 : kmh, !paused && (!mateVertical || mateThrottle > .02));
       if (mateVertical && to.dragonReleased && !falconState(mate.mesh)?.released) {
         const up = new Vector3(0, 1, 0).applyQuaternion(skyQuat);
         const velocity = new Vector3(0, kmh / 3.6, 0).applyQuaternion(mateQuat);
         releaseDragon(mate.mesh, scene, velocity, up, vehicleGroundShadows);
-      } else if (mateVertical && !to.dragonReleased) resetFalcon9(mate.mesh);
+      } else if (mateVertical && !to.dragonReleased) resetDragon(mate.mesh);
       mate.kmh = kmh;
       const marker = ensureMateMarker(mate);
       const markOn = mp.goAt && performance.now() - mp.goAt < MATE_MARKER_MS;
@@ -4777,6 +4840,7 @@ function tickFrame() {
   }
   for (const mate of mp.mates.values()) {
     updateDragon(mate.mesh, dt, tiles.group, !paused && !menuOpen, mp.active && !menuOpen && !!mate.mesh?.visible);
+    updateBooster(mate.mesh, dt, tiles.group, { active: !paused && !menuOpen, visible: mp.active && !menuOpen && !!mate.mesh?.visible });
   }
 
   // Zewnętrzne kamery trzymają poziom; widok z dzioba śledzi pełną orientację.
@@ -4866,7 +4930,7 @@ function tickFrame() {
   }
 
   // poszerzenie FOV przy nitrie — efekt prędkości
-  const targetFov = !plane.isLunar && plane.speed > plane.cruise * 1.2 ? 78 : 70;
+  const targetFov = !plane.isLunar && !plane.isBalloon && plane.speed > plane.cruise * 1.2 ? 78 : 70;
   if (Math.abs(camera.fov - targetFov) > 0.05) {
     camera.fov += (targetFov - camera.fov) * Math.min(1, 3 * dt);
     camera.updateProjectionMatrix();
@@ -5167,7 +5231,7 @@ window.__forceTestMate = () => {
 function updateHud(agl) {
   // skala prędkościomierza pod najszybszy pojazd (nitro), zaokrąglona w górę
   const kmh = plane.isLunar && plane.height < 100000 ? plane.velocity.length() * 3.6 : plane.kmh;
-  const maxKmh = plane.isLunar ? Math.max(2000, Math.ceil(kmh / 10000) * 10000) : Math.ceil((PLANES[selectedPlane].boost * 3.6) / 200) * 200;
+  const maxKmh = plane.isLunar ? Math.max(2000, Math.ceil(kmh / 10000) * 10000) : plane.isBalloon ? 60 : Math.ceil((PLANES[selectedPlane].boost * 3.6) / 200) * 200;
   if (el.gSpeed?.clientWidth) drawAirspeed(el.gSpeed, kmh, maxKmh);
   if (el.gAlt?.clientWidth) drawAltimeter(el.gAlt, Math.max(0, agl));
   if (el.gHdg?.clientWidth) drawCompass(el.gHdg, plane.headingDeg);

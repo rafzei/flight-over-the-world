@@ -145,8 +145,46 @@ test("manual lunar contact distinguishes gentle upright landing from impact and 
   }
   const c = new LunarController(0, 0, 1000, 0, { vertical: true });
   inertialState(c, new Vector3(C.EARTH_EQUATORIAL_RADIUS + 2000000, 0, 0), new Vector3(-10000000, 0, 0));
-  c.throttle = 0; c.setTimeWarp(1000); c.update(.1, { throttle: 0 });
-  assert.equal(c.spaceStatus, "impact-earth", "swept contact detects crossing the entire planet within a time-warp step");
+  c.throttle = 0; c.setTimeWarp(1000);
+  for (let i = 0; i < 3 && !c.crashed; i++) c.update(.1, { throttle: 0 });
+  assert.equal(c.spaceStatus, "impact-earth", "real surface impacts are still detected after automatic reentry slowdown");
+});
+
+test("descending into Earth's atmosphere at 10x follows the same trajectory as real time", () => {
+  for (const latitude of [0, 52.23, 85]) {
+    const make = warp => {
+      const c = new LunarController(latitude, 21, 100000, 0, { vertical: true });
+      c.velocityInertial.addScaledVector(c.positionInertial.clone().normalize(), -2500);
+      c.throttle = 0; c.setTimeWarp(warp); c._publishPose();
+      return c;
+    };
+    const real = make(1), accelerated = make(10);
+    for (let i = 0; i < 120; i++) {
+      real.update(1 / 60, { throttle: 0 }); accelerated.update(1 / 60, { throttle: 0 });
+      assert.equal(accelerated.spaceStatus, "flight");
+      assert.equal(accelerated.effectiveTimeWarp, 1);
+      assert(accelerated.positionInertial.distanceTo(real.positionInertial) < 1e-6);
+    }
+    assert(accelerated.height > 94000 && accelerated.height < 96000);
+    near(accelerated.simulationTime, 2, 1e-10);
+  }
+});
+
+test("warp is limited before crossing the atmosphere and rechecked inside an accelerated frame", () => {
+  for (const warp of [10, 100, 1000]) {
+    const c = new LunarController(0, 0, 150050, 0, { vertical: true });
+    c.velocityInertial.add(new Vector3(-12000, 0, 0));
+    c.throttle = 0; c.setTimeWarp(warp); c._publishPose();
+    c.update(.05, { throttle: 0 });
+    assert.equal(c.effectiveTimeWarp, 1); assert.equal(c.spaceStatus, "flight");
+    assert(c.height > 149000); near(c.simulationTime, .05, 1e-10);
+  }
+  const c = new LunarController(0, 0, 200000, 0, { vertical: true });
+  c.velocityInertial.add(new Vector3(-1000, 0, 0));
+  c.throttle = 0; c.setTimeWarp(1000); c._publishPose();
+  c.update(.1, { throttle: 0 });
+  assert.equal(c.effectiveTimeWarp, 1); assert.equal(c.spaceStatus, "flight");
+  assert(c.simulationTime < 60 && c.height > 140000, "unused real time is not spent at the old 1000x rate");
 });
 
 test("spawn rebasing, guidance cancellation and near-surface warp limits preserve control", () => {

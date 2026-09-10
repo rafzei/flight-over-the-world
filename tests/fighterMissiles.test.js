@@ -133,7 +133,8 @@ test("Enter routes Fighter missiles, Drone cannons and Falcon Dragon, with input
     selectedPlane: "jet", mp: { active: false }, menuOpen: false, paused: false, guessOpen: false, leaveOpen: false,
     crashed: false, finished: false, pendingSnap: false, awaitingSnap: false, freeMap: { open: false },
     keys: new Set(), Vector3, frameAt: () => new Matrix4(), plane: { lat: 0, lon: 0, height: 100, speed: 400 }, planeMesh: {},
-    fighterMissiles: { fire: () => { shots++; return { station: 0 }; } }, deployDragon: () => releases++,
+    fighterMissiles: { fire: () => { shots++; return { station: 0 }; } },
+    falconStageInput: { press: () => releases++ }, performance: { now: () => 1000 },
     droneCannons: { fire: () => { bursts++; return true; } },
   });
   vm.runInContext(source.slice(fire.start, fire.end), context);

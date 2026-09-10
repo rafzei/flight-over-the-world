@@ -85,6 +85,7 @@ const STYLES = {
   rocket: { fBase: 26,  fRange: 40,   subDiv: 1, am: 0,    lpBase: 130,  lpRange: 380,  exG: 0.85, exR: 0.55, subG: 0.5,  subR: 0.35, noiseMul: 3.1 },
   drone:  { fBase: 150, fRange: 220,  subDiv: 3, am: 0.04, lpBase: 650,  lpRange: 1500, exG: 0.22, exR: 0.18, subG: 0.06, subR: 0.04, noiseMul: 1.1 },
   wind:   { fBase: 46,  fRange: 64,   subDiv: 2, am: 0,    lpBase: 240,  lpRange: 640,  exG: 0,    exR: 0,    subG: 0,    subR: 0,    noiseMul: 1.5 },
+  balloon:{ fBase: 46,  fRange: 64,   subDiv: 2, am: 0,    lpBase: 240,  lpRange: 640,  exG: 0,    exR: 0,    subG: 0,    subR: 0,    noiseMul: 1 },
 };
 
 // audible — czy słychać (lot, nie menu/pauza/kraksa)
@@ -111,8 +112,9 @@ export function updateEngineSound(audible, rpm01, speed01, style = "plane") {
   subGain.gain.setTargetAtTime(S.subG + rpm * S.subR, t, 0.1);
 
   const wash = Math.max(0, Math.min(1, speed01));
-  noiseGain.gain.setTargetAtTime(wash * wash * 0.5 * S.noiseMul, t, 0.25);
-  bp.frequency.setTargetAtTime(380 + wash * 720, t, 0.25);
+  const burner = Math.max(0, Math.min(1, rpm01));
+  noiseGain.gain.setTargetAtTime(style === "balloon" ? .012 * wash + burner * .7 : wash * wash * 0.5 * S.noiseMul, t, 0.25);
+  bp.frequency.setTargetAtTime(style === "balloon" ? 650 + burner * 650 : 380 + wash * 720, t, 0.25);
 }
 
 export function engineDebug() {

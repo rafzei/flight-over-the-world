@@ -34,7 +34,8 @@ export class TowVisuals {
     this.rope.visible = state.connected;
     if (!state.connected) return;
     const origin = glider.position;
-    const from = new Vector3(0, -.32, -4.08).applyMatrix4(glider.matrixWorld).sub(origin);
+    const sailplane = glider.getObjectByName("sailplane") || glider;
+    const from = new Vector3(0, 0, -4.08).applyMatrix4(sailplane.matrixWorld).sub(origin);
     const to = new Vector3(0, -.06, 2.8).applyMatrix4(this.aircraft.matrixWorld).sub(origin);
     const up = new Vector3().setFromMatrixColumn(glider.matrixWorld, 1).normalize();
     this.rope.position.copy(origin);

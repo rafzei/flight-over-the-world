@@ -169,13 +169,17 @@ button, .mode-card, .scope-btn {
 [data-clock-detail] { margin-top: 4px; color: var(--muted); font-size: 10px; }
 #flight-clock[data-phase="Night"] [data-clock-phase] { color: #b6d0ff; }
 @media (max-width: 1000px), (pointer: coarse) {
-  #flight-clock { left: auto; right: 12px; bottom: max(310px, calc(env(safe-area-inset-bottom) + 294px)); width: min(216px, calc(100vw - 152px)); padding: 8px 10px; }
-  .flight-clock-face time { font-size: 21px; }
+  #flight-clock { left: auto; right: 68px; bottom: max(128px, calc(env(safe-area-inset-bottom) + 112px)); width: min(216px, calc(100vw - 224px)); padding: 8px 10px; }
+  .flight-clock-face time { font-size: 18px; }
   .flight-clock-face { gap: 6px; }
   .space-overview #flight-clock { bottom: max(16px, env(safe-area-inset-bottom)); right: 12px; }
 }
 @media (min-width: 721px) and (max-width: 1000px) and (pointer: fine) {
-  #flight-clock { right: 64px; }
+  #flight-clock { right: 64px; bottom: 310px; }
+}
+@media (max-width: 350px) {
+  #flight-clock [data-clock-phase] { display: none; }
+  #flight-clock [data-clock-zone], #flight-clock [data-clock-detail] { font-size: 9px; }
 }
 
 #landing-panel { position: absolute; pointer-events: auto; top: 22px; right: 22px; width: 315px; padding: 12px; border: 1px solid #ffffff30; border-radius: 6px; background: #120e0add; font-size: 12px; }

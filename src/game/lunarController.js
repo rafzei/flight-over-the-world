@@ -181,13 +181,25 @@ export class LunarController extends PlaneController {
 
   _acceleration(time, thrust) {
     const acceleration = gravityAcceleration(this.positionInertial, time).add(thrust);
-    const altitude = this.positionInertial.length() - C.EARTH_EQUATORIAL_RADIUS;
+    const altitude = ecefToGeodetic(this.positionInertial).height;
     if (altitude < 150000) {
       const airVelocity = this.velocityInertial.clone().sub(surfaceVelocityInertial(this.positionInertial));
       const density = 1.225 * Math.exp(-Math.max(0, altitude) / 8500);
       acceleration.addScaledVector(airVelocity, -.5 * density * airVelocity.length() / 40000);
     }
     return acceleration;
+  }
+
+  _safeTimeWarp(realSeconds) {
+    const altitude = ecefToGeodetic(this.positionInertial).height;
+    const descent = -this.velocityInertial.dot(this.positionInertial.clone().normalize());
+    // Enter the atmosphere in real time, including a crossing during this
+    // frame. Re-evaluate after every substep, not once for a warped frame.
+    const lookAhead = Math.max(0, descent) * Math.min(10, realSeconds * this.timeWarp);
+    if (descent > 1 && altitude - lookAhead < 150000) return 1;
+    const moonAltitude = this.positionInertial.distanceTo(moonPositionInertial(this.simulationTime)) - C.MOON_RADIUS - this.surfaceClearance;
+    const nearest = Math.min(altitude, moonAltitude);
+    return Math.min(this.timeWarp, nearest < 1000 ? 1 : nearest < 20000 ? 10 : nearest < 150000 ? 100 : 1000);
   }
 
   _landedUpdate(dt) {
@@ -206,13 +218,10 @@ export class LunarController extends PlaneController {
     if (this._needsRebase()) this.rebaseFromGeodetic();
     if (this.crashed || this.spaceStatus.startsWith("impact")) return;
     if (Number.isFinite(ctrl.timeWarp)) this.setTimeWarp(ctrl.timeWarp);
-    const moonAltitude = this.positionInertial.distanceTo(moonPositionInertial(this.simulationTime)) - C.MOON_RADIUS - this.surfaceClearance;
-    const nearestAltitude = Math.min(this.height, moonAltitude);
-    const safeWarp = nearestAltitude < 1000 ? 1 : nearestAltitude < 20000 ? 10 : nearestAltitude < 150000 ? 100 : 1000;
-    this.effectiveTimeWarp = this.spaceStatus === "landed-moon" ? this.timeWarp : Math.min(this.timeWarp, safeWarp);
-    let remaining = dt * this.effectiveTimeWarp;
+    let remaining = dt;
     if (this.spaceStatus === "landed-moon") {
-      this._landedUpdate(remaining); this._publishPose(); return;
+      this.effectiveTimeWarp = this.timeWarp;
+      this._landedUpdate(dt * this.timeWarp); this._publishPose(); return;
     }
     if (!this.guidanceActive) {
       const lever = Number.isFinite(ctrl.throttle) ? MathUtils.clamp(ctrl.throttle, 0, 1) : this.cruiseT;
@@ -224,11 +233,15 @@ export class LunarController extends PlaneController {
       this.thrustDirectionInertial.copy(this.vertical ? Y : new Vector3(0, 0, -1)).applyQuaternion(this.orientationInertial).normalize();
     }
     while (remaining > 1e-9 && this.spaceStatus === "flight") {
+      this.effectiveTimeWarp = this._safeTimeWarp(remaining);
       const moonStart = moonPositionInertial(this.simulationTime);
       const lunarHeight = this.positionInertial.distanceTo(moonStart) - C.MOON_RADIUS - this.surfaceClearance;
-      const earthHeight = this.positionInertial.length() - C.EARTH_EQUATORIAL_RADIUS;
+      const earthHeight = ecefToGeodetic(this.positionInertial).height;
       const closest = Math.min(lunarHeight, earthHeight);
-      const step = Math.min(remaining, closest < 2000 ? .05 : closest < 150000 ? .5 : this.guidanceActive ? 2 : 10);
+      const airSpeed = this.velocityInertial.clone().sub(surfaceVelocityInertial(this.positionInertial)).length();
+      const dragRate = .5 * 1.225 * Math.exp(-Math.max(0, earthHeight) / 8500) * airSpeed / 40000;
+      const step = Math.min(remaining * this.effectiveTimeWarp, .2 / Math.max(dragRate, 1e-9), closest < 2000 ? .05 : closest < 150000 ? .5 : this.guidanceActive ? 2 : 10);
+      const realStep = step / this.effectiveTimeWarp;
       const before = this.positionInertial.clone(), oldVelocity = this.velocityInertial.clone();
       const thrust = this.guidanceActive ? this._guidanceAcceleration(this.simulationTime) : this.thrustDirectionInertial.clone().multiplyScalar(this.throttle * this.maximumThrustAcceleration);
       const a0 = this._acceleration(this.simulationTime, thrust);
@@ -274,7 +287,7 @@ export class LunarController extends PlaneController {
           this.timeWarp = this.effectiveTimeWarp = 1;
         }
       }
-      remaining -= step;
+      remaining -= realStep;
     }
     this._publishPose();
   }

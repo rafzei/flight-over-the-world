@@ -38,7 +38,7 @@ Fly over photorealistic Earth – guess the region, find your way home, or just 
 
 ## Vehicles
 
-Nine vehicles are available in single player and multiplayer:
+Eleven vehicles are available in single player and multiplayer:
 
 | Vehicle | Cruise / max speed | Flight characteristics and features |
 | --- | --- | --- |
@@ -52,6 +52,7 @@ Nine vehicles are available in single player and multiplayer:
 | **Rocket** | ~790 / 5000 km/h | Fast aircraft with standard pitch, bank and throttle controls, four fin trails and high-speed engine exhaust. |
 | **Combat Drone** | 120 / 320 km/h | Armed quadrotor replacing Rocket 1, with four spinning rotors, two forward-firing rotary cannons, a camera and red lights. Independent lift and automatic braking; cutting throttle makes it descend under gravity. |
 | **SpaceX Falcon 9** | Thrust-controlled; no fixed speed cap | Upright game spacecraft with nine engine nozzles and assisted Earth–Moon travel. Press `Enter` below 80 km Earth altitude to release Dragon with its red-and-white parachute. |
+| **Red hot-air balloon** | Wind drift, typically 10–30 km/h | Original red fabric envelope, open wicker basket, suspension cables, propane tanks and animated twin burners. Heat controls lift; the wind carries the balloon. |
 
 Aircraft speeds are game settings, not real-world specifications. Aircraft can exceed their nominal maximum in a dive. Falcon 9 inherits Earth's eastward surface velocity and accelerates under thrust; the HUD uses speed relative to Earth near the launch site. In space, its flight panel identifies the distance and speed relative to the Moon.
 
@@ -62,6 +63,8 @@ Gliders can also land on flat grass fields and meadows identified by OpenStreetM
 After stopping, press **H** or **Call Cessna for tow**. The game checks 250 m of grass for the ground run and the climb corridor ahead. A Cessna 172 arrives, attaches a visible tow rope and pulls the glider through an assisted takeoff and climb. **L** or **Release tow rope** disconnects it at any time; it releases automatically at 350 m above the departure field and flies away. **B** cancels a ground tow. Free gliding resumes immediately, with no engine thrust. The tow aircraft and cable are also visible to multiplayer peers; both buttons support touch input. This simplified model has no thermals.
 
 The drone uses `A` / `D` to turn, even at zero forward speed, and `W` / `S` to descend / climb while powered. Its throttle controls horizontal speed and rotor lift: at zero throttle it brakes and falls towards the ground; adding power restores altitude control. Falcon 9 uses `W` / `S` to tilt and `A` / `D` to turn; throttle controls thrust, so cutting it lets gravity pull the rocket down. The released Dragon descends separately while you continue controlling Falcon 9. The on-screen **Release Dragon** button also works on touch devices.
+
+The **red hot-air balloon** starts airborne. Use the **HEAT** slider or mouse wheel to adjust its burner; approximately 50% maintains height below 2.5 km. Hold `S` / `Shift` to heat and climb, or `W` / `Ctrl` to cool and descend. The envelope warms and cools gradually, so vertical motion responds with a delay. `A` / `D` rotate the basket and camera without steering horizontal drift; change altitude to find a different wind layer. `C` cycles the camera views, including a level view from the basket. The touch stick also controls heating/cooling. Wind is a deterministic game model, not live weather. Terrain impacts retain the game's collision behavior; the balloon is not available in runway landing practice. Its burners, gentle sway and glowing red envelope appear in multiplayer and in the live day/night lighting.
 
 ## Earth–Moon flight
 

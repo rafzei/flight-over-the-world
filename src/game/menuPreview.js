@@ -10,6 +10,7 @@ import {
 } from "three";
 import { loadVehicleModel, disposeModelResources } from "./vehicleModels.js";
 import { updateCombatDrone } from "./combatDrone.js";
+import { updateBalloon } from "./balloon.js";
 import { applyRotorState } from "./rotors.js";
 import { finishVehicleMaterials, updateFighterSurfaces, disposeVehicleVisuals } from "./vehicleVisuals.js";
 
@@ -118,6 +119,7 @@ export function createCarousel(canvas, items, opts = {}) {
     current.group.rotation.z = Math.sin(t * 0.6) * 0.05;
     updateFighterSurfaces(current.group, dt, 0, 0);
     updateCombatDrone(current.group, dt);
+    updateBalloon(current.group, dt, .7);
     renderer.render(scene, camera);
   }
   tick();

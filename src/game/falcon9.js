@@ -1,11 +1,14 @@
 import {
-  BoxGeometry, BufferGeometry, CanvasTexture, CylinderGeometry, DoubleSide,
+  Box3, BoxGeometry, BufferGeometry, CanvasTexture, CylinderGeometry, DoubleSide,
   Euler, Float32BufferAttribute, Group, LatheGeometry, MathUtils, Mesh,
   MeshStandardMaterial, PlaneGeometry, Quaternion, Raycaster, Shape,
   ExtrudeGeometry, SphereGeometry, SRGBColorSpace, TorusGeometry, Vector2, Vector3,
 } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { disposeModelResources } from "./vehicleModels.js";
+import { BoosterRecovery } from "./boosterRecovery.js";
+import { attachRocketExhaust, disposeRocketExhaust, updateRocketExhaust } from "./rocketExhaust.js";
+import { raycastTerrain } from "./vehicleCollision.js";
 
 function mergeStatic(root) {
   root.updateWorldMatrix(true, true);
@@ -71,7 +74,9 @@ function dragonBadge() {
 // Upright +Y model, with a separate Dragon nose. Dimensions are scaled for gameplay.
 export function createFalcon9() {
   const root = new Group(); root.name = "spacex-falcon-9";
-  const body = new Group(); root.add(body);
+  const body = new Group(); body.name = "falcon-upper-stage"; root.add(body);
+  const booster = new Group(); booster.name = "falcon-booster"; root.add(booster);
+  const boosterBody = new Group(); booster.add(boosterBody);
   function material(name, color, metalness = .2, roughness = .4, extra = {}) {
     const m = new MeshStandardMaterial({ name, color, metalness, roughness, ...extra });
     m.userData.vehicleFinish = true; return m;
@@ -82,21 +87,21 @@ export function createFalcon9() {
   const steel = material("falcon-engine-metal", 0x77868d, .8, .25);
   const black = material("falcon-engine-interior", 0x121a20, .35, .7, { side: DoubleSide });
   const glass = material("dragon-windows", 0x18252e, .5, .12);
-  const part = (geo, mat, x, y, z, parent = body) => {
+  const part = (geo, mat, x, y, z, parent = boosterBody) => {
     const mesh = new Mesh(geo, mat); mesh.position.set(x, y, z);
     mesh.castShadow = mesh.receiveShadow = true; parent.add(mesh); return mesh;
   };
-  const cylinder = (top, bottom, height, mat, y, parent = body) => part(new CylinderGeometry(top, bottom, height, 48), mat, 0, y, 0, parent);
-  const ring = (radius, y, mat = seam, parent = body) => {
+  const cylinder = (top, bottom, height, mat, y, parent = boosterBody) => part(new CylinderGeometry(top, bottom, height, 48), mat, 0, y, 0, parent);
+  const ring = (radius, y, mat = seam, parent = boosterBody) => {
     const mesh = part(new TorusGeometry(radius, .024, 6, 48), mat, 0, y, 0, parent); mesh.rotation.x = Math.PI / 2; return mesh;
   };
   cylinder(.97, .97, 22, white, -6);
   cylinder(.98, .98, 4, dark, 7);
-  cylinder(.97, .97, 5, white, 11.5);
-  cylinder(1.04, .98, .8, white, 14.4);
-  cylinder(1.13, 1.04, 1.7, white, 15.65);
+  cylinder(.97, .97, 5, white, 11.5, body);
+  cylinder(1.04, .98, .8, white, 14.4, body);
+  cylinder(1.13, 1.04, 1.7, white, 15.65, body);
   cylinder(1.005, 1.005, .68, dark, -17.05);
-  for (const y of [-16.6, -13, -6, 1.8, 4.96, 9.03, 13.98, 14.85, 16.48]) ring(y > 14 ? 1.12 : .979, y);
+  for (const y of [-16.6, -13, -6, 1.8, 4.96, 9.03, 13.98, 14.85, 16.48]) ring(y > 14 ? 1.12 : .979, y, seam, y >= 9 ? body : boosterBody);
   for (const a of [0, Math.PI]) {
     const cover = part(new BoxGeometry(.085, 25.4, .1), dark, Math.sin(a) * .98, -3.8, Math.cos(a) * .98);
     cover.rotation.y = a;
@@ -113,28 +118,35 @@ export function createFalcon9() {
   legShape.moveTo(-.26, -16.95); legShape.lineTo(.28, -16.95);
   legShape.lineTo(.18, -11.6); legShape.quadraticCurveTo(0, -10.5, -.17, -11.7); legShape.closePath();
   const legGeo = new ExtrudeGeometry(legShape, { depth: .12, bevelEnabled: true, bevelSize: .05, bevelThickness: .04, bevelSegments: 1, steps: 1 });
+  legGeo.translate(0, 16.95, 0);
+  const legs = [], fins = [];
   for (let i = 0; i < 4; i++) {
     const a = Math.PI / 4 + i * Math.PI / 2;
-    const leg = new Group(); leg.rotation.y = a; body.add(leg);
-    part(legGeo, dark, 0, 0, .94, leg);
-    const rod = part(new CylinderGeometry(.035, .035, 4.8, 8), steel, 0, -14.35, 1.12, leg); rod.rotation.x = -.028;
+    const leg = new Group(); leg.rotation.y = a; booster.add(leg);
+    const pivot = new Group(); pivot.name = "falcon-landing-leg"; pivot.position.set(0, -16.92, 1.04); leg.add(pivot);
+    part(legGeo, dark, 0, 0, 0, pivot);
+    const foot = part(new BoxGeometry(.65, .12, .55), dark, 0, 6.2, .06, pivot); foot.name = "falcon-landing-foot";
+    const rod = part(new CylinderGeometry(.045, .045, 1, 10), steel, 0, 0, 0, leg);
     const hinge = part(new CylinderGeometry(.17, .17, .5, 16), steel, 0, -16.92, 1.04, leg); hinge.rotation.z = Math.PI / 2;
-    for (let y = -16; y < -12; y += 1) {
-      const pad = part(new TorusGeometry(.08, .014, 4, 12), seam, 0, y, 1.08, leg);
-      pad.scale.y = 1.5;
-    }
+    legs.push({ pivot, foot, rod });
   }
   // Folded lattice grid fins around the black interstage.
   for (let i = 0; i < 4; i++) {
-    const fin = new Group(); fin.rotation.y = Math.PI / 4 + i * Math.PI / 2; body.add(fin);
-    for (const x of [-.32, .32]) part(new BoxGeometry(.055, 1.05, .07), steel, x, 5.55, 1.08, fin);
-    for (const y of [5.02, 6.08]) part(new BoxGeometry(.69, .055, .07), steel, 0, y, 1.08, fin);
+    const holder = new Group(); holder.rotation.y = Math.PI / 4 + i * Math.PI / 2; booster.add(holder);
+    const fin = new Group(); fin.name = "falcon-grid-fin"; fin.position.set(0, 6.2, 1.03); holder.add(fin);
+    for (const x of [-.32, .32]) part(new BoxGeometry(.055, 1.05, .07), steel, x, -.65, .05, fin);
+    for (const y of [-1.18, -.12]) part(new BoxGeometry(.69, .055, .07), steel, 0, y, .05, fin);
     for (let j = -3; j <= 3; j++) {
-      part(new BoxGeometry(.026, 1.03, .05), dark, j * .085, 5.55, 1.08, fin);
-      part(new BoxGeometry(.64, .026, .05), dark, 0, 5.55 + j * .14, 1.08, fin);
+      part(new BoxGeometry(.026, 1.03, .05), dark, j * .085, -.65, .05, fin);
+      part(new BoxGeometry(.64, .026, .05), dark, 0, -.65 + j * .14, .05, fin);
     }
-    const hinge = part(new CylinderGeometry(.12, .12, .7, 12), dark, 0, 6.2, 1.03, fin); hinge.rotation.z = Math.PI / 2;
+    const hinge = part(new CylinderGeometry(.12, .12, .7, 12), dark, 0, 0, 0, fin); hinge.rotation.z = Math.PI / 2;
+    mergeStatic(fin); fins.push(fin);
   }
+  // The second-stage vacuum engine is revealed when the interstage departs.
+  const vacuumProfile = [[.22, .7], [.24, .45], [.4, -.05], [.7, -.8]].map(([r, y]) => new Vector2(r, y));
+  part(new LatheGeometry(vacuumProfile, 32), black, 0, 8.35, 0, body);
+  cylinder(.96, .96, .08, steel, 9.02, body);
   // Octaweb: eight outer Merlin bells and one central engine, with hollow mouths.
   const bellProfile = [[.16, .34], [.17, .12], [.22, -.2], [.3, -.6], [.31, -.65]].map(([r, y]) => new Vector2(r, y));
   const bellGeo = new LatheGeometry(bellProfile, 24);
@@ -148,10 +160,11 @@ export function createFalcon9() {
   }
   // Trunk fins remain on the rocket when the crew capsule separates.
   for (let i = 0; i < 4; i++) {
-    const fin = part(new BoxGeometry(.07, 1.65, .48), white, 0, 15.56, 1.2);
+    const fin = part(new BoxGeometry(.07, 1.65, .48), white, 0, 15.56, 1.2, body);
     const holder = new Group(); holder.rotation.y = i * Math.PI / 2; body.add(holder); holder.add(fin);
   }
   mergeStatic(body);
+  mergeStatic(boosterBody);
 
   const dragon = new Group(); dragon.name = "dragon-capsule"; dragon.position.y = 16.5; root.add(dragon);
   const profile = [[1.12, 0], [1.13, .18], [1.08, .76], [.94, 1.32], [.7, 1.98], [.44, 2.48], [.23, 2.74], [0, 2.83]].map(([r, y]) => new Vector2(r, y));
@@ -174,7 +187,9 @@ export function createFalcon9() {
   const badge = material("dragon-badge", 0xffffff, .1, .5, { map: dragonBadge(), transparent: true, depthWrite: false });
   part(new PlaneGeometry(.62, .31), badge, 0, .37, 1.084, dragon);
   mergeStatic(dragon);
-  root.userData.falcon9 = { dragon, parent: root, position: dragon.position.clone(), released: false, flight: null };
+  root.userData.falcon9 = { dragon, parent: root, position: dragon.position.clone(), released: false, flight: null,
+    booster, legs, fins, boosterReleased: false, recovery: null };
+  setBoosterDeployment(root.userData.falcon9, 0, 0);
   return root;
 }
 
@@ -218,6 +233,109 @@ export function falconState(root) {
   root.traverse(node => { if (node.userData.falcon9) state = node.userData.falcon9; });
   root.userData.falconParts = state;
   return state;
+}
+
+export function setBoosterDeployment(state, legExtension, finExtension) {
+  for (const { pivot, foot, rod } of state.legs) {
+    pivot.rotation.x = legExtension * 2.05;
+    foot.rotation.x = -pivot.rotation.x;
+    const start = new Vector3(0, -12.7, 1.1);
+    const end = new Vector3(0, 5.5, .06).applyAxisAngle(new Vector3(1, 0, 0), pivot.rotation.x).add(pivot.position);
+    rod.position.copy(start).add(end).multiplyScalar(.5);
+    rod.scale.y = start.distanceTo(end);
+    rod.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), end.sub(start).normalize());
+  }
+  for (const fin of state.fins) fin.rotation.x = -finExtension * Math.PI / 2;
+}
+
+function localBounds(root) {
+  root.updateWorldMatrix(true, true);
+  const inverse = root.matrixWorld.clone().invert(), box = new Box3();
+  root.traverse(mesh => {
+    if (!mesh.isMesh) return;
+    mesh.geometry.computeBoundingBox();
+    box.union(mesh.geometry.boundingBox.clone().applyMatrix4(inverse.clone().multiply(mesh.matrixWorld)));
+  });
+  return box;
+}
+
+export function releaseBooster(root, scene, velocity, up, { target, shadows, remote = false } = {}) {
+  const state = falconState(root);
+  if (!state || state.boosterReleased || !target) return false;
+  root.updateWorldMatrix(true, true);
+  state.modelPosition = state.parent.position.clone();
+  state.shadows = shadows;
+  scene.attach(state.booster);
+  const scale = state.booster.getWorldScale(new Vector3()).y;
+  // The foot soles sit below the engines when the four legs are fully open.
+  const clearance = (16.92 - 6.2 * Math.cos(2.05) + .06 * Math.sin(2.05) + .06) * scale;
+  state.recovery = new BoosterRecovery({
+    position: state.booster.position, velocity: velocity.clone().addScaledVector(up, -3),
+    orientation: state.booster.quaternion, up, target, clearance,
+  });
+  state.remote = remote;
+  state.boosterReleased = true;
+  attachRocketExhaust(state.booster, { axis: "y", ignitionKmh: 0 });
+  disposeRocketExhaust(root);
+  const bounds = localBounds(root), center = bounds.getCenter(new Vector3());
+  const worldCenter = root.localToWorld(center.clone());
+  state.parent.position.sub(center);
+  if (!remote) root.position.copy(root.parent.worldToLocal(worldCenter));
+  state.upperClearance = (bounds.max.y - bounds.min.y) / 2;
+  attachRocketExhaust(root, { axis: "y", ignitionKmh: 0 });
+  shadows?.removeVehicle(root); shadows?.addVehicle(root); shadows?.addVehicle(state.booster);
+  return true;
+}
+
+export function updateBooster(root, dt, terrain, { active = true, visible = true, timeWarp = 1 } = {}) {
+  const state = falconState(root), recovery = state?.recovery;
+  if (!recovery) return;
+  state.booster.visible = visible;
+  if (active && !state.remote) {
+    // Refresh the touchdown surface as detailed terrain arrives. The ray
+    // ignores shadow receivers, and samples the actual return target.
+    if (!recovery.landed && Math.floor(recovery.age * 4) !== state.groundProbeAt) {
+      state.groundProbeAt = Math.floor(recovery.age * 4);
+      const ray = new Raycaster(recovery.target.clone().addScaledVector(recovery.up, 3000), recovery.up.clone().negate(), 0, 6000);
+      const hit = terrain && raycastTerrain(ray, terrain)[0];
+      if (hit) recovery.target.copy(hit.point);
+    }
+    recovery.update(dt, timeWarp);
+  }
+  state.booster.position.copy(recovery.position); state.booster.quaternion.copy(recovery.orientation);
+  setBoosterDeployment(state, recovery.legs, recovery.fins);
+  updateRocketExhaust(state.booster, active ? dt : 0, recovery.throttle * 15000, visible && recovery.throttle > .02 && !recovery.landed);
+}
+
+export function boosterSnapshot(root, mapMatrix) {
+  const state = falconState(root), recovery = state?.recovery;
+  if (!recovery) return null;
+  const inverse = mapMatrix.clone().invert();
+  return { position: recovery.position.clone().applyMatrix4(inverse).toArray(),
+    orientation: new Quaternion().setFromRotationMatrix(inverse).multiply(recovery.orientation).toArray(),
+    legs: recovery.legs, fins: recovery.fins, throttle: recovery.throttle, phase: recovery.phase };
+}
+
+export function parseBoosterSnapshot(value) {
+  if (!value || !Array.isArray(value.position) || value.position.length !== 3 || !value.position.every(n => Number.isFinite(n) && Math.abs(n) < 1e9) ||
+      !Array.isArray(value.orientation) || value.orientation.length !== 4 || !value.orientation.every(Number.isFinite) ||
+      ![value.legs, value.fins, value.throttle].every(n => Number.isFinite(n) && n >= 0 && n <= 1) ||
+      !["separation", "boostback", "entry", "landing-burn", "landed", "failed"].includes(value.phase)) return null;
+  const length = Math.hypot(...value.orientation);
+  if (length < .9 || length > 1.1) return null;
+  return { position: [...value.position], orientation: [...value.orientation], legs: value.legs, fins: value.fins, throttle: value.throttle, phase: value.phase };
+}
+
+export function syncBooster(root, scene, snapshot, mapMatrix, shadows) {
+  const state = falconState(root);
+  if (!state || !snapshot) return;
+  const position = new Vector3().fromArray(snapshot.position).applyMatrix4(mapMatrix);
+  const orientation = new Quaternion().setFromRotationMatrix(mapMatrix).multiply(new Quaternion().fromArray(snapshot.orientation).normalize());
+  if (!state.boosterReleased) releaseBooster(root, scene, new Vector3(), new Vector3(0, 1, 0).applyQuaternion(orientation), { target: position, shadows, remote: true });
+  const recovery = state.recovery;
+  recovery.position.copy(position); recovery.orientation.copy(orientation);
+  recovery.legs = snapshot.legs; recovery.fins = snapshot.fins; recovery.throttle = snapshot.throttle;
+  recovery.phase = snapshot.phase; recovery.landed = snapshot.phase === "landed";
 }
 
 export function releaseDragon(root, scene, velocity, up, shadows) {
@@ -270,7 +388,7 @@ export function updateDragon(root, dt, terrain, active, visible = true) {
   dragon.quaternion.multiply(sway);
 }
 
-export function resetFalcon9(root) {
+export function resetDragon(root) {
   const state = falconState(root);
   if (!state?.released) return;
   state.flight?.shadows?.removeVehicle(state.dragon);
@@ -282,10 +400,28 @@ export function resetFalcon9(root) {
   state.dragon.visible = true; state.flight = null; state.released = false;
 }
 
+export function resetFalcon9(root, { restoreEffects = true } = {}) {
+  resetDragon(root);
+  const state = falconState(root);
+  if (!state?.boosterReleased) return;
+  state.shadows?.removeVehicle(state.booster);
+  disposeRocketExhaust(state.booster);
+  disposeRocketExhaust(root);
+  state.parent.add(state.booster);
+  state.booster.position.set(0, 0, 0); state.booster.quaternion.identity(); state.booster.scale.setScalar(1);
+  state.booster.visible = true; state.parent.position.copy(state.modelPosition);
+  state.boosterReleased = false; state.recovery = null; state.groundProbeAt = undefined; state.remote = false;
+  setBoosterDeployment(state, 0, 0);
+  if (restoreEffects) {
+    attachRocketExhaust(root, { axis: "y", ignitionKmh: 0 });
+    state.shadows?.removeVehicle(root); state.shadows?.addVehicle(root);
+  }
+}
+
 export function disposeFalcon9(root) {
   const state = falconState(root);
   if (!state) return;
-  resetFalcon9(root);
+  resetFalcon9(root, { restoreEffects: false });
   disposeModelResources(state.parent);
   delete state.parent.userData.falcon9;
   delete root.userData.falconParts;
