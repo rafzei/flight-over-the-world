@@ -10,12 +10,13 @@ import { AIRLINERS } from "../../shared/aircraftTypes.js";
 export function createAirliner(key = "b738") {
   const spec = AIRLINERS[key];
   if (!spec) throw new Error("Unsupported airliner");
-  const airbus = key === "a320", root = new Group();
+  const airbus = key === "a320" || key === "a321", embraer = key === "e195", root = new Group();
+  const wingScale = embraer ? spec.span / 35.8 : 1;
   root.name = spec.name;
   root.userData.airliner = key;
   const materials = {
     body: new MeshStandardMaterial({ color: 0xf0f3f5, roughness: .36, metalness: .16 }),
-    paint: new MeshStandardMaterial({ color: airbus ? 0x007f9b : 0x164c9d, roughness: .36, metalness: .12 }),
+    paint: new MeshStandardMaterial({ color: embraer ? 0xb94037 : key === "a321" ? 0x3155a5 : airbus ? 0x007f9b : 0x164c9d, roughness: .36, metalness: .12 }),
     glass: new MeshStandardMaterial({ color: 0x142e3e, roughness: .12, metalness: .35 }),
     metal: new MeshStandardMaterial({ color: 0x89969e, roughness: .28, metalness: .7 }),
     intake: new MeshStandardMaterial({ color: 0x1d2931, roughness: .76, metalness: .12 }),
@@ -53,9 +54,10 @@ export function createAirliner(key = "b738") {
   }
 
   // The 737 has the longer pointed radome; the Airbus has a fuller, rounder nose.
-  const rings = airbus
+  let rings = airbus
     ? [[-1,.025],[-.989,.20],[-.967,.41],[-.935,.66],[-.89,.88],[-.83,.985],[-.75,1],[.59,1],[.72,.90],[.83,.67],[.93,.31],[1,.015]]
     : [[-1,.015],[-.985,.105],[-.955,.27],[-.92,.46],[-.875,.70],[-.83,.90],[-.77,.99],[-.73,1],[.57,1],[.72,.89],[.83,.60],[.93,.26],[1,.015]];
+  if (key === "a321") rings = rings.map(([z, r]) => [z < -.5 ? -1 + (z + 1) * 37.57 / spec.length : z > .5 ? 1 - (1 - z) * 37.57 / spec.length : z, r]);
   function bodyAt(z) {
     const t = z / half;
     const index = Math.max(1, rings.findIndex(r => r[0] >= t));
@@ -125,6 +127,7 @@ export function createAirliner(key = "b738") {
     }
   }
   function slab(outline, thickness, vertical = false, yOffset=0) {
+    if (!vertical && embraer) outline = outline.map(([x,z]) => [x * wingScale, z]);
     if(ShapeUtils.isClockWise(outline.map(([x,z])=>new Vector2(x,z)))) outline=[...outline].reverse();
     const p=[],ids=[],count=outline.length;
     const point=([x,z],offset)=>vertical?[offset,x,z]:[x,-.4+Math.abs(x)*.045+offset+yOffset,z];
@@ -134,7 +137,7 @@ export function createAirliner(key = "b738") {
     if(!vertical)for(let i=0;i<ids.length;i+=3)[ids[i],ids[i+2]]=[ids[i+2],ids[i]];
     const g=new BufferGeometry();g.setAttribute("position",new Float32BufferAttribute(p,3));g.setIndex(ids);g.computeVertexNormals();return g;
   }
-  function wingPoint(side,x,z,offset=.13){return [side*x,-.4+x*.045+offset,z];}
+  function wingPoint(side,x,z,offset=.13){return [side*x*wingScale,-.4+x*wingScale*.045+offset,z];}
   function light(position,color,label,size=.09) {
     const geometry=new SphereGeometry(size,8,5), rgb=new Color(color), colors=[];
     for(let i=0;i<geometry.attributes.position.count;i++) colors.push(rgb.r,rgb.g,rgb.b);
@@ -142,12 +145,12 @@ export function createAirliner(key = "b738") {
     features.lights.push({label,position,color});
   }
   // Wing/body fairing, gently blended into the belly, never lower than nacelles.
-  ellipsoid("body",[0,-.85,.7],[radius*1.22,.92,6]);
-  const wingTip=spec.span/2-(airbus?.453:.361);
+  ellipsoid("body",[0,-.85,.7],[radius*1.22,embraer?.65:.92,embraer?4.8:6]);
+  const wingTip=35.8/2-(airbus?.453:.361);
   for(const side of [-1,1]) {
     add(slab([[side*1.3,-4],[side*5,-3],[side*wingTip,4.7],[side*wingTip,6],[side*7,3.4],[side*1.3,5.2]],.22),"body");
     add(slab([[side*.8,half-8],[side*6.8,half-3],[side*7.1,half-1.8],[side*.8,half-3.1]],.15),"body");
-    const tip=add(slab([[.4,4.7],[airbus?2.65:2.6,5.9],[airbus?2.7:2.5,6.6],[.4,6]],.10,true),"paint",side*wingTip);
+    const tip=add(slab([[.4,4.7],[embraer?2.15:airbus?2.65:2.6,5.9],[embraer?2.2:airbus?2.7:2.5,6.6],[.4,6]],.10,true),"paint",side*wingTip*wingScale);
     tip.rotation.z=side*(airbus?-.15:-.12);
     // Polished leading edges, aileron/flap divisions and upper-wing spoilers.
     for(const [a,b] of [[[1.8,-3.85],[5,-2.95]],[[5,-2.95],[17.5,4.5]]]) rod(wingPoint(side,...a),wingPoint(side,...b),.045);
@@ -157,12 +160,12 @@ export function createAirliner(key = "b738") {
       for(let i=0;i<4;i++)rod(wingPoint(side,...outline[i]),wingPoint(side,...outline[(i+1)%4]),.011);
     }
     for(const [x,z] of [[4.2,3.7],[7.8,3.75],[11.2,4.5]]) {
-      ellipsoid("body",[side*x,-.48+x*.045,z],[.18,.23,1.05]); features.flapFairings++;
+      ellipsoid("body",[side*x*wingScale,-.48+x*wingScale*.045,z],[.18,.23,1.05]); features.flapFairings++;
     }
     rod(wingPoint(side,1,half-3.65,.10),wingPoint(side,6.7,half-2.25,.10),.013);
 
-    const engineX=side*5.5, engineZ=airbus?-2.3:-2.9, engineY=-1.55, engineRadius=airbus?1.13:1.02;
-    const engineShape=(r,a)=>[Math.cos(a)*r,airbus?Math.sin(a)*r:Math.max(-.80*r,Math.sin(a)*r)];
+    const engineX=side*(embraer?4.4:5.5), engineZ=embraer?-1.8:airbus?-2.3:-2.9, engineY=embraer?-1.25:-1.55, engineRadius=embraer?.79:airbus?1.13:1.02;
+    const engineShape=(r,a)=>[Math.cos(a)*r,(airbus||embraer)?Math.sin(a)*r:Math.max(-.80*r,Math.sin(a)*r)];
     function nacelle(profile,material) {
       const p=[],ids=[],n=32;
       for(const [z,r] of profile)for(let i=0;i<=n;i++){const [x,y]=engineShape(r,i/n*Math.PI*2);p.push(engineX+x,engineY+y,engineZ+z);}
@@ -189,9 +192,10 @@ export function createAirliner(key = "b738") {
     const join=[];for(let i=0;i<=32;i++){const [x,y]=engineShape(engineRadius*1.019,i/32*Math.PI*2);join.push([engineX+x,engineY+y,engineZ-.4]);}
     for(let i=0;i<join.length-1;i++)rod(join[i],join[i+1],.012);
 
-    const doorZ=[-half+5.1,half-5.25], exitZ=airbus?[-.2,1.0]:[-.65,.6];
+    const doorZ=key === "a321" ? [-half+5.1,-7.3,7.5,half-5.25] : [-half+5.1,half-5.25];
+    const exitZ=key === "a321" ? [] : embraer ? [.1] : airbus?[-.2,1.0]:[-.65,.6];
     for(let z=-half+6.35;z<half-6;z+=.61) {
-      if(exitZ.some(e=>Math.abs(z-e)<.42))continue;
+      if(exitZ.some(e=>Math.abs(z-e)<.42) || doorZ.some(e=>Math.abs(z-e)<.64))continue;
       skinPanel(side,roundedOutline(.48,z,.45,.29,.085));features.cabinWindows++;
     }
     for(const z of doorZ) {
@@ -211,18 +215,18 @@ export function createAirliner(key = "b738") {
       ? [[[.43,.89],[1.06,1.02],[1.07,1.76],[.43,1.82]],[[.43,1.91],[1.07,1.86],[.92,2.38],[.43,2.41]]]
       : [[[.46,.81],[1.10,.93],[1.11,1.56],[.47,1.66]],[[.47,1.75],[1.1,1.66],[.90,2.23],[.47,2.28]]];
     windshield(side,cockpitStart-.22);features.cockpitPanes++;
-    for(const pane of panes){const outline=pane.map(([y,z])=>[y,cockpitStart+z]);skinPanel(side,outline);seam(side,outline,.023,"body");features.cockpitPanes++;}
+    for(const pane of (embraer ? panes.slice(0,1) : panes)){const outline=pane.map(([y,z])=>[y,cockpitStart+z]);skinPanel(side,outline);seam(side,outline,.023,"body");features.cockpitPanes++;}
     seam(side,[[.42,cockpitStart+.2],[.60,cockpitStart+.62]],.017,"intake",false);
     const probe=skin(side,.04,cockpitStart+1.4,.065);rod(probe,[probe[0]+side*.16,probe[1],probe[2]-.48],.018);
     // Subtle unbranded stripe follows the curved lower fuselage.
     const stripe=[];for(let z=-half+5.6;z<=half-5.6;z+=.3)stripe.push(z);
     for(let i=0;i<stripe.length-1;i++)skinPanel(side,[[-.32,stripe[i]],[-.22,stripe[i]],[-.22,stripe[i+1]],[-.32,stripe[i+1]]],"paint");
-    light([side*(wingTip-.06),.47,5.32],side<0?0xff3535:0x48ff9a,side<0?"port-red":"starboard-green");
+    light([side*(wingTip-.06)*wingScale,.47,5.32],side<0?0xff3535:0x48ff9a,side<0?"port-red":"starboard-green");
     light([side*2.25,-.22,-3.74],0xfff4de,"landing-light",.105);
   }
-  add(slab([[.5,half-8],[airbus?8.8:9.5,half-4.6],[airbus?9:9.6,half-2.9],[.6,half-.9]],.25,true),"paint");
+  add(slab([[.5,half-8],[embraer?7.25:airbus?8.8:9.5,half-4.6],[embraer?7.5:airbus?9:9.6,half-2.9],[.6,half-.9]],.25,true),"paint");
   for(const side of [-1,1]) {
-    rod([side*.139,1.15,half-1.6],[side*.139,airbus?8.45:9.0,half-3.2],.018,"intake");
+    rod([side*.139,1.15,half-1.6],[side*.139,embraer?7.0:airbus?8.45:9.0,half-3.2],.018,"intake");
     patch([[side*.143,4.6,half-5.05],[side*.143,6.1,half-4.47],[side*.143,6.1,half-3.48],[side*.143,4.6,half-3.06]],"body",side<0);
   }
   for(const z of [-7,5])add(slab([[radius-.03,z-.3],[radius+.46,z-.07],[radius+.36,z+.28],[radius-.03,z+.36]],.055,true),"body");

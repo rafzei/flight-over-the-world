@@ -67,6 +67,8 @@ import { createVehicleCollisionDetector, raycastTerrain } from "./game/vehicleCo
 import { createCarousel } from "./game/menuPreview.js";
 import { createSky } from "./game/sky.js";
 import { solarPosition, localSolarState, createTerrainDayNight } from "./game/dayNight.js";
+import { sampleWeather } from "./game/weather.js";
+import { WeatherVisuals, createWeatherHud } from "./game/weatherVisuals.js";
 import { createFlightClock } from "./game/flightClock.js";
 import { SpaceScene, SPACE_RENDER_SCALE } from "./game/spaceScene.js";
 import { SPACE_CONSTANTS, moonPositionECEF } from "./game/spacePhysics.js";
@@ -244,6 +246,16 @@ const PLANES = {
     cruise: 225, boost: 265, brake: 68, cam: [0, 12, 54],
     name: "Airbus A320", desc: "Twin-engine airliner – cruise 810, max 950 km/h", sound: "jet",
   },
+  e195: {
+    create: () => createAirliner("e195"), wingspan: 38.66,
+    cruise: 225, boost: 242, brake: 62, cam: [0, 11, 53],
+    name: "Embraer E195LR", desc: "Regional jet · CF34 engines · cruise 810 km/h", sound: "jet",
+  },
+  a321: {
+    create: () => createAirliner("a321"), wingspan: 44.51,
+    cruise: 230, boost: 265, brake: 72, cam: [0, 13, 61],
+    name: "Airbus A321", desc: "Stretched Airbus · four doors per side · cruise 830 km/h", sound: "jet",
+  },
   jet: {
     file: asset("models/jet.glb"),
     wingspan: 10,
@@ -299,7 +311,7 @@ const PLANES = {
     exhaustOptions: { axis: "y", ignitionKmh: 0 },
   },
 };
-const PLANE_ORDER = ["pa28", "sailplane", "q400", "citation", "b738", "a320", "jet", "rocket", "drone", "falcon9", "balloon"];
+const PLANE_ORDER = ["pa28", "sailplane", "q400", "citation", "b738", "e195", "a321", "a320", "jet", "rocket", "drone", "falcon9", "balloon"];
 
 const HOME_TIME = 600; // 10 min na dolot do domu
 const GUESS_TIME = 60; // 1 min na rozpoznanie terenu
@@ -317,6 +329,8 @@ const earthCentreWorld = new Vector3();
 const terrainDayNight = createTerrainDayNight();
 const flightClock = createFlightClock(document.getElementById('flight-clock'));
 let solar = solarPosition(), localSun;
+let weather, weatherVisuals;
+const weatherHud = createWeatherHud(document.getElementById("flight-weather"));
 let spaceTime = 0;
 let liveTraffic;
 const airportRunways = new AirportRunways();
@@ -2805,7 +2819,8 @@ async function init() {
 
     // niebo — proceduralna kopuła (gradient + słońce + chmury FBM),
     // horyzont = dokładnie kolor mgły, więc nie ma przerwy ani poświaty
-    sky = createSky(0x9dd0ea, { physicalBodies: true });
+    sky = createSky(0x9dd0ea, { physicalBodies: true, weatherClouds: true });
+    weatherVisuals = new WeatherVisuals(scene);
     sky.mesh.traverse(o => o.layers.set(1));
     scene.add(sky.mesh);
     spaceScene = new SpaceScene(scene, renderer.domElement, { baseUrl: import.meta.env.BASE_URL, simple: isMobile });
@@ -3238,20 +3253,21 @@ function updateFlightPhysics(dt) {
     if (canCrash && landingSystem?.gear && landingSystem.grounded) {
       if (landingSystem.runway.isGrass && grassLanding.reason) { flightPosition(planePos); crash(planePos); return; }
       const result = plane.isSailplane && sailplaneTow.attached ? sailplaneTow.step(step, plane, landingSystem) : landingSystem.roll(plane, step, ctrl);
+      plane.weatherVertical = 0;
       left -= step;
       if (result.crash) { flightPosition(planePos); crash(planePos); return; }
       continue;
     }
     const before = landingSystem?.gear ? flightPose(plane) : null;
     if (canCrash) flightPosition(_flightFrom);
-    if (plane.isSailplane && sailplaneTow.attached) sailplaneTow.step(step, plane, landingSystem);
+    if (plane.isSailplane && sailplaneTow.attached) { sailplaneTow.step(step, plane, landingSystem); plane.weatherVertical = 0; }
     else plane.update(step, ctrl);
     left -= step;
     if (canCrash) {
       if (before) {
         const result = landingSystem.resolve(plane, before, step);
         if (result.crash) { flightPosition(planePos); crash(planePos); return; }
-        if (result.handled) continue;
+        if (result.handled) { plane.weatherVertical = 0; continue; }
       }
       flightPosition(_flightTo);
       WGS84_ELLIPSOID.getCartographicToNormal(plane.lat, plane.lon, _flightUp);
@@ -4521,6 +4537,7 @@ window.__foeDebug = () => ({
   spaceSky: sky?.uniforms.uSpace.value,
   daylight: localSun ? { ...localSun, utc: new Date(solar.utcMs).toISOString(), siderealAngle: solar.siderealAngle } : null,
   flightClock: flightClock.diagnostics(),
+  weather: weather ? { north: weather.north, east: weather.east, up: weather.up, from: weather.from, speed: weather.speed, cloudBase: weather.cloudBase, nearest: weather.nearest, groundSpeed: plane.groundSpeed, vario: plane.verticalSpeed, ...weatherVisuals?.diagnostics() } : null,
   balloon: plane?.isBalloon ? { heat: plane.heat, burner: plane.throttle, climbMps: plane.verticalSpeed, northMps: plane.northSpeed, eastMps: plane.eastSpeed } : null,
   landing: plane ? landingSystem.diagnostics(plane) : null,
   sailplane: plane?.isSailplane ? { grassMap: grassFields.status, grass: !!landingSystem.runway.isGrass, towPhase: sailplaneTow.phase, tow: sailplaneTow.snapshot(), reason: sailplaneTow.reason } : null,
@@ -4622,6 +4639,9 @@ function tickFrame() {
   ctrl.wheelBrake = keys.has("b") || landingBrake;
   landingSystem.gear?.update(flying ? dt : 0, plane.speed, landingSystem.grounded, landingSystem.touchdown?.sink || 0);
 
+  solar = solarPosition(Date.now());
+  weather = sampleWeather({ lat: plane.lat, lon: plane.lon, height: plane.height, ground: groundAlt, utcMs: solar.utcMs, solar });
+  ctrl.weather = weather;
   if (flying) {
     if (sailplaneTow.attached && landingSystem.grounded && ctrl.wheelBrake) sailplaneTow.release(plane, landingSystem);
     sailplaneTow.update(dt, plane, landingSystem);
@@ -4630,7 +4650,10 @@ function tickFrame() {
   }
   if (plane.isLunar) spaceTime = plane.simulationTime;
   else if (flying) spaceTime += dt;
-  if ((!menuOpen || awaitingSnap) && plane.height < 100000) airportRunways.updateVisuals(plane);
+  if ((!menuOpen || awaitingSnap) && plane.height < 100000) airportRunways.updateVisuals(plane, {
+    solar, camera, pixelRatio: renderer.getPixelRatio(), height: renderer.domElement.clientHeight,
+    fogDensity: scene.fog?.density ?? 0, time: clock.elapsedTime,
+  });
   const landingPanel = document.getElementById("landing-panel");
   if (landingPanel) {
     landingPanel.hidden = menuOpen || paused || guessOpen || leaveOpen || freeMap.open || !landingSystem.gear || (!plane.isSailplane && !nearRunway && mode !== "landing");
@@ -4880,7 +4903,6 @@ function tickFrame() {
   }
   sky.mesh.position.copy(camPos);
   sky.mesh.quaternion.copy(skyQuat);
-  solar = solarPosition(Date.now());
   localSun = localSolarState(solar, plane.lat, plane.lon, plane.height);
   sky.update(plane.height, clock.elapsedTime, scene.fog, localSun);
   moonPositionECEF(spaceTime, spaceMoon);
@@ -4915,8 +4937,13 @@ function tickFrame() {
   sun.castShadow = !isMobile && !inSpace && localSun.sunlight > .01;
   scene.environmentIntensity = inSpace ? .08 : localSun.environmentIntensity;
   terrainDayNight.update(physicalSunWorld, earthCentreWorld.setFromMatrixPosition(tiles.group.matrixWorld));
+  terrainDayNight.setAirportLights(plane.height < 100000 ? airportRunways.lightRegions : []);
   flightClock.update({ utcMs: solar.utcMs, latDeg: plane.latDeg, lonDeg: plane.lonDeg, phase: localSun.phase, inSpace,
     hidden: menuOpen || guessOpen || leaveOpen || freeMap.open });
+  weatherHud.update(weather, plane, { hidden: plane.isLunar || plane.height > 24000, grounded: landingSystem.grounded, towing: sailplaneTow.attached });
+  weatherVisuals.update(weather, plane, camera, tiles.group.matrixWorld, {
+    hidden: menuOpen || spaceScene.overview || plane.height > 24000, markers: weatherHud.markers,
+  });
   sun.target.position.copy(planePos);
   sun.target.updateMatrixWorld();
 

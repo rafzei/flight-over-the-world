@@ -1,4 +1,4 @@
-import { Vector3 } from 'three';
+import { Vector3, Vector4 } from 'three';
 
 const RAD = Math.PI / 180;
 const DAY_MS = 86400000;
@@ -51,9 +51,18 @@ export function localSolarState(solar, lat, lon, altitudeM = 0) {
 // Photogrammetry is usually unlit, with daylight baked into its photographs.
 // Shade it geographically before fog/tone mapping, including newly loaded tiles.
 export function createTerrainDayNight() {
-  const uniforms = { daylightSun: { value: new Vector3(1, 0, 0) }, earthCentre: { value: new Vector3() } };
+  const uniforms = { daylightSun: { value: new Vector3(1, 0, 0) }, earthCentre: { value: new Vector3() },
+    airportLightCount: { value: 0 }, airportLightStart: { value: Array.from({ length: 8 }, () => new Vector4()) },
+    airportLightEnd: { value: Array.from({ length: 8 }, () => new Vector4()) } };
   const patched = new WeakSet();
   return {
+    setAirportLights(regions = []) {
+      uniforms.airportLightCount.value = Math.min(8, regions.length);
+      for (let i = 0; i < uniforms.airportLightCount.value; i++) {
+        uniforms.airportLightStart.value[i].copy(regions[i].start);
+        uniforms.airportLightEnd.value[i].copy(regions[i].end);
+      }
+    },
     update(sunWorld, earthCentre) {
       uniforms.daylightSun.value.copy(sunWorld);
       uniforms.earthCentre.value.copy(earthCentre);
@@ -70,15 +79,31 @@ export function createTerrainDayNight() {
             Object.assign(shader.uniforms, uniforms);
             shader.vertexShader = 'varying vec3 vDayNightPosition;\n' + shader.vertexShader;
             shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvDayNightPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-            shader.fragmentShader = 'uniform vec3 daylightSun;\nuniform vec3 earthCentre;\nvarying vec3 vDayNightPosition;\n' + shader.fragmentShader;
+            shader.fragmentShader = `uniform vec3 daylightSun;
+              uniform vec3 earthCentre;
+              uniform int airportLightCount;
+              uniform vec4 airportLightStart[8];
+              uniform vec4 airportLightEnd[8];
+              varying vec3 vDayNightPosition;\n` + shader.fragmentShader;
             shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `
               float solarHeight = dot(normalize(vDayNightPosition - earthCentre), daylightSun);
               float day = smoothstep(-0.139173, 0.104528, solarHeight);
-              outgoingLight *= mix(vec3(0.018, 0.027, 0.055), vec3(1.0), day);
+              float airportGlow = 0.0;
+              for (int i = 0; i < 8; i++) {
+                if (i >= airportLightCount) break;
+                vec3 lightAxis = airportLightEnd[i].xyz - airportLightStart[i].xyz;
+                vec3 delta = vDayNightPosition - airportLightStart[i].xyz;
+                float along = clamp(dot(delta, lightAxis) / max(1.0, dot(lightAxis, lightAxis)), 0.0, 1.0);
+                float distanceToLight = length(delta - along * lightAxis);
+                float pool = 1.0 - smoothstep(airportLightStart[i].w * .2, airportLightStart[i].w, distanceToLight);
+                airportGlow = max(airportGlow, pool * airportLightEnd[i].w);
+              }
+              vec3 naturalLight = mix(vec3(0.018, 0.027, 0.055), vec3(1.0), day);
+              outgoingLight *= mix(naturalLight, vec3(.52, .46, .32), airportGlow * (1.0 - day));
               #include <opaque_fragment>
             `);
           };
-          material.customProgramCacheKey = () => `${cacheKey}|earth-day-night-v1`;
+          material.customProgramCacheKey = () => `${cacheKey}|earth-day-night-airports-v2`;
           material.needsUpdate = true;
         }
       });

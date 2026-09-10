@@ -240,6 +240,11 @@
         <div class="flight-clock-face"><time>--:--:--</time><span data-clock-phase>Live</span></div>
         <div data-clock-zone></div>
         <div data-clock-detail></div>
+        <details id="flight-weather">
+          <summary><span data-wind>Wind</span><span data-vario>Vario</span></summary>
+          <div data-weather-details></div>
+          <label><input type="checkbox"> Show thermals</label>
+        </details>
       </section>
       <section id="space-panel" aria-label="Space flight" hidden>
         <strong id="space-status">Earth–Moon flight</strong>
@@ -284,7 +289,7 @@
         <details>
           <summary>Traffic details</summary>
           <label>Source <select id="traffic-source"><option value="live">OpenSky live</option><option value="replay">Synthetic replay</option></select></label>
-          <label><input id="traffic-prediction" type="checkbox" checked /> Predict movement</label>
+          <label><input id="traffic-prediction" type="checkbox" checked /> Smooth movement and predict gaps</label>
           <pre id="traffic-details"></pre>
           <a href="https://opensky-network.org/" target="_blank" rel="noopener">Data: OpenSky Network</a>
           <a href="https://www.adsbdb.com/" target="_blank" rel="noopener">Aircraft types: adsbdb</a>

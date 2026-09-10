@@ -74,6 +74,11 @@ test("staging preserves the visible pose, detaches engines, deploys feet onto re
   assert(state.dragon.getWorldPosition(new Vector3()).distanceTo(dragonPosition) < 1e-7);
   assert(engine.getWorldPosition(new Vector3()).distanceTo(enginePosition) < 1e-7);
   assert(state.upperClearance > 4 && state.upperClearance < 8);
+  for (const vehicle of [r.root, state.booster]) {
+    const exhaust = vehicle.getObjectByName("rocket-exhaust");
+    assert(Math.abs(exhaust.position.x) < .1 && Math.abs(exhaust.position.z) < .1);
+    assert(exhaust.position.y < 0 && exhaust.position.y > -25, "exhaust attaches to the local engine, even at Earth coordinates");
+  }
   assert(!releaseBooster(r.root, r.scene, new Vector3(), r.up, { target: r.target }));
   const frozen = state.recovery.position.clone();
   updateBooster(r.root, 5, r.ground, { active: false, visible: false });

@@ -1,3 +1,4 @@
+import { advanceAirMotion } from "./weather.js";
 import {
   BoxGeometry, BufferGeometry, CylinderGeometry, Float32BufferAttribute,
   Group, LatheGeometry, MathUtils, Mesh, MeshStandardMaterial, SphereGeometry, Vector2, Vector3,
@@ -119,8 +120,6 @@ export class SailplaneController extends PlaneController {
     this.verticalSpeed = speed * Math.sin(glideAngle);
     this.heading -= 9.81 * Math.tan(this.roll) / Math.max(12, speed) * dt;
     const horizontal = speed * Math.cos(glideAngle);
-    this.lat = MathUtils.clamp(this.lat + Math.cos(this.heading) * horizontal * dt / 6378137, -Math.PI / 2 + 1e-6, Math.PI / 2 - 1e-6);
-    this.lon += Math.sin(this.heading) * horizontal * dt / (6378137 * Math.max(1e-6, Math.cos(this.lat)));
-    this.height += this.verticalSpeed * dt;
+    advanceAirMotion(this, dt, Math.cos(this.heading)*horizontal, Math.sin(this.heading)*horizontal, this.verticalSpeed, ctrl.weather);
   }
 }

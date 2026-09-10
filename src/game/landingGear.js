@@ -1,6 +1,6 @@
 import { Box3, CylinderGeometry, Group, Mesh, MeshStandardMaterial, Raycaster, Vector3 } from "three";
 
-export const LANDING_SPEEDS = Object.freeze({ pa28:38,sailplane:28,q400:58,citation:60,b738:72,a320:70,jet:80 });
+export const LANDING_SPEEDS = Object.freeze({ pa28:38,sailplane:28,q400:58,citation:60,b738:72,a320:70,a321:73,e195:64,jet:80 });
 
 export function attachLandingGear(wrapper, model, key) {
   if(!LANDING_SPEEDS[key])return null;
@@ -12,7 +12,7 @@ export function attachLandingGear(wrapper, model, key) {
   const rubber=new MeshStandardMaterial({color:0x15181b,roughness:.94});rubber.name='landing-rubber';
   const metal=new MeshStandardMaterial({color:0xafb9c0,metalness:.7,roughness:.3});metal.name='landing-metal';
   const fixed=existing.length===3||(key==='sailplane'&&existing.length===2);
-  const radius=(key==='b738'||key==='a320') ? .55 : Math.max(.18,size.z*.022);
+  const radius=['b738','a320','a321'].includes(key) ? .55 : key==='e195' ? .45 : Math.max(.18,size.z*.022);
   const legLength=Math.max(.7,size.y*.15), bottom=box.min.y-legLength-radius;
   const wheels=fixed?existing.map(w=>({name:key==='sailplane'?w.name:w.name==='roueA'?'nose':'main',base:w.point,meshes:[]})):
     [{name:'main',base:new Vector3(-size.x*.115,bottom,size.z*.06),meshes:[]},{name:'main',base:new Vector3(size.x*.115,bottom,size.z*.06),meshes:[]},{name:'nose',base:new Vector3(0,bottom,-size.z*.34),meshes:[]}];

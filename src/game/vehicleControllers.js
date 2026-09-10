@@ -1,3 +1,4 @@
+import { beginAirMotion, advanceAirMotion } from "./weather.js";
 import { Euler, MathUtils, Vector3 } from "three";
 import { PlaneController, HIGH_SPEED_CONTROL_PENALTY } from "./plane.js";
 import { LunarController } from "./lunarController.js";
@@ -25,6 +26,8 @@ export class DroneController extends PlaneController {
   }
 
   update(dt, ctrl) {
+    if (!(dt > 0)) return;
+    beginAirMotion(this);
     const lever = Number.isFinite(ctrl.throttle) ? MathUtils.clamp(ctrl.throttle, 0, 1) : this.cruiseT;
     this.throttle += (lever - this.throttle) * blend(5, dt);
     const yawAuthority = 1.2 - .45 * this.speed / this.boost * HIGH_SPEED_CONTROL_PENALTY;
@@ -48,7 +51,7 @@ export class DroneController extends PlaneController {
     this.speed = Math.hypot(this.northSpeed, this.eastSpeed);
     this.roll += (-ctrl.roll * .32 - this.roll) * blend(7, dt);
     this.pitch += (-this.speed / this.boost * .22 + ctrl.pitch * .12 - this.pitch) * blend(5, dt);
-    integrate(this, dt, this.northSpeed, this.eastSpeed, this.verticalSpeed);
+    advanceAirMotion(this, dt, this.northSpeed, this.eastSpeed, this.verticalSpeed, ctrl.weather);
   }
 }
 

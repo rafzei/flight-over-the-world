@@ -43,11 +43,12 @@ export class TrafficSpheres {
       earthPosition(sample.latitudeDeg * Math.PI / 180, sample.longitudeDeg * Math.PI / 180, sample.altitudeM, mapMatrix, this.point);
       const distance = camera.position.distanceTo(this.point);
       if (distance > range || hiddenByEarth(camera.position, this.point, this.inverse)) continue;
-      const visual = aircraftVisual(sample.aircraft?.typeCode);
+      const visual = aircraftVisual(sample.aircraft?.typeCode, sample.aircraft?.modelName);
       const radius = markerRadius(distance, camera.fov, viewportHeight) * Math.sqrt(sample.freshness);
       const spec = visual ? AIRLINERS[visual.model] : null;
       const metersPerPixel = 2 * distance * Math.tan(camera.fov * Math.PI / 360) / Math.max(1, viewportHeight);
-      const modelScale = spec ? Math.min(12, Math.max(1, 18 * metersPerPixel / spec.span)) * Math.sqrt(sample.freshness) : 1;
+      const groundLimit = sample.approach?.runway ? Math.max(1, (sample.altitudeM - sample.approach.runway.elevation) / 30) : 12;
+      const modelScale = spec ? Math.min(12, groundLimit, Math.max(1, 18 * metersPerPixel / spec.span)) * Math.sqrt(sample.freshness) : 1;
       this.sphere.set(this.point, spec ? Math.max(radius, Math.hypot(visual.length, spec.span, 14) * modelScale / 2) : radius);
       if (!this.frustum.intersectsSphere(this.sphere)) continue;
       candidates.push({ sample, distance, radius, visual, modelScale, position: this.point.clone() });
@@ -56,7 +57,7 @@ export class TrafficSpheres {
     this.visible = candidates.slice(0, this.limit);
     // Camera-relative instance coordinates preserve float precision at Earth-scale positions.
     this.mesh.position.copy(camera.position);
-    const counts = { b738: 0, a320: 0 }; let spheres = 0;
+    const counts = Object.fromEntries(Array.from(this.airliners.keys(), key => [key, 0])); let spheres = 0;
     for (const parts of this.airliners.values()) for (const part of parts) part.position.copy(camera.position);
     for (const item of this.visible) {
       this.relative.subVectors(item.position, camera.position);
@@ -66,7 +67,8 @@ export class TrafficSpheres {
         const scale = item.modelScale;
         const heading = (sample.trueTrackDeg ?? 0) * Math.PI / 180;
         const pitch = Math.atan2(sample.verticalRateMps ?? 0, Math.max(1, sample.velocityMps ?? 1));
-        WGS84_ELLIPSOID.getObjectFrame(sample.latitudeDeg*Math.PI/180, sample.longitudeDeg*Math.PI/180, sample.altitudeM, heading, pitch, 0, this.matrix, CAMERA_FRAME);
+        const bank = (sample.bankDeg ?? 0) * Math.PI / 180;
+        WGS84_ELLIPSOID.getObjectFrame(sample.latitudeDeg*Math.PI/180, sample.longitudeDeg*Math.PI/180, sample.altitudeM, heading, pitch, bank, this.matrix, CAMERA_FRAME);
         this.matrix.premultiply(mapMatrix).setPosition(this.relative).scale(new Vector3(scale, scale, scale * item.visual.length / spec.length));
         const index = counts[item.visual.model]++;
         for (const part of this.airliners.get(item.visual.model)) part.setMatrixAt(index, this.matrix);

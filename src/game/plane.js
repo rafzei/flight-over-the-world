@@ -1,3 +1,4 @@
+import { beginAirMotion, advanceAirMotion } from "./weather.js";
 import {
   Group,
   Mesh,
@@ -171,6 +172,8 @@ export class PlaneController {
   }
 
   update(dt, ctrl) {
+    if (!(dt > 0)) return;
+    beginAirMotion(this);
     const speedRatio = Math.max(1, this.speed / HIGH_SPEED_HANDLING);
     const rollAuthority = MathUtils.lerp(1, 1 / Math.sqrt(speedRatio), HIGH_SPEED_CONTROL_PENALTY);
     const pitchAuthority = MathUtils.lerp(1, 1 / Math.pow(speedRatio, 0.75), HIGH_SPEED_CONTROL_PENALTY);
@@ -213,9 +216,7 @@ export class PlaneController {
     const vN = Math.cos(this.heading) * vH;
     const vE = Math.sin(this.heading) * vH;
 
-    this.lat += (vN * dt) / R_EARTH;
-    this.lon += (vE * dt) / (R_EARTH * Math.cos(this.lat));
-    this.height += climb * dt;
+    advanceAirMotion(this, dt, vN, vE, climb, ctrl.weather);
   }
 
   get latDeg() {

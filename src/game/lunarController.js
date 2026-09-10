@@ -24,7 +24,7 @@ function firstSphereContact(a, b, radius) {
 }
 
 // Continuous thrust with unlimited propellant is an explicitly assisted game
-// spacecraft, not a simulation of Falcon 9 staging, fuel or lunar capability.
+// spacecraft, not a simulation of Falcon 9 fuel use or real lunar capability.
 // Gravity, inertia, body distances, rotation and elapsed time remain physical.
 export class LunarController extends PlaneController {
   constructor(...args) {

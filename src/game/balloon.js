@@ -1,3 +1,4 @@
+import { advanceAirMotion } from "./weather.js";
 import {
   BoxGeometry, CatmullRomCurve3, Color, ConeGeometry, CylinderGeometry, DoubleSide,
   Float32BufferAttribute, Group, LatheGeometry, MathUtils, Mesh, MeshBasicMaterial,
@@ -151,17 +152,14 @@ export class BalloonController extends PlaneController {
     this.heat += (this.throttle - this.heat) * blend(.12);
     const neutralHeat = .5 + Math.max(0, this.height - 2500) / 18000;
     const targetClimb = MathUtils.clamp((this.heat - neutralHeat) * 9, -4.5, 4.5);
-    this.verticalSpeed += (targetClimb - this.verticalSpeed) * blend(.45);
-    const wind = balloonWind(this.lat, this.lon, this.height);
+    this.verticalSpeed += (targetClimb + (ctrl.weather?.up ?? 0) - this.verticalSpeed) * blend(.45);
+    const wind = ctrl.weather ?? balloonWind(this.lat, this.lon, this.height);
     this.northSpeed += (wind.north - this.northSpeed) * blend(.35);
     this.eastSpeed += (wind.east - this.eastSpeed) * blend(.35);
     this.heading += (ctrl.roll || 0) * .3 * dt;
     this.pitch = Math.sin(this.elapsed * .55) * .009;
     this.roll = Math.sin(this.elapsed * .43) * .012;
-    this.lat = MathUtils.clamp(this.lat + this.northSpeed * dt / 6378137, -Math.PI / 2 + 1e-6, Math.PI / 2 - 1e-6);
-    this.lon += this.eastSpeed * dt / (6378137 * Math.max(1e-6, Math.cos(this.lat)));
-    this.lon = ((this.lon + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
-    this.height += this.verticalSpeed * dt;
+    advanceAirMotion(this, dt, this.northSpeed, this.eastSpeed, this.verticalSpeed);
     this.speed = Math.hypot(this.northSpeed, this.eastSpeed);
   }
 }

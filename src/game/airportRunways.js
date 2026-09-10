@@ -12,6 +12,9 @@ export class AirportRunways {
     this.approaches = this.runways.flatMap(r => r.directions);
     this.byId = new Map(this.approaches.map(r => [r.definition.id, r]));
     this.visuals = new Map();
+    this.lightRegions = [];
+    this.beacons = new Map();
+    for (const runway of this.runways) if (!this.beacons.has(runway.data.airportId)) this.beacons.set(runway.data.airportId, runway);
     this.scene = null;
     this.mapRoot = null;
   }
@@ -39,20 +42,25 @@ export class AirportRunways {
     }
     return best;
   }
-  updateVisuals(plane) {
+  updateVisuals(plane, lighting = {}) {
     if (!this.scene) return;
     const visible = new Set(this.nearby(plane));
     for (const runway of visible) {
       let visual = this.visuals.get(runway);
       if (!visual) {
-        visual = createRunwayVisual(this.scene, runway, this.mapRoot);
+        visual = createRunwayVisual(this.scene, runway, this.mapRoot, { beacon: this.beacons.get(runway.data.airportId) === runway });
         this.visuals.set(runway, visual);
       }
-      visual.update();
+      visual.update(lighting);
     }
     for (const [runway, visual] of this.visuals) if (!visible.has(runway)) {
       visual.dispose(); this.visuals.delete(runway);
     }
+    // Only nearby airport footprints reach the terrain shader's fixed budget.
+    this.lightRegions = [...visible].sort((a, b) => {
+      const distance = r => Math.hypot((r.data.lat * DEG - plane.lat), (r.data.lon * DEG - plane.lon) * Math.cos(plane.lat));
+      return distance(a) - distance(b);
+    }).slice(0, 8).map(runway => this.visuals.get(runway).lighting.region());
   }
-  dispose() { for (const visual of this.visuals.values()) visual.dispose(); this.visuals.clear(); }
+  dispose() { for (const visual of this.visuals.values()) visual.dispose(); this.visuals.clear(); this.lightRegions = []; }
 }

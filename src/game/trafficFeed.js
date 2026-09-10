@@ -8,8 +8,12 @@ export class TrafficFeed {
     this.active = false; this.generation = 0; this.timer = null; this.controller = null;
     this.view = null; this.requestView = null; this.lastStarted = -Infinity; this.status = "disabled";
     this.serverBase = wallNow() / 1000; this.monotonicBase = now(); this.snapshot = null;
+    this.clockDrift = 0; this.synchronized = false;
   }
-  serverTime() { return this.serverBase + (this.now() - this.monotonicBase) / 1000; }
+  serverTime() {
+    const elapsed = Math.max(0, (this.now() - this.monotonicBase) / 1000);
+    return this.serverBase + elapsed + Math.sign(this.clockDrift) * Math.min(Math.abs(this.clockDrift), elapsed * .1);
+  }
   setView(view) {
     this.view = view;
     if (this.active && this.requestView && distanceM(view, this.requestView) > 40_000) {
@@ -29,6 +33,7 @@ export class TrafficFeed {
     this.clearTimer(this.timer); this.timer = null;
     this.controller?.abort(); this.controller = null;
     this.requestView = null; this.snapshot = null; this.onReset();
+    this.synchronized = false;
     this.status = this.active ? "loading" : "disabled";
   }
   schedule(ms) {
@@ -49,8 +54,12 @@ export class TrafficFeed {
       if (finite(data.nextPollAfterMs)) wait = Math.max(1000, Math.min(86_400_000, data.nextPollAfterMs));
       if (!response.ok) { this.status = response.status === 429 ? "rate-limited" : "unavailable"; return; }
       if (data.schemaVersion !== 1 || !finite(data.serverTime) || !Array.isArray(data.aircraft) || data.aircraft.length > 10_000) throw new Error("Invalid traffic data");
-      this.serverBase = data.serverTime + Math.min(2, (this.now() - this.lastStarted) / 2000);
+      const observedTime = data.serverTime + Math.min(2, (this.now() - this.lastStarted) / 2000);
+      const currentTime = this.serverTime();
+      this.serverBase = this.synchronized ? currentTime : observedTime;
+      this.clockDrift = this.synchronized ? observedTime - currentTime : 0;
       this.monotonicBase = this.now();
+      this.synchronized = true;
       this.snapshot = data; this.status = data.status;
       this.onSnapshot(data, this.serverTime());
     } catch {

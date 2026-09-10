@@ -1,6 +1,8 @@
-import { BoxGeometry, CanvasTexture, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Matrix4, PlaneGeometry, Vector3 } from 'three';
+import { CanvasTexture, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Matrix4, PlaneGeometry, Vector3 } from 'three';
 import { CAMERA_FRAME, WGS84_ELLIPSOID } from '3d-tiles-renderer';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { createRunwayLighting, runwayNightStrength } from './runwayLighting.js';
+import { localSolarState } from './dayNight.js';
 
 const DEG = Math.PI / 180;
 
@@ -97,17 +99,14 @@ export class Runway extends RunwayFrame {
   }
 }
 
-export function createRunwayVisual(scene, runway, mapRoot) {
+export function createRunwayVisual(scene, runway, mapRoot, lightingOptions) {
   const root = new Group();
   root.name = runway.data.id;
   root.matrixAutoUpdate = false;
   scene.add(root);
-  const asphalt = new MeshStandardMaterial({ color: 0x3b4144, roughness: .96 });
+  const asphalt = new MeshStandardMaterial({ color: 0x3b4144, roughness: .96, emissive: 0x344451, emissiveIntensity: 0 });
   const white = new MeshBasicMaterial({ color: 0xf5f0dc });
-  const green = new MeshBasicMaterial({ color: 0x72ff9a });
-  const red = new MeshBasicMaterial({ color: 0xff3b28 });
-  const light = new MeshBasicMaterial({ color: 0xffebae });
-  const textures = [], materials = [asphalt, white, green, red, light];
+  const textures = [], materials = [asphalt, white];
   const d = runway.data;
   function rectangle(x, along, width, length, material = white, y = .025, reverse = false) {
     const mesh = new Mesh(new PlaneGeometry(width, length), material);
@@ -130,10 +129,6 @@ export function createRunwayVisual(scene, runway, mapRoot) {
       for (let i = 0; i < count; i++) rectangle(side * (d.width * .08 + i * d.width * .36 / count), threshold + thresholdInset, Math.max(.5, d.width * .025), stripeLength, white, .025, reverse);
       rectangle(side * d.width * .21, threshold + runway.directions[end].definition.aimingPoint, d.width * .09, 35 * scale, white, .025, reverse);
     }
-    if (d.lighted) for (let x = -d.width / 2 + 2; x < d.width / 2; x += 3) {
-      rectangle(x, threshold, .8, .8, green, .05, reverse);
-      rectangle(x, d.length - 2, .8, .8, red, .05, reverse);
-    }
     const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#f5f0dc'; ctx.font = 'bold 130px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -141,10 +136,6 @@ export function createRunwayVisual(scene, runway, mapRoot) {
     const texture = new CanvasTexture(canvas); textures.push(texture);
     const material = new MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false }); materials.push(material);
     rectangle(0, threshold + 80 * scale, Math.min(16, d.width * .45), 24 * scale, material, .04, reverse);
-  }
-  if (d.lighted) for (const side of [-1, 1]) for (let along = 0; along <= d.length; along += 60) {
-    const bulb = new Mesh(new BoxGeometry(.5, .22, .5), light);
-    bulb.position.set(side * (d.width / 2 + .3), .15, -along); root.add(bulb);
   }
   root.updateMatrixWorld(true);
   for (const material of materials) {
@@ -156,10 +147,16 @@ export function createRunwayVisual(scene, runway, mapRoot) {
     for (const g of geometries) g.dispose();
   }
   root.traverse(o => { if (o.isMesh) { o.receiveShadow = true; o.userData.runway = true; } });
+  const lighting = createRunwayLighting(d, lightingOptions); root.add(lighting.root);
   return {
-    root,
-    update() { root.matrix.multiplyMatrices(mapRoot.matrixWorld, runway.frame); root.updateMatrixWorld(true); },
+    root, lighting,
+    update(options = {}) {
+      root.matrix.multiplyMatrices(mapRoot.matrixWorld, runway.frame); root.updateMatrixWorld(true);
+      const night = options.solar ? runwayNightStrength(localSolarState(options.solar, d.lat * DEG, d.lon * DEG).elevation) : 0;
+      lighting.update({ ...options, night }); asphalt.emissiveIntensity = night * .4;
+    },
     dispose() {
+      lighting.dispose();
       root.removeFromParent();
       root.traverse(o => o.geometry?.dispose());
       for (const resource of [...materials, ...textures]) resource.dispose();

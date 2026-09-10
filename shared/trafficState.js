@@ -1,4 +1,5 @@
-export const TRAFFIC = Object.freeze({ pollMs: 30_000, freshSeconds: 30, hideSeconds: 60, removeSeconds: 90, radiusKm: 35, maxRadiusKm: 75 });
+export const TRAFFIC = Object.freeze({ pollMs: 30_000, freshSeconds: 30, initialAgeSeconds: 90,
+  fadeSeconds: 120, hideSeconds: 180, removeSeconds: 240, radiusKm: 35, maxRadiusKm: 75 });
 export const finite = value => typeof value === "number" && Number.isFinite(value);
 const DEG = Math.PI / 180;
 const EARTH_M = 6_371_008.8;
@@ -66,7 +67,7 @@ export function normalizeStates(payload, nowSeconds) {
     if (row[8] !== false || !finite(row[5]) || Math.abs(row[5]) > 180 || !finite(row[6]) || Math.abs(row[6]) > 90
       || !finite(row[3]) || !finite(altitudeM) || altitudeM < -1000 || altitudeM > 100_000) { stats.invalid++; continue; }
     const age = nowSeconds - row[3];
-    if (age < -5 || age > TRAFFIC.freshSeconds) { stats.stale++; continue; }
+    if (age < -5 || age > TRAFFIC.initialAgeSeconds) { stats.stale++; continue; }
     const item = {
       icao24: id, callsign: typeof row[1] === "string" ? row[1].trim().slice(0, 16) : null,
       latitudeDeg: row[6], longitudeDeg: row[5], altitudeM,

@@ -13,7 +13,7 @@ export function spaceSkyBlend(altitudeM) {
 // Proceduralne niebo: gradient zenit→horyzont + tarcza słońca + chmury FBM.
 // Horyzont ma DOKŁADNIE kolor mgły (w przestrzeni liniowej, przez ten sam
 // tone mapping ACES co teren), więc nie ma żadnej przerwy ani poświaty.
-export function createSky(fogColorHex, { simple = false, physicalBodies = false } = {}) {
+export function createSky(fogColorHex, { simple = false, physicalBodies = false, weatherClouds = false } = {}) {
   const dayZenith = new Color(0x2a63b8), dayMid = new Color(0x7db3e2), dayHorizon = new Color(fogColorHex);
   const nightZenith = new Color(0x02040d), nightMid = new Color(0x080e20), nightHorizon = new Color(0x121b2e);
   const sunsetHorizon = new Color(0xb86542), sunsetSun = new Color(0xff9455), daySun = new Color(0xfff2dd);
@@ -120,7 +120,7 @@ export function createSky(fogColorHex, { simple = false, physicalBodies = false 
         col += uSunColor * (pow(s, 1400.0) * 8.0 + pow(s, 48.0) * 0.25 + pow(s, 6.0) * 0.05) * uSunVisibility;
         col += vec3(0.45, 0.095, 0.025) * uTwilight * pow(s, 3.0) * exp(-abs(h) * 7.0);
 
-        ${simple ? "" : `
+        ${simple || weatherClouds ? "" : `
         // chmury — rzut kierunku na płaszczyznę, dryf w czasie
         if (h > 0.005) {
           vec2 cuv = d.xz / (h + 0.12) * 0.55;

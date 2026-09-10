@@ -32,11 +32,17 @@ function glowTexture() {
   return texture;
 }
 
-// Attach after the model is rotated, scaled and centered, before placing it on Earth.
+// Attach to a centered model, including a stage already placed on Earth.
 // Flight points toward -Z, so the engine plume extends along local +Z.
 export function attachRocketExhaust(root, { axis = "z", ignitionKmh = IGNITION_KMH } = {}) {
   if (root.userData.rocketExhaust) return;
-  const box = new Box3().setFromObject(root);
+  root.updateWorldMatrix(true, true);
+  const inverse = root.matrixWorld.clone().invert(), box = new Box3();
+  root.traverse(mesh => {
+    if (!mesh.isMesh) return;
+    mesh.geometry.computeBoundingBox();
+    box.union(mesh.geometry.boundingBox.clone().applyMatrix4(inverse.clone().multiply(mesh.matrixWorld)));
+  });
   const size = box.getSize(new Vector3());
   const center = box.getCenter(new Vector3());
   const bodyLength = size[axis];
