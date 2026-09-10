@@ -33,8 +33,8 @@ Fly over photorealistic Earth – guess the region, find your way home, or just 
 
 - **Guess the region** – one minute of flight, then mark on the map where you are (Poland / Europe / World).
 - **Fly home** – start ~30 km from the address you enter, 10 minutes to get back.
-- **Free flight** – pick a city and fly. You can also fly to Warsaw Chopin runway 33 and land without changing modes.
-- **Land** – practise landing, initially at Warsaw Chopin runway 33. Start 6 km before the threshold, aligned with a 3° approach and landing gear down. Available for Piper, Q400, Citation, Boeing 737, Airbus A320 and Fighter.
+- **Free flight** – pick a city and fly. Land on paved runways across Poland without changing modes; the game detects the runway and approach direction automatically.
+- **Land** – choose an airport and runway direction from the Polish catalogue (64 airports, 68 runways). Start 6 km before the threshold, aligned with a 3° approach and landing gear down. Available for Piper, Q400, Citation, Boeing 737, Airbus A320 and Fighter. Choose a light aircraft for short or narrow strips.
 
 ## Vehicles
 
@@ -42,19 +42,33 @@ Nine vehicles are available in single player and multiplayer:
 
 | Vehicle | Cruise / max speed | Flight characteristics and features |
 | --- | --- | --- |
-| **Piper PA-28** | ~170 / 470 km/h | Light propeller aircraft with animated propeller. |
-| **Dash 8 Q400** | ~270 / 670 km/h | Regional turboprop with two animated propellers. |
-| **Cessna Citation** | ~330 / 900 km/h | Business jet. |
-| **Boeing 737-800** | ~830 / 970 km/h | Original simplified twin-engine airliner, blue tail and tall winglets. |
-| **Airbus A320** | ~810 / 950 km/h | Original simplified twin-engine airliner, rounded nose and teal tail. |
+| **Piper PA-28** | ~170 / 470 km/h | Light propeller aircraft with animated propeller, authored surface panels, refined glazing and navigation lights. |
+| **Dash 8 Q400** | ~270 / 670 km/h | Regional turboprop with two animated propellers, cabin windows, panel seams and navigation lights. |
+| **Cessna Citation** | ~330 / 900 km/h | Business jet with refined glazing, metal surfaces and navigation lights. |
+| **Boeing 737-800** | ~830 / 970 km/h | Original twin-engine airliner with framed cockpit panes, doors, cargo hatches, fan blades, flattened nacelles, wing panels and blue livery. |
+| **Airbus A320** | ~810 / 950 km/h | Original twin-engine airliner with framed cockpit panes, doors, cargo hatches, fan blades, wing panels and teal livery. |
 | **Fighter** | ~540 / 1510 km/h | Combat jet with moving control surfaces, navigation lights, launchable missiles and wingtip contrails above 1000 km/h. |
-| **Rocket** | ~790 / 5000 km/h | Forward-flying rocket with trails from four fins; engine fire appears above 5000 km/h. |
+| **Rocket** | Thrust-controlled; no fixed speed cap | Steerable spacecraft with vacuum inertia, variable gravity and assisted Earth–Moon travel. Engine exhaust follows thrust. |
 | **Combat Drone** | 120 / 320 km/h | Armed quadrotor replacing Rocket 1, with four spinning rotors, two rotating cannons firing 360° bursts, a camera and red lights. Independent lift and automatic braking; cutting throttle makes it descend under gravity. |
-| **SpaceX Falcon 9** | Thrust-controlled / 8000 km/h | Upright rocket with nine engine nozzles, steering, gravity and inertia. Press `Enter` to release the Dragon capsule; its red-and-white parachute opens after separation. |
+| **SpaceX Falcon 9** | Thrust-controlled; no fixed speed cap | Upright game spacecraft with nine engine nozzles and assisted Earth–Moon travel. Press `Enter` below 80 km Earth altitude to release Dragon with its red-and-white parachute. |
 
-Speeds are game settings, not real-world specifications. Aircraft and the original Rocket can exceed their nominal maximum in a dive. Falcon 9 starts upright with zero speed and accelerates under engine thrust.
+Aircraft speeds are game settings, not real-world specifications. Aircraft can exceed their nominal maximum in a dive. Both rockets inherit Earth's eastward surface velocity and accelerate under thrust; the HUD uses speed relative to Earth near the launch site. In space, the flight panel identifies the distance and speed relative to the Moon.
 
 The drone uses `A` / `D` to turn, even at zero forward speed, and `W` / `S` to descend / climb while powered. Its throttle controls horizontal speed and rotor lift: at zero throttle it brakes and falls towards the ground; adding power restores altitude control. Falcon 9 uses `W` / `S` to tilt and `A` / `D` to turn; throttle controls thrust, so cutting it lets gravity pull the rocket down. The released Dragon descends separately while you continue controlling Falcon 9. The on-screen **Release Dragon** button also works on touch devices.
+
+## Earth–Moon flight
+
+Choose **Single player → Free flight → Rocket or SpaceX Falcon 9**, enter a city and start. **Fly to Moon** engages guidance from your current position. Select **1000×** to accelerate the journey; the panel shows the effective rate, which automatically drops near either surface. **Stop guidance** returns to manual thrust and steering at 1×. `Esc` pauses the flight.
+
+Guidance performs a powered ascent, curves around Earth when necessary, tracks the moving Moon and brakes for touchdown. Both rockets can reach and remain on the lunar surface. Their position changes through integrated velocity and acceleration, with Earth and lunar gravity and no fixed vacuum speed cap. The nominal Earth–Moon centre distance is **384,400 km**; a typical assisted Warsaw mission takes about **9.5 simulated hours**, or a few minutes at the selected time acceleration. Near touchdown the last kilometre runs at normal speed.
+
+**Space map** shows Earth, the Moon and the rocket in the same distance scale. Drag to orbit, scroll to zoom, and use `Esc` or **Return to flight** to return. `M` opens this view above 100 km in Free flight. Earth rotates once per sidereal day, with a 23.44° tilted axis in the overview. The ship marker and text labels are enlarged for legibility. **Magnetosphere & flight model** enables the optional field illustration and its solar-wind pressure control. [Scientific assumptions and references](docs/space-science.md) distinguish altitude from distance measured from Earth's centre.
+
+These are **assisted game spacecraft with unlimited propellant**, including the Falcon-shaped vehicle. Fuel, staging, life support, radiation damage, return-to-Earth guidance and a real Falcon lunar mission profile are not simulated. The Moon follows a mean circular inclined orbit and a mission-relative clock, with an illustrative initial Sun phase, rather than the current UTC ephemeris. The surface is spherical; the imagery does not provide crater elevation or local terrain relief. Dragon's atmospheric parachute is available only below 80 km above Earth.
+
+Detailed Earth tiles and OpenSky polling stop during deep-space flight. Near objects remain in metres; distant bodies use a separate scaled render scene and individual depth passes to keep both the ship and the Moon stable at large distances. Aircraft and airport landing dynamics continue to use the existing Earth scene. B738/A320 share their detailed six-part geometry between player, menu and instanced traffic models.
+
+Imagery: [Moon LROC colour map](https://svs.gsfc.nasa.gov/4720/) — NASA/GSFC/Arizona State University; [Earth Blue Marble texture distributed with Three.js r170](https://github.com/mrdoob/three.js/blob/r170/examples/textures/planets/earth_atmos_2048.jpg) — NASA imagery derivative. The bundled 2048-pixel maps are for the globe view, not ground-resolution photography.
 
 ## Flight features
 
@@ -94,15 +108,17 @@ Fixed tracking keeps the camera at its current location and turns it toward
 the flying vehicle. The next `C` switches to an external front view that follows
 the vehicle and looks back at it. Press `C` once more to return to normal chase.
 
-## Landing in Warsaw
+## Landing in Poland
 
-Choose **Single player → Land → Start** for a prepared approach, or fly to Warsaw Chopin in **Free flight** and extend the gear with `G`. The same landing physics and instruments work in both modes. Follow the runway centreline and the landing panel's target speed, descent rate and glide-path error. The marked threshold is displaced from the physical start of the pavement: touch down beyond the threshold stripes, near the paired aiming-point blocks.
+Choose **Single player → Land**, select the airport and runway direction, then **Start** for a prepared approach. Alternatively, fly to an airport in **Free flight** and extend the gear with `G`. The same landing physics and instruments work in both modes. Follow the runway centreline and the landing panel's target speed, descent rate and glide-path error. Where the threshold is displaced from the physical start of the pavement, touch down beyond its stripes, near the paired aiming-point blocks. Both runway directions work, and the panel identifies the active airport and runway.
 
 Keep the wings level, reduce throttle near the runway and gently pull back with `S` to flare. The main wheels must touch first, with a small nose-up attitude and a low descent rate. After touchdown, let the nose settle, press `,` for idle and hold `B` to stop. `A` / `D` steer on the ground; sharp turns at speed can cause a runway excursion. For another takeoff, release the brakes, press `.` for full power and pull back after accelerating above approach speed. Gear and wheel-brake buttons also support touch input.
 
 The aircraft rests on its wheels, with animated retractable gear, wheel rotation and suspension compression. Excessive sink can cause a bounce or gear failure; a belly landing, nose-first impact, wing strike or departure from the pavement ends the flight. `R` restarts the approach after a crash. Landing gear cannot retract while on the ground.
 
-This is a simplified game flight model with descent inertia, flare, rollout drag and wheel braking. It is not a training simulator. The runway uses the published EPWA 15/33 location, 332° true heading, 3690 × 60 m dimensions and 661.4 m displaced threshold from [OurAirports runway data](https://ourairports.com/data/) ([source CSV](https://davidmegginson.github.io/ourairports-data/runways.csv)). Its elevation is calibrated against loaded map terrain before the practice approach; the visible surface and wheel collision share the same plane. Elsewhere, terrain impacts retain the existing crash behavior. Landing tests and browser checks can run with **Live traffic** off, without OpenSky credits.
+This is a simplified game flight model with descent inertia, flare, rollout drag and wheel braking. It is not a training simulator. The offline catalogue combines OurAirports with © OpenStreetMap contributors, excluding closed airports, closed runways and grass surfaces. It includes passenger airports, military airfields and smaller paved strips. The catalogue is a data snapshot, not live operational or NOTAM information. See [the airport list, sources, exceptions and update procedure](docs/polish-airports.md).
+
+Runways render within approximately 35 km of the player and release their graphics resources when left behind. The visible pavement and both landing directions share one physical plane. Its elevation and slope are calibrated from map terrain while the aircraft is safely airborne, then held fixed near touchdown and during rollout. Outside the pavement, terrain impacts retain the existing crash behavior. Landing uses no OpenSky requests; tests can run with **Live traffic** off.
 
 ## Contrail settings
 

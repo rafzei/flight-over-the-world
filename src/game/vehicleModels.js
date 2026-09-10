@@ -1,9 +1,10 @@
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { passengerType, preparePassengerDetails } from "./passengerDetails.js";
 
 export async function loadVehicleModel(spec) {
   if (spec.create) return spec.create();
   const gltf = await new GLTFLoader().loadAsync(spec.file);
-  return gltf.scene;
+  return preparePassengerDetails(gltf.scene, passengerType(spec));
 }
 
 // Models are loaded/created independently, so unused loads own their resources.

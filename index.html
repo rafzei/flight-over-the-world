@@ -236,6 +236,28 @@
     </div>
 
     <div id="hud">
+      <section id="space-panel" aria-label="Space flight" hidden>
+        <strong id="space-status">Earth–Moon flight</strong>
+        <pre id="space-details"></pre>
+        <div class="space-actions">
+          <button id="moon-guidance" type="button">Fly to Moon</button>
+          <label>Time <select id="space-warp"><option value="1">1×</option><option value="10">10×</option><option value="100">100×</option><option value="1000">1000×</option></select></label>
+          <button id="space-map-toggle" type="button" aria-pressed="false">Space map</button>
+          <button id="dragon-release" type="button" hidden>Enter · Release Dragon</button>
+        </div>
+        <p id="space-map-help" hidden>Drag to orbit · scroll to zoom · Esc returns to flight</p>
+        <details id="space-science">
+          <summary>Magnetosphere &amp; flight model</summary>
+          <label><input id="magnetosphere-toggle" type="checkbox" /> Show magnetosphere</label>
+          <label>Solar wind pressure <select id="solar-pressure"><option value="0.5">Quiet · 0.5 nPa</option><option value="2" selected>Typical · 2 nPa</option><option value="10">Strong · 10 nPa</option></select></label>
+          <p id="space-environment"></p>
+          <p>Plasmasphere · Inner / Outer Van Allen belts · Magnetopause · Magnetosheath · Bow shock · Magnetotail · Solar wind / IMF</p>
+          <p>The boundaries move with solar wind. Earth's magnetic field has no sharp end. Distances use 1 Rₑ = 6,371 km.</p>
+          <p>Lunar guidance uses assisted steering and unlimited game propulsion. This is not a real Falcon 9 mission profile.</p>
+          <small>Moon imagery: NASA / GSFC / Arizona State University · Earth: NASA Blue Marble</small>
+        </details>
+      </section>
+      <div id="space-labels" aria-hidden="true"></div>
       <section id="landing-panel" aria-label="Landing instruments" hidden>
         <strong id="landing-status">Landing instruments</strong>
         <pre id="landing-details"></pre>
@@ -290,7 +312,6 @@
       </button>
 
       <div id="map-note" hidden>Map unavailable in this mode</div>
-      <button id="dragon-release" type="button" hidden>Enter · Release Dragon</button>
       <button id="missile-fire" type="button" hidden>Enter · Fire missile</button>
       <button id="drone-fire" type="button" hidden>Enter · Fire 360° burst</button>
     </div>

@@ -13,15 +13,16 @@ export function spaceSkyBlend(altitudeM) {
 // Proceduralne niebo: gradient zenit→horyzont + tarcza słońca + chmury FBM.
 // Horyzont ma DOKŁADNIE kolor mgły (w przestrzeni liniowej, przez ten sam
 // tone mapping ACES co teren), więc nie ma żadnej przerwy ani poświaty.
-export function createSky(fogColorHex, { simple = false } = {}) {
+export function createSky(fogColorHex, { simple = false, physicalBodies = false } = {}) {
   const uniforms = {
     uZenith: { value: new Color(0x2a63b8) },
     uMid: { value: new Color(0x7db3e2) },
     uHorizon: { value: new Color(fogColorHex) },
-    uSunDir: { value: SUN_DIR },
+    uSunDir: { value: SUN_DIR.clone() },
     uSunColor: { value: new Color(0xfff2dd) },
     uTime: { value: 0 },
     uSpace: { value: 0 },
+    uAirglow: { value: 1 },
     uMoonDir: { value: MOON_DIR },
   };
 
@@ -46,11 +47,12 @@ export function createSky(fogColorHex, { simple = false } = {}) {
       uniform vec3 uSunColor;
       uniform float uTime;
       uniform float uSpace;
+      uniform float uAirglow;
       uniform vec3 uMoonDir;
 
       vec3 spaceSky(vec3 d) {
         vec3 col = vec3(0.0005, 0.001, 0.003);
-        col += uHorizon * pow(1.0 - abs(d.y), 36.0) * 0.035;
+        col += uHorizon * pow(1.0 - abs(d.y), 36.0) * 0.035 * uAirglow;
         float sunAngle = acos(clamp(dot(d, uSunDir), -1.0, 1.0));
         float aa = max(fwidth(sunAngle), 0.0003);
         col += uSunColor * (18.0 * (1.0 - smoothstep(0.012, 0.012 + aa, sunAngle)) + 0.6 * exp(-sunAngle * 48.0));
@@ -59,7 +61,7 @@ export function createSky(fogColorHex, { simple = false } = {}) {
         vec3 up = cross(uMoonDir, right);
         vec2 p = vec2(dot(d, right), dot(d, up)) / 0.026;
         float r = length(p), edge = max(fwidth(r), 0.01);
-        if (dot(d, uMoonDir) > 0.99 && r < 1.0 + edge) {
+        if (${physicalBodies ? 'false' : 'true'} && dot(d, uMoonDir) > 0.99 && r < 1.0 + edge) {
           vec3 normal = normalize(right * p.x + up * p.y - uMoonDir * sqrt(max(0.0, 1.0 - r * r)));
           float shade = 0.16 + 0.84 * max(0.0, dot(normal, uSunDir));
           float maria = 0.70 + 0.18 * sin(p.x * 15.0 + sin(p.y * 12.0)) * sin(p.y * 19.0);
@@ -156,6 +158,7 @@ export function createSky(fogColorHex, { simple = false } = {}) {
     update(altitudeM, elapsedSeconds, fog) {
       const blend = spaceSkyBlend(Number.isFinite(altitudeM) ? altitudeM : 0);
       uniforms.uSpace.value = blend;
+      uniforms.uAirglow.value = Math.max(0, Math.min(1, (120000 - altitudeM) / 100000));
       stars.visible = blend > 0; starMaterial.opacity = blend;
       uniforms.uTime.value = elapsedSeconds;
       if (fog?.isFogExp2) {

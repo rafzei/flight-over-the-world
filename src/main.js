@@ -58,7 +58,10 @@ import { finishVehicleMaterials, prepareFighterSurfaces, updateFighterSurfaces, 
 import { createVehicleGroundShadows } from "./game/vehicleGroundShadows.js";
 import { createVehicleCollisionDetector, raycastTerrain } from "./game/vehicleCollision.js";
 import { createCarousel } from "./game/menuPreview.js";
-import { createSky, SUN_DIR } from "./game/sky.js";
+import { createSky } from "./game/sky.js";
+import { SpaceScene, SPACE_RENDER_SCALE } from "./game/spaceScene.js";
+import { SPACE_CONSTANTS, moonPositionECEF, sunDirectionInertial, inertialToECEF, ecefToInertial } from "./game/spacePhysics.js";
+import { createMagnetosphereOverlay, classifySpaceEnvironment } from "./game/magnetosphere.js";
 import { createAirliner } from "./game/airliner.js";
 import { AirportRunways, DEFAULT_APPROACH } from "./game/airportRunways.js";
 import { attachLandingGear, LANDING_SPEEDS } from "./game/landingGear.js";
@@ -250,11 +253,12 @@ const PLANES = {
     brake: 120,
     cam: [0, 6, 20],
     name: "Rocket",
-    desc: "Space rocket – cruise 790, max 5000 km/h",
+    desc: "Earth–Moon rocket · inertial flight · assisted lunar guidance",
     sound: "rocket",
     contrailOptions: { wingAxes: ["x", "y"] },
     exhaust: true,
     prepare: prepareRocket,
+    flightModel: "lunar",
   },
   drone: {
     create: createCombatDrone,
@@ -276,9 +280,9 @@ const PLANES = {
     brake: 0,
     cam: [0, 9, 43],
     name: "SpaceX Falcon 9",
-    desc: "Vertical rocket · steer with WASD · Enter releases Dragon",
+    desc: "Earth–Moon game flight · assisted guidance · Dragon parachute below 80 km",
     sound: "rocket",
-    flightModel: "falcon",
+    flightModel: "lunar",
     vertical: true,
     exhaust: true,
     exhaustOptions: { axis: "y", ignitionKmh: 0 },
@@ -293,7 +297,12 @@ const RESULTS_TIME = 10;
 const HOME_CAPTURE_M = 600;
 const HOME_BEACON_M = 1000;
 
-let camera, scene, renderer, tiles, sun, sky;
+let camera, scene, renderer, tiles, sun, sky, ambientLight;
+let spaceScene, magnetosphere;
+let solarPressure = 2;
+const spaceMoon = new Vector3(), spaceSun = new Vector3(), spaceObserver = new Vector3();
+const physicalSunWorld = new Vector3();
+let spaceTime = 0;
 let liveTraffic;
 const airportRunways = new AirportRunways();
 let selectedApproach = DEFAULT_APPROACH;
@@ -844,6 +853,7 @@ const miniMap = createMiniMap({
 function canOpenFreeMap() {
   return (
     mode === "free" &&
+    plane?.height < 100000 &&
     !menuOpen &&
     !paused &&
     !guessOpen &&
@@ -897,6 +907,7 @@ function showMapUnavailable() {
 }
 
 function toggleFreeMap() {
+  if (plane?.height >= 100000 && !menuOpen && !paused && !guessOpen) { toggleSpaceMap(); return; }
   if (!canOpenFreeMap() && !freeMap.open) return;
   if (freeMap.open) {
     freeMap.hide();
@@ -2601,7 +2612,7 @@ async function init() {
 
   try {
     scene = new Scene();
-    scene.background = new Color(0x8ec8e8);
+    scene.background = null;
     scene.fog = new FogExp2(0x9dd0ea, 0.00007);
 
     renderer = new WebGLRenderer({
@@ -2628,7 +2639,8 @@ async function init() {
       },
     });
 
-    scene.add(new HemisphereLight(0xbfd8ee, 0x5a7048, 1.15));
+    ambientLight = new HemisphereLight(0xbfd8ee, 0x5a7048, 1.15);
+    scene.add(ambientLight);
     sun = new DirectionalLight(0xfff2dd, 2.0);
     sun.castShadow = !isMobile;
     sun.shadow.mapSize.set(2048, 2048);
@@ -2758,8 +2770,12 @@ async function init() {
 
     // niebo — proceduralna kopuła (gradient + słońce + chmury FBM),
     // horyzont = dokładnie kolor mgły, więc nie ma przerwy ani poświaty
-    sky = createSky(0x9dd0ea);
+    sky = createSky(0x9dd0ea, { physicalBodies: true });
+    sky.mesh.traverse(o => o.layers.set(1));
     scene.add(sky.mesh);
+    spaceScene = new SpaceScene(scene, renderer.domElement, { baseUrl: import.meta.env.BASE_URL, simple: isMobile });
+    magnetosphere = createMagnetosphereOverlay();
+    spaceScene.scene.add(magnetosphere.root);
 
     if (!isMobile) {
       new TextureLoader().load(asset("textures/sky_day.jpg"), (tex) => {
@@ -2797,6 +2813,9 @@ async function init() {
       },
       get camera() {
         return camera;
+      },
+      get spaceScene() {
+        return spaceScene;
       },
     };
     window.__scene = scene;
@@ -2956,6 +2975,9 @@ function loadMate(id, key) {
 }
 
 function resetFlight(latDeg, lonDeg) {
+  toggleSpaceMap(false);
+  spaceTime = 0;
+  document.getElementById("space-warp").value = "1";
   landingSystem.reset();
   if (mode === "landing") landingSystem.runway = airportRunways.get(selectedApproach);
   planeMesh?.userData.landingGear?.reset();
@@ -3157,6 +3179,20 @@ function stopAtImpact(hit) {
 function updateFlightPhysics(dt) {
   const canCrash = !pendingSnap && !awaitingSnap && performance.now() > crashGraceUntil;
   const radius = PLANES[selectedPlane].vertical ? 18 : 4.5;
+  if (plane.isLunar) {
+    if (canCrash) flightPosition(_flightFrom);
+    plane.update(dt, ctrl);
+    if (!canCrash) return;
+    if (plane.spaceStatus?.startsWith("impact-")) { flightPosition(planePos); crash(planePos); return; }
+    if (plane.height < 100000) {
+      flightPosition(_flightTo);
+      WGS84_ELLIPSOID.getCartographicToNormal(plane.lat, plane.lon, _flightUp);
+      _flightUp.transformDirection(tiles.group.matrixWorld);
+      const hit = vehicleCollision.sweep(tiles.group, _flightFrom, _flightTo, _flightUp, radius);
+      if (hit) stopAtImpact(hit);
+    }
+    return;
+  }
   let left = dt;
   while (left > 0) {
     const step = Math.min(1 / 60, left);
@@ -3256,6 +3292,7 @@ function hidePlaceBadge() {
 }
 
 function syncPlaceBadge() {
+  if (plane?.height >= 100000) { hidePlaceBadge(); return; }
   if (mode !== "free" || menuOpen || guessOpen || !plane) {
     if (mode !== "free" || menuOpen) hidePlaceBadge();
     return;
@@ -3277,7 +3314,7 @@ function syncPlaceBadge() {
   fetch(url, { headers: { Accept: "application/json" } })
     .then((res) => (res.ok ? res.json() : null))
     .then((data) => {
-      if (token !== placeReq || mode !== "free" || menuOpen) return;
+      if (token !== placeReq || mode !== "free" || menuOpen || plane.height >= 100000) return;
       const name = placeNameFromReverse(data);
       if (!name) return;
       if (el.place) el.place.textContent = name;
@@ -3952,6 +3989,7 @@ window.addEventListener("keydown", (e) => {
   }
   if (e.key === "Escape") {
     if (menuOpen) return;
+    if (spaceScene?.overview) { toggleSpaceMap(false); return; }
     if (freeMap.open) {
       freeMap.hide();
       updateLocationMaps();
@@ -4038,6 +4076,7 @@ for (const event of ["pointerup", "pointercancel", "lostpointercapture"]) brakeB
 
 function deployDragon() {
   if (selectedPlane !== "falcon9" || menuOpen || paused || guessOpen || leaveOpen || crashed || finished || freeMap.open) return;
+  if (plane.isLunar && plane.height > 80000) return;
   // Controller stores east/north/up; the level flight frame is east/up/south.
   const v = plane.velocity;
   if (!v) return;
@@ -4046,6 +4085,55 @@ function deployDragon() {
   releaseDragon(planeMesh, scene, velocity, up, vehicleGroundShadows);
 }
 el.dragonRelease?.addEventListener("click", deployDragon);
+
+function toggleSpaceMap(enabled = !spaceScene?.overview) {
+  if (!spaceScene) return;
+  spaceScene.setOverview(enabled);
+  document.getElementById("space-map-toggle").setAttribute("aria-pressed", String(enabled));
+  document.getElementById("space-map-toggle").textContent = enabled ? "Return to flight" : "Space map";
+  document.getElementById("space-map-help").hidden = !enabled;
+  keys.clear();
+}
+document.getElementById("space-map-toggle").addEventListener("click", () => toggleSpaceMap());
+document.getElementById("moon-guidance").addEventListener("click", () => {
+  if (!plane?.isLunar || menuOpen || paused || crashed || pendingSnap || awaitingSnap) return;
+  if (plane.guidanceActive) {
+    plane.stopLunarGuidance();
+    setThrottleLever(plane.throttle);
+  } else plane.startLunarGuidance();
+});
+document.getElementById("space-warp").addEventListener("change", e => plane?.isLunar && plane.setTimeWarp(e.target.value));
+document.getElementById("magnetosphere-toggle").addEventListener("change", e => {
+  if (e.target.checked) toggleSpaceMap(true);
+  magnetosphere?.setVisible(e.target.checked);
+});
+document.getElementById("solar-pressure").addEventListener("change", e => { solarPressure = Number(e.target.value); });
+
+function updateSpaceHud() {
+  const panel = document.getElementById("space-panel");
+  panel.hidden = menuOpen || paused || guessOpen || leaveOpen || freeMap.open || (!plane.isLunar && plane.height < 20000);
+  if (panel.hidden) return;
+  const d = plane.isLunar ? plane.diagnostics() : null;
+  const stage = { manual: "Manual flight", ascent: "Earth ascent", dogleg: "Clearing Earth", transfer: "Lunar transfer", "lunar-descent": "Lunar descent", arrived: "LANDED ON THE MOON", impact: "Impact" };
+  const distance = metres => metres < 1000 ? `${Math.max(0, metres).toFixed(1)} m` : `${(metres / 1000).toLocaleString("en", { maximumFractionDigits: 1 })} km`;
+  const seconds = Math.floor(spaceTime);
+  document.getElementById("space-status").textContent = d ? stage[d.guidancePhase] : "Near space";
+  document.getElementById("space-details").textContent = d
+    ? `Moon surface: ${distance(d.remainingDistanceM)}\nMoon-relative speed: ${d.relativeMoonSpeedMps.toFixed(1)} m/s\nEarth altitude: ${distance(d.earthAltitudeM)}\nElapsed: ${Math.floor(seconds / 3600)}h ${Math.floor(seconds / 60) % 60}m ${seconds % 60}s · ${d.effectiveTimeWarp}×${d.effectiveTimeWarp < d.timeWarp ? " (limited near surface)" : ""}${d.touchdownSpeedMps !== null ? `\nTouchdown: ${d.touchdownSpeedMps.toFixed(2)} m/s` : ""}`
+    : `Earth altitude: ${distance(plane.height)}\nMoon: ${distance(spaceObserver.distanceTo(spaceMoon) - SPACE_CONSTANTS.MOON_RADIUS)}`;
+  const guidance = document.getElementById("moon-guidance");
+  guidance.hidden = !d;
+  guidance.disabled = crashed || pendingSnap || awaitingSnap || (d && d.status !== "flight");
+  guidance.textContent = d?.guidanceActive ? "Stop guidance" : d?.status === "landed-moon" ? "Moon reached" : "Fly to Moon";
+  const warp = document.getElementById("space-warp");
+  warp.closest("label").hidden = !d;
+  warp.disabled = crashed;
+  if (d) warp.value = String(d.timeWarp);
+  const environment = classifySpaceEnvironment(ecefToInertial(spaceObserver, spaceTime), {
+    sunDirection: spaceSun, siderealTime: spaceTime * SPACE_CONSTANTS.EARTH_ANGULAR_SPEED, solarPressure,
+  });
+  document.getElementById("space-environment").textContent = `${environment.label}${environment.zoneLabels.length ? " · " + environment.zoneLabels.join(" · ") : ""}\nFrom Earth centre: ${(environment.centerMeters / SPACE_CONSTANTS.EARTH_MEAN_RADIUS).toFixed(2)} Rₑ · altitude: ${distance(environment.altitudeMeters)}`;
+}
 
 function fireFighterMissile() {
   if (selectedPlane !== "jet" || menuOpen || paused || guessOpen || leaveOpen || crashed || finished ||
@@ -4247,9 +4335,9 @@ if (el.throttleRail) {
 }
 
 window.addEventListener("wheel", (e) => {
-  if (menuOpen || paused || leaveOpen || guessOpen || crashed || finished || freeMap.open) return;
+  if (menuOpen || paused || leaveOpen || guessOpen || crashed || finished || freeMap.open || spaceScene?.overview) return;
   if (e.defaultPrevented || e.ctrlKey || e.metaKey || !Number.isFinite(e.deltaY) || e.deltaY === 0) return;
-  if (e.target?.isContentEditable || e.target?.closest?.("input, textarea, select, #traffic-panel, #landing-panel")) return;
+  if (e.target?.isContentEditable || e.target?.closest?.("input, textarea, select, #traffic-panel, #landing-panel, #space-panel")) return;
   e.preventDefault();
   const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? innerHeight : 1;
   const delta = e.deltaY * unit;
@@ -4337,6 +4425,10 @@ window.__foeDebug = () => ({
   traffic: liveTraffic?.debug(),
   spaceSky: sky?.uniforms.uSpace.value,
   landing: plane ? landingSystem.diagnostics(plane) : null,
+  space: plane?.isLunar ? plane.diagnostics() : null,
+  spaceMap: spaceScene?.overview,
+  moonRenderPosition: spaceScene?.moonWorld.toArray(),
+  magnetosphere: magnetosphere?.diagnostics(),
 });
 const skyQuat = new Quaternion(); // lokalna ramka N/S (bez kursu) — dla kopuły nieba i słońca
 const skyFramePos = new Vector3();
@@ -4389,12 +4481,15 @@ function tickFrame() {
   const keyPitch =
     (keys.has("s") || keys.has("arrowdown") ? 1 : 0) -
     (keys.has("w") || keys.has("arrowup") ? 1 : 0);
-  const rollIn = keyRoll || touch.roll;
-  const pitchIn = keyPitch || touch.pitch;
+  const rollIn = spaceScene.overview ? 0 : keyRoll || touch.roll;
+  const pitchIn = spaceScene.overview ? 0 : keyPitch || touch.pitch;
   const controlBlend = 1 - Math.exp(-6 * dt);
   ctrl.roll += (rollIn - ctrl.roll) * controlBlend;
   ctrl.pitch += (pitchIn - ctrl.pitch) * controlBlend;
-  if (flying) tickThrottle(dt);
+  if (flying && plane.isLunar && (plane.guidanceActive || plane.spaceStatus === "landed-moon")) {
+    throttleShown = plane.throttle;
+    syncThrottleUi();
+  } else if (flying) tickThrottle(dt);
   else if (throttleShown !== throttleLever) {
     throttleShown = throttleLever;
     syncThrottleUi();
@@ -4425,7 +4520,9 @@ function tickFrame() {
     updateFlightPhysics(dt);
     flying = !crashed;
   }
-  if (!menuOpen || awaitingSnap) airportRunways.updateVisuals(plane);
+  if (plane.isLunar) spaceTime = plane.simulationTime;
+  else if (flying) spaceTime += dt;
+  if ((!menuOpen || awaitingSnap) && plane.height < 100000) airportRunways.updateVisuals(plane);
   const landingPanel = document.getElementById("landing-panel");
   if (landingPanel) {
     landingPanel.hidden = menuOpen || paused || guessOpen || leaveOpen || freeMap.open || !landingSystem.gear || (!nearRunway && mode !== "landing");
@@ -4457,6 +4554,7 @@ function tickFrame() {
     -plane.roll
   );
   m.decompose(planePos, planeQuat, planeMesh.scale);
+  if (plane.isLunar) planeQuat.copy(plane.orientationECEF).premultiply(new Quaternion().setFromRotationMatrix(tiles.group.matrixWorld));
   planeMesh.position.copy(planePos);
   planeMesh.quaternion.copy(planeQuat);
   if (planeMesh.userData.prop) {
@@ -4466,13 +4564,13 @@ function tickFrame() {
   updateCombatDrone(planeMesh, flying ? dt : 0, plane.throttle, flying);
   updateFighterSurfaces(planeMesh, paused ? 0 : dt, flying ? ctrl.roll : 0, flying ? ctrl.pitch : 0);
   const verticalRocket = PLANES[selectedPlane].vertical;
-  updateRocketExhaust(planeMesh, dt, verticalRocket ? plane.throttle * 15000 : plane.kmh, flying && (!verticalRocket || plane.throttle > .02));
-  updateDragon(planeMesh, dt, tiles.group, flying, !menuOpen && !guessOpen);
+  updateRocketExhaust(planeMesh, dt, plane.isLunar ? plane.throttle * 15000 : plane.kmh, flying && (!plane.isLunar || plane.throttle > .02));
+  updateDragon(planeMesh, dt, tiles.group, flying && plane.height < 80000, !menuOpen && !guessOpen && plane.height < 80000);
   if (el.dragonRelease) {
-    el.dragonRelease.hidden = !verticalRocket || !flying || freeMap.open;
+    el.dragonRelease.hidden = !verticalRocket || !flying || freeMap.open || plane.height > 80000;
     const released = !!falconState(planeMesh)?.released;
-    el.dragonRelease.disabled = released;
-    el.dragonRelease.textContent = released ? "Dragon released" : "Enter · Release Dragon";
+    el.dragonRelease.disabled = released || plane.height > 80000;
+    el.dragonRelease.textContent = released ? "Dragon released" : plane.height > 80000 ? "Dragon parachute · below 80 km" : "Enter · Release Dragon";
   }
   if (el.missileFire) {
     const status = fighterMissiles?.status(planeMesh);
@@ -4597,6 +4695,7 @@ function tickFrame() {
     0
   );
   camFrame.decompose(camFramePos, camFrameQuat, camFrameScale);
+  if (plane.isLunar && plane.height > 100000) camFrameQuat.copy(planeQuat);
   flightCamera.update(camOffset, planePos, planeQuat, camFrameQuat);
   camInit = true;
   camera.position.copy(camPos);
@@ -4624,13 +4723,38 @@ function tickFrame() {
   sky.mesh.position.copy(camPos);
   sky.mesh.quaternion.copy(skyQuat);
   sky.update(plane.height, clock.elapsedTime, scene.fog);
+  moonPositionECEF(spaceTime, spaceMoon);
+  sunDirectionInertial(spaceTime, spaceSun);
+  WGS84_ELLIPSOID.getCartographicToPosition(plane.lat, plane.lon, plane.height, spaceObserver);
+  const sunECEF = inertialToECEF(spaceSun, spaceTime);
+  const mapOrientation = new Quaternion().setFromRotationMatrix(tiles.group.matrixWorld);
+  physicalSunWorld.copy(sunECEF).applyQuaternion(mapOrientation);
+  sky.uniforms.uSunDir.value.copy(physicalSunWorld).applyQuaternion(skyQuat.clone().invert());
+  const stars = sky.mesh.getObjectByName("space-stars");
+  if (stars) stars.quaternion.copy(skyQuat).invert().multiply(mapOrientation).multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), -spaceTime * SPACE_CONSTANTS.EARTH_ANGULAR_SPEED));
+  spaceScene.update({ camera, mapMatrix: tiles.group.matrixWorld, moonECEF: spaceMoon, sunECEF,
+    altitude: plane.height, active: !menuOpen, observerECEF: spaceObserver,
+    siderealAngle: spaceTime * SPACE_CONSTANTS.EARTH_ANGULAR_SPEED });
+  magnetosphere.setVisible(!menuOpen && spaceScene.overview && document.getElementById("magnetosphere-toggle").checked);
+  magnetosphere.update({ sunDirection: spaceSun, siderealTime: spaceTime * SPACE_CONSTANTS.EARTH_ANGULAR_SPEED,
+    time: spaceTime, solarPressure, orientation: spaceScene.inertialOrientation, metersToWorld: SPACE_RENDER_SCALE });
+  if (frameCount % 4 === 0) updateSpaceHud();
 
-  offset.copy(SUN_DIR).applyQuaternion(skyQuat);
-  sun.position.copy(offset).multiplyScalar(700).add(planePos);
+  sun.position.copy(physicalSunWorld).multiplyScalar(700).add(planePos);
+  const inSpace = plane.height > 120000;
+  document.body.classList.toggle("in-space", !menuOpen && inSpace);
+  document.body.classList.toggle("space-overview", !menuOpen && spaceScene.overview);
+  if (plane.height >= 100000) hidePlaceBadge();
+  ambientLight.intensity = inSpace ? .14 : 1.15;
+  ambientLight.color.set(inSpace ? 0xc8d6ef : 0xbfd8ee);
+  ambientLight.groundColor.set(inSpace ? 0xc8d6ef : 0x5a7048);
+  sun.intensity = inSpace ? 2.8 : 2;
+  sun.color.set(inSpace ? 0xffffff : 0xfff2dd);
+  sun.castShadow = !isMobile && !inSpace;
   sun.target.position.copy(planePos);
   sun.target.updateMatrixWorld();
 
-  if (!liteMode && !menuOpen && frameCount % 15 === 0) {
+  if (!liteMode && !menuOpen && plane.height < 100000 && frameCount % 15 === 0) {
     tiles.group.traverse((o) => {
       if (o.isMesh && !o.castShadow && !o.userData.vehicleShadowReceiver) {
         o.castShadow = true;
@@ -4640,13 +4764,13 @@ function tickFrame() {
   }
 
   // poszerzenie FOV przy nitrie — efekt prędkości
-  const targetFov = plane.speed > plane.cruise * 1.2 ? 78 : 70;
+  const targetFov = !plane.isLunar && plane.speed > plane.cruise * 1.2 ? 78 : 70;
   if (Math.abs(camera.fov - targetFov) > 0.05) {
     camera.fov += (targetFov - camera.fov) * Math.min(1, 3 * dt);
     camera.updateProjectionMatrix();
   }
 
-  if ((!menuOpen || awaitingSnap) && frameCount % 8 === 0) {
+  if ((!menuOpen || awaitingSnap) && plane.height < 100000 && frameCount % 8 === 0) {
     const snapping = pendingSnap || awaitingSnap;
     const refH = snapping
       ? Math.max(plane.height, spawnHoldAlt(), 10000)
@@ -4822,7 +4946,7 @@ function tickFrame() {
       retryFailedTiles();
       updateTilesSafe();
     }
-  } else {
+  } else if (plane.height < 200000) {
     tiles.group.visible = true;
     if (planeMesh && !crashed) planeMesh.visible = true;
     tiles.setResolutionFromRenderer(camera, renderer);
@@ -4830,28 +4954,31 @@ function tickFrame() {
     camera.updateMatrixWorld();
     retryFailedTiles();
     updateTilesSafe();
+  } else {
+    tiles.group.visible = false;
+    if (planeMesh && !crashed) planeMesh.visible = true;
   }
 
-  updateContrails(planeMesh, dt, plane.kmh, flying && !crashed && !menuOpen, camera);
+  updateContrails(planeMesh, dt, plane.kmh, flying && !crashed && !menuOpen && plane.height < 30000, camera);
   for (const mate of mp.mates.values()) {
     updateContrails(mate.mesh, dt, mate.kmh ?? 0,
       mp.active && !menuOpen && !paused && !guessOpen && !!mate.mesh?.visible, camera);
   }
   shadowUp.set(0, 1, 0).applyQuaternion(skyQuat);
-  shadowSunDirection.copy(SUN_DIR).applyQuaternion(skyQuat);
+  shadowSunDirection.copy(physicalSunWorld);
   vehicleGroundShadows?.update(dt, {
     terrain: tiles.group,
     camera,
     up: shadowUp,
     sunDirection: shadowSunDirection,
-    active: !menuOpen && !pendingSnap && !awaitingSnap,
+    active: !menuOpen && !pendingSnap && !awaitingSnap && plane.height < 100000,
   });
   liveTraffic?.update({
-    active: !menuOpen && !paused && !guessOpen && !leaveOpen && !crashed && !finished && !pendingSnap && !awaitingSnap && !freeMap.open && !window.__ctxLost,
+    active: !menuOpen && !paused && !guessOpen && !leaveOpen && !crashed && !finished && !pendingSnap && !awaitingSnap && !freeMap.open && !window.__ctxLost && plane.height < 100000,
     speedMps: plane.speed,
     viewportHeight: innerHeight,
   });
-  renderer.render(scene, camera);
+  spaceScene.render(renderer, scene, camera);
 
   const mateDbg = [];
   for (const [id, mate] of mp.mates) {
@@ -4937,10 +5064,11 @@ window.__forceTestMate = () => {
 
 function updateHud(agl) {
   // skala prędkościomierza pod najszybszy pojazd (nitro), zaokrąglona w górę
-  const maxKmh = Math.ceil((PLANES[selectedPlane].boost * 3.6) / 200) * 200;
-  if (el.gSpeed) drawAirspeed(el.gSpeed, plane.kmh, maxKmh);
-  if (el.gAlt) drawAltimeter(el.gAlt, Math.max(0, agl));
-  if (el.gHdg) drawCompass(el.gHdg, plane.headingDeg);
+  const kmh = plane.isLunar && plane.height < 100000 ? plane.velocity.length() * 3.6 : plane.kmh;
+  const maxKmh = plane.isLunar ? Math.max(2000, Math.ceil(kmh / 10000) * 10000) : Math.ceil((PLANES[selectedPlane].boost * 3.6) / 200) * 200;
+  if (el.gSpeed?.clientWidth) drawAirspeed(el.gSpeed, kmh, maxKmh);
+  if (el.gAlt?.clientWidth) drawAltimeter(el.gAlt, Math.max(0, agl));
+  if (el.gHdg?.clientWidth) drawCompass(el.gHdg, plane.headingDeg);
 
   if (timerActive || mode !== "free") {
     const tsec = Math.max(0, Math.ceil(timeLeft));

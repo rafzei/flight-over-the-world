@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {Box3,Group,Vector3} from 'three';
+import {Box3,Group,Raycaster,Vector3} from 'three';
 import {createAirliner} from '../src/game/airliner.js';
 import {PlaneController} from '../src/game/plane.js';
 import {attachLandingGear} from '../src/game/landingGear.js';
@@ -97,4 +97,27 @@ test('gear travels over three simulation seconds and freezes while paused',()=>{
   r.gear.update(2,72,false);assert(r.gear.extension<1e-8);assert(!r.gear.root.visible);
   r.gear.toggle(false);r.gear.update(3,72,false);assert.equal(r.gear.extension,1);
   r.gear.reset();assert.equal(r.gear.target,1);assert.equal(r.gear.compression,0);r.dispose();
+});
+
+test('generated struts reach the actual airframe and stay connected while retracting',()=>{
+  for(const key of ['b738','a320']){
+    const model=createAirliner(key),wrapper=new Group();
+    model.position.sub(new Box3().setFromObject(model).getCenter(new Vector3()));wrapper.add(model);
+    const gear=attachLandingGear(wrapper,model,key),contacts=gear.points().map(w=>w.point.toArray());
+    for(const wheel of gear.wheels){
+      const ray=new Raycaster(wheel.base.clone(),new Vector3(0,1,0)),hit=ray.intersectObject(model)[0];
+      assert(hit,'wheel column must meet the airframe');
+      const strut=new Box3().setFromObject(wheel.leg);
+      assert(strut.max.y>=hit.point.y&&strut.max.y<hit.point.y+.10,'strut top must reach inside the underside');
+      assert(Math.abs(strut.min.y-wheel.meshes[0].position.y)<1e-6,'strut bottom must reach the wheel axle');
+    }
+    gear.toggle(false);gear.update(1.5,72,false);wrapper.updateMatrixWorld(true);
+    assert.deepEqual(gear.points().map(w=>w.point.toArray()),contacts,'visual retraction cannot move collision contact bases');
+    for(const wheel of gear.wheels){
+      const strut=new Box3().setFromObject(wheel.leg);
+      assert(Math.abs(strut.max.y-wheel.mountY)<1e-6,'upper attachment stays fixed');
+      assert(Math.abs(strut.min.y-wheel.meshes[0].position.y)<1e-6,'retracting wheel stays attached');
+    }
+    gear.dispose();disposeModelResources(model);
+  }
 });

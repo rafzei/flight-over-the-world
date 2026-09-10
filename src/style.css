@@ -156,6 +156,28 @@ button, .mode-card, .scope-btn {
 #landing-panel button { font: inherit; color: var(--paper); background: #ffffff12; border: 1px solid #ffffff35; border-radius: 4px; padding: 8px; cursor: pointer; }
 #landing-panel button:disabled { opacity: .55; cursor: default; }
 #wheel-brake { touch-action: none; user-select: none; }
+#space-panel { position: absolute; pointer-events: auto; top: 22px; right: 22px; width: min(370px, calc(100vw - 44px)); max-height: calc(100dvh - 190px); overflow: auto; padding: 12px; border: 1px solid #ffffff30; border-radius: 6px; background: #120e0aeb; font-size: 12px; }
+#space-panel[hidden], #space-map-help[hidden] { display: none; }
+#space-panel { z-index: 5; }
+#space-panel #dragon-release { position: static; }
+#space-labels { pointer-events: none; }
+.in-space #f-place-box, .in-space #minimap, .in-space #f-instruments, .in-space #traffic-panel { display: none; }
+.space-overview #stick, .space-overview #throttle { display: none; }
+#space-panel strong { color: #ffd986; }
+#space-panel pre { white-space: pre-wrap; font: 11px/1.6 monospace; }
+#space-panel button, #space-panel select { color: var(--paper); background: #29241f; border: 1px solid #ffffff35; border-radius: 4px; padding: 7px; font: inherit; }
+#space-panel button { cursor: pointer; }
+#space-panel button:disabled { opacity: .45; cursor: default; }
+#space-panel details { margin-top: 10px; }
+#space-panel details label { display: block; margin-top: 8px; }
+#space-panel p { color: var(--muted); line-height: 1.5; }
+.space-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.space-body-label { position: absolute; transform: translate(-50%, 14px); padding: 3px 6px; color: #ffdf9c; background: #090d17b3; border-radius: 3px; font: 12px monospace; }
+.space-body-label[hidden] { display: none; }
+@media (max-width: 760px), (pointer: coarse) {
+  #space-panel { top: 80px; left: 10px; right: auto; width: min(350px, calc(100vw - 20px)); max-height: calc(100dvh - 300px); }
+  #hud:has(#space-panel:not([hidden])) #traffic-panel { display: none; }
+}
 #landing-selectors { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 8px 12px; margin-bottom: 12px; text-align: left; }
 #landing-selectors[hidden] { display: none; }
 #landing-selectors label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; min-width: 0; }

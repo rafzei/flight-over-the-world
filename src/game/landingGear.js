@@ -1,4 +1,4 @@
-import { Box3, CylinderGeometry, Group, Mesh, MeshStandardMaterial, Vector3 } from "three";
+import { Box3, CylinderGeometry, Group, Mesh, MeshStandardMaterial, Raycaster, Vector3 } from "three";
 
 export const LANDING_SPEEDS = Object.freeze({ pa28:38,q400:58,citation:60,b738:72,a320:70,jet:80 });
 
@@ -15,8 +15,17 @@ export function attachLandingGear(wrapper, model, key) {
   const legLength=Math.max(.7,size.y*.15), bottom=box.min.y-legLength-radius;
   const wheels=fixed?existing.map(w=>({name:w.name==='roueA'?'nose':'main',base:w.point,meshes:[]})):
     [{name:'main',base:new Vector3(-size.x*.115,bottom,size.z*.06),meshes:[]},{name:'main',base:new Vector3(size.x*.115,bottom,size.z*.06),meshes:[]},{name:'nose',base:new Vector3(0,bottom,-size.z*.34),meshes:[]}];
+  // Contact bases keep the original ground clearance. Each visible strut reaches
+  // the actual underside at its own x/z instead of the lowest nacelle elsewhere.
+  const airframe=[];model.traverseVisible(node=>{if(node.isMesh&&!node.userData.noVehicleShadow)airframe.push(node);});
+  const mountProbe=new Raycaster();
   for(const wheel of wheels)if(!fixed){
-    const leg=new Mesh(new CylinderGeometry(.075,.075,legLength,8),metal);leg.position.set(wheel.base.x,box.min.y-legLength/2,wheel.base.z);root.add(leg);wheel.leg=leg;
+    mountProbe.set(new Vector3(wheel.base.x,box.min.y-1,wheel.base.z),new Vector3(0,1,0));
+    mountProbe.far=size.y+2;
+    const mount=mountProbe.intersectObjects(airframe,false)[0];
+    wheel.mountY=(mount?.point.y??box.min.y)+.08;
+    wheel.strutLength=wheel.mountY-(wheel.base.y+radius);
+    const leg=new Mesh(new CylinderGeometry(.075,.075,wheel.strutLength,8),metal);leg.position.set(wheel.base.x,wheel.mountY-wheel.strutLength/2,wheel.base.z);root.add(leg);wheel.leg=leg;
     for(const side of (size.z>12?[-1,1]:[0])){
       const tire=new Mesh(new CylinderGeometry(radius,radius,radius*.55,14),rubber);tire.rotation.z=Math.PI/2;tire.position.set(wheel.base.x+side*radius*.4,wheel.base.y+radius,wheel.base.z);tire.castShadow=true;root.add(tire);wheel.meshes.push(tire);
       const hub=new Mesh(new CylinderGeometry(radius*.45,radius*.45,radius*.57,10),metal);hub.rotation.z=Math.PI/2;hub.position.copy(tire.position);root.add(hub);wheel.meshes.push(hub);
@@ -36,8 +45,9 @@ export function attachLandingGear(wrapper, model, key) {
       if(grounded)this.rotation+=speed*dt/radius;
       root.visible=this.extension>.02;
       for(const wheel of wheels)if(!fixed){
-        for(const mesh of wheel.meshes){mesh.position.y=wheel.base.y+radius+this.compression+(1-this.extension)*(legLength+radius*2);mesh.rotation.x=this.rotation;mesh.scale.setScalar(Math.max(.02,this.extension));}
-        wheel.leg.scale.y=Math.max(.01,this.extension*(1-this.compression/legLength));wheel.leg.position.y=box.min.y-(legLength-this.compression)*this.extension/2;
+        const visibleLength=(wheel.strutLength-this.compression)*this.extension;
+        for(const mesh of wheel.meshes){mesh.position.y=wheel.mountY-visibleLength;mesh.rotation.x=this.rotation;mesh.scale.setScalar(Math.max(.02,this.extension));}
+        wheel.leg.scale.y=Math.max(.0001,visibleLength/wheel.strutLength);wheel.leg.position.y=wheel.mountY-visibleLength/2;
       }
     },
     dispose(){root.removeFromParent();const all=new Set([rubber,metal]);root.traverse(o=>{if(o.geometry)all.add(o.geometry);});for(const r of all)r.dispose();},
