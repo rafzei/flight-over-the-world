@@ -97,6 +97,7 @@ test('lunar contact patch has outward faces, continuous seam UVs and matches the
       assert(Math.abs(height - lunarTerrainHeight(point)) < .03, 'drawn vertices agree with collision surface');
       minHeight = Math.min(minHeight, height); maxHeight = Math.max(maxHeight, height);
     }
+    assert(maxHeight - minHeight > 80, "the visible mesh has real relief, not only a texture");
   }
 });
 

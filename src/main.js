@@ -45,15 +45,19 @@ import { createDroneCannons } from "./game/droneCannons.js";
 import { setLoader, hideLoader } from "./game/hud.js";
 import { createPlaneMesh } from "./game/plane.js";
 import { createVehicleController } from "./game/vehicleControllers.js";
+import { FlightPoints, PointRecords, POINT_HUNT_SECONDS, validPointScore } from "./game/flightPoints.js";
+import { PointVisuals, createPointHud } from "./game/pointVisuals.js";
+import { pointFlightFrame, pointMapMarkers as mapPointGates } from "./game/pointFlightFrame.js";
 import { SAILPLANE_SPEC, updateSailplane } from "./game/sailplane.js";
 import { BALLOON_SPEC, updateBalloon } from "./game/balloon.js";
 import { GrassFields } from "./game/grassFields.js";
 import { GrassLanding, checkTowPath } from "./game/grassLanding.js";
 import { SailplaneTow, TowVisuals, parseTowSnapshot } from "./game/sailplaneTow.js";
 import { createFalcon9, falconState, releaseDragon, resetDragon, resetFalcon9, updateDragon,
-  releaseBooster, updateBooster, boosterSnapshot, parseBoosterSnapshot, syncBooster } from "./game/falcon9.js";
+  releaseBooster, updateBooster, boosterSnapshot, parseBoosterSnapshot, syncBooster, isFalconVehicle, falconBoosters } from "./game/falcon9.js";
+import { createFalconHeavy } from "./game/falconHeavy.js";
 import { FalconStageInput } from "./game/boosterRecovery.js";
-import { FlightCamera, FLIGHT_CAMERAS } from "./game/flightCamera.js";
+import { FlightCamera, FLIGHT_CAMERAS, bindFlightCameraDrag } from "./game/flightCamera.js";
 import { applyRotorState, spinRotors } from "./game/rotors.js";
 import {
   attachRocketExhaust,
@@ -312,8 +316,24 @@ const PLANES = {
     exhaust: true,
     exhaustOptions: { axis: "y", ignitionKmh: 0 },
   },
+  falconHeavy: {
+    create: createFalconHeavy,
+    wingspan: 70,
+    cruise: 300 / 3.6,
+    boost: 8000 / 3.6,
+    brake: 0,
+    cam: [0, 15, 82],
+    name: "SpaceX Falcon Heavy",
+    desc: "27 engines · detachable boosters · cabin inside fairing (game variant)",
+    sound: "rocket",
+    flightModel: "lunar",
+    vertical: true,
+    surfaceClearance: 35,
+    exhaust: true,
+    exhaustOptions: { axis: "y", ignitionKmh: 0 },
+  },
 };
-const PLANE_ORDER = ["pa28", "sailplane", "q400", "citation", "b738", "e195", "a321", "a320", "jet", "rocket", "drone", "falcon9", "balloon"];
+const PLANE_ORDER = ["pa28", "sailplane", "q400", "citation", "b738", "e195", "a321", "a320", "jet", "rocket", "drone", "falcon9", "falconHeavy", "balloon"];
 
 const HOME_TIME = 600; // 10 min na dolot do domu
 const GUESS_TIME = 60; // 1 min na rozpoznanie terenu
@@ -325,6 +345,7 @@ const HOME_BEACON_M = 1000;
 let camera, scene, renderer, tiles, sun, sky, ambientLight;
 let spaceScene, magnetosphere;
 let lunarSurfaceView = false;
+let disposeCameraDrag;
 let solarPressure = 2;
 const spaceMoon = new Vector3(), spaceSun = new Vector3(), spaceObserver = new Vector3();
 const physicalSunWorld = new Vector3();
@@ -346,6 +367,11 @@ let landingBrake = false;
 let vehicleGroundShadows;
 let fighterMissiles;
 let droneCannons;
+let pointVisuals;
+let pointStorage;
+try { pointStorage = localStorage; } catch { /* private mode */ }
+const flightPoints = new FlightPoints({ records: new PointRecords(pointStorage), onCollect: gate => pointVisuals?.collect(gate) });
+const pointHud = createPointHud(document.getElementById("flight-points"));
 const falconStageInput = new FalconStageInput({ single: deployDragon, double: deployBooster });
 let missileShotSeq = 0;
 const lastMissileShotSeq = new Map();
@@ -888,7 +914,7 @@ const miniMap = createMiniMap({
 
 function canOpenFreeMap() {
   return (
-    mode === "free" &&
+    ["free", "arcade", "landing"].includes(mode) &&
     plane?.height < 100000 &&
     !menuOpen &&
     !paused &&
@@ -896,6 +922,41 @@ function canOpenFreeMap() {
     !crashed &&
     !finished
   );
+}
+
+function currentPointFrame() {
+  return pointFlightFrame({ plane, spec: PLANES[selectedPlane], mapMatrix: tiles.group.matrixWorld,
+    mode, runway: landingSystem.runway,
+    clearance: Math.max(3, ...(landingSystem.gear?.points() ?? []).map(wheel => -wheel.point.y)), ground: probeSurface, weather });
+}
+
+function pointMapMarkers() { return tiles ? mapPointGates(flightPoints.gates, tiles.group.matrixWorld) : []; }
+
+function canCollectPoints() {
+  return !menuOpen && !paused && !leaveOpen && !guessOpen && !crashed && !finished && !pendingSnap && !awaitingSnap && !freeMap.open && !spaceScene?.overview;
+}
+
+document.getElementById("points-new-trail").addEventListener("click", () => {
+  if (canCollectPoints()) flightPoints.newTrail(currentPointFrame());
+});
+
+function updateFlightPoints(dt) {
+  const frame = currentPointFrame(), active = canCollectPoints();
+  flightPoints.update(dt, frame, { active });
+  if (active && landingSystem.grounded && landingSystem.touchdown) {
+    flightPoints.award("touchdown", Math.max(250, Math.round(1200 - landingSystem.touchdown.sink * 150)), "Landing bonus");
+    if (landingSystem.status === "stopped") flightPoints.award("stopped", 250, "Safe stop");
+  }
+  if (mode === "arcade" && flightPoints.started) {
+    timeLeft = flightPoints.remaining;
+    if (flightPoints.finished && !finished) {
+      finished = true; timerActive = false;
+      showBanner(flightPoints.score > flightPoints.startBest ? "NEW POINT HUNT RECORD!" : "POINT HUNT COMPLETE");
+    }
+  }
+  const visible = flightPoints.started && !menuOpen && !guessOpen && !leaveOpen && !crashed && !finished && !freeMap.open && !spaceScene?.overview;
+  pointVisuals?.update(flightPoints, frame.position, dt, visible, active);
+  pointHud.update(flightPoints, frame, { visible: visible && !paused, active, camera, hunt: mode === "arcade", time: timerActive ? timeLeft : null });
 }
 
 function poseForMaps() {
@@ -911,14 +972,15 @@ function poseForMaps() {
 function updateLocationMaps() {
   const pose = poseForMaps();
   const showMini = canOpenFreeMap() && !freeMap.open;
+  const gates = (showMini || freeMap.open) ? pointMapMarkers() : [];
   if (showMini && pose) {
-    miniMap.update(pose.lat, pose.lon, pose.heading);
+    miniMap.update(pose.lat, pose.lon, pose.heading, gates);
     miniMap.show();
   } else {
     miniMap.hide();
   }
   if (freeMap.open && pose) {
-    freeMap.update(pose.lat, pose.lon, pose.heading, pose.name);
+    freeMap.update(pose.lat, pose.lon, pose.heading, pose.name, gates);
   }
 }
 
@@ -952,7 +1014,7 @@ function toggleFreeMap() {
   }
   const pose = poseForMaps();
   if (!pose || !canOpenFreeMap()) return;
-  freeMap.update(pose.lat, pose.lon, pose.heading, pose.name);
+  freeMap.update(pose.lat, pose.lon, pose.heading, pose.name, pointMapMarkers());
   freeMap.show();
   miniMap.hide();
 }
@@ -1005,7 +1067,11 @@ function selectPlane(i, dir, silent = false) {
         ? hint.node.classList.contains("hint-touch")
           ? "Red hot-air balloon · slide HEAT to warm or cool the envelope · pull the stick to heat, push to cool · wind carries the balloon · C cycles cameras, including basket view"
           : "<kbd>S</kbd> / <kbd>Shift</kbd> heat to climb · <kbd>W</kbd> / <kbd>Ctrl</kbd> cool to descend · scroll or drag HEAT · <kbd>A</kbd><kbd>D</kbd> rotate basket view · wind controls drift · <kbd>C</kbd> camera · <kbd>M</kbd> map · <kbd>Esc</kbd> pause"
-        : hint.html;
+        : selectedPlane === "falconHeavy"
+          ? hint.node.classList.contains("hint-touch")
+            ? "Throttle controls thrust · separate side boosters, then center core · release cabin opens the fairing · cabin is a game variant"
+            : "<kbd>W</kbd><kbd>S</kbd> tilt · <kbd>A</kbd><kbd>D</kbd> turn · throttle controls thrust · <kbd>Enter</kbd> ×2 side boosters, then center core · <kbd>Enter</kbd> release cabin · <kbd>C</kbd> camera · <kbd>Esc</kbd> pause"
+          : hint.html;
   }
   if (!silent && mp.active && mp.net) {
     mp.net.send({ t: "plane", plane: selectedPlane, from: mp.myId });
@@ -1046,12 +1112,14 @@ runwaySelect.addEventListener("change", () => { selectedApproach = runwaySelect.
 syncLandingSelection(true);
 
 const MODE_PLACEHOLDERS = {
+  arcade: "Starting city… e.g. Paris",
   landing: "Choose an airport and runway",
   free: "Starting city… e.g. Paris",
   home: "Your address… e.g. 5th Avenue, New York",
   guess: "",
 };
 const MODE_DESCS = {
+  arcade: "Three minutes to collect as many rings as you can. Gold: 100 pts, mint: 200 pts. Keep a series for up to ×5; every 10 rings adds 500. Works with every vehicle. M shows rings on the map.",
   landing: "Choose a paved runway in Poland. G: landing gear. Reduce throttle, flare gently with S, then hold B to brake. Landing also works during Free flight.",
   free: "Pick a starting city and fly with no time limit. Land on paved runways across Poland: extend gear with G, touch down on the main wheels and hold B to brake.",
   home: "We drop you ~30 km from home. You have 10 minutes to find your way back.",
@@ -1064,7 +1132,7 @@ function selectMode(m) {
   document
     .querySelectorAll("#menu .mode-card")
     .forEach((b) => b.classList.toggle("selected", b.dataset.mode === m));
-  el.modeDesc.textContent = MODE_DESCS[m];
+  el.modeDesc.textContent = MODE_DESCS[m] + (m === "arcade" ? "" : " Collect gold and mint rings along the way for flight points and a personal record.");
   el.city.placeholder = MODE_PLACEHOLDERS[m];
   el.city.style.display = m === "guess" || m === "landing" ? "none" : "";
   document.getElementById("landing-selectors").hidden = m !== "landing";
@@ -1395,17 +1463,19 @@ function renderTabList() {
     {
       name: mp.myName || "You",
       score: mp.myScore || 0,
+      flightScore: flightPoints.score,
       you: true,
     },
     ...otherPlayers().map((p) => ({
       name: p.name || "Player",
       score: p.score || 0,
+      flightScore: mp.poses.get(p.id)?.samples.at(-1)?.collectionScore ?? 0,
       you: false,
     })),
   ].sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
   el.mpTabList.innerHTML = people
     .map((p) => {
-      const pts = `${p.score} pt${p.score === 1 ? "" : "s"}`;
+      const pts = `${p.score} win${p.score === 1 ? "" : "s"} · ${p.flightScore} flight pts`;
       const you = p.you ? " (You)" : "";
       return `<div class="mp-tab-row"><span class="p-name${
         p.you ? " p-you" : ""
@@ -2197,13 +2267,14 @@ function pushMatePose(id, data) {
     pitch: data.pitch,
     roll: data.roll,
     kmh: Number.isFinite(data.kmh) ? Math.max(0, data.kmh) : 0,
+    collectionScore: validPointScore(data.collectionScore),
     controlRoll: poseControl(data.controlRoll, -data.roll / 0.9),
     controlPitch: poseControl(data.controlPitch, data.pitch / 0.4),
     throttle: Number.isFinite(data.throttle) ? Math.max(0, Math.min(1, data.throttle)) : .6,
     airbrake: Number.isFinite(data.airbrake) ? Math.max(0, Math.min(1, data.airbrake)) : 0,
     tow: data.plane === "sailplane" ? parseTowSnapshot(data.tow) : null,
     dragonReleased: data.dragonReleased === true,
-    booster: data.plane === "falcon9" ? parseBoosterSnapshot(data.booster) : null,
+    booster: isFalconVehicle(data.plane) ? parseBoosterSnapshot(data.booster) : null,
   });
   if (track.samples.length > 24)
     track.samples.splice(0, track.samples.length - 24);
@@ -2663,6 +2734,7 @@ async function init() {
 
   try {
     scene = new Scene();
+    pointVisuals = new PointVisuals(scene);
     scene.background = null;
     scene.fog = new FogExp2(0x9dd0ea, 0.00007);
 
@@ -2858,6 +2930,7 @@ async function init() {
       );
     });
     window.__game = {
+      get flightPoints() { return flightPoints; },
       get planeMesh() {
         return planeMesh;
       },
@@ -2872,6 +2945,11 @@ async function init() {
       },
     };
     window.__scene = scene;
+    disposeCameraDrag = bindFlightCameraDrag(renderer.domElement, flightCamera, () => ({
+      enabled: !menuOpen && !paused && !guessOpen && !leaveOpen && !freeMap.open && !spaceScene.overview && !pendingSnap && !awaitingSnap,
+      camera, position: planePos, frame: camFrameQuat, minimumPitch: plane?.spaceStatus === "landed-moon" ? 0 : undefined,
+      onStart() { lunarSurfaceView = false; document.getElementById("lunar-camera").checked = false; },
+    }));
     gameReady = true;
     clearStarting();
     if (
@@ -3030,11 +3108,14 @@ function loadMate(id, key) {
 }
 
 function resetFlight(latDeg, lonDeg) {
+  flightPoints.reset({ mode, vehicle: selectedPlane });
+  pointVisuals?.reset();
   falconStageInput.reset();
   sailplaneTow.reset(); grassLanding.reset();
   toggleSpaceMap(false);
   spaceTime = 0;
   lunarSurfaceView = false; document.getElementById("lunar-camera").checked = false;
+  flightCamera.mouseOrbit = null;
   document.getElementById("space-warp").value = "1";
   document.getElementById("space-destination").value = "moon";
   document.getElementById("space-view").value = "earth-moon";
@@ -3052,7 +3133,7 @@ function resetFlight(latDeg, lonDeg) {
   lastMissileShotSeq.clear();
   for (const explosion of explosions) explosion.dispose();
   explosions.length = 0;
-  timeLeft = mode === "home" ? HOME_TIME : mode === "guess" ? GUESS_TIME : 0;
+  timeLeft = mode === "home" ? HOME_TIME : mode === "guess" ? GUESS_TIME : mode === "arcade" ? POINT_HUNT_SECONDS : 0;
   timerActive = false;
   startLat = latDeg;
   startLon = lonDeg;
@@ -3428,7 +3509,7 @@ async function startGame() {
       const runway = airportRunways.get(selectedApproach);
       const p = runway.pose(0, runway.definition.threshold - 6000, 340);
       beginFlight(p.lat * 180 / Math.PI, p.lon * 180 / Math.PI);
-    } else if (mode === "free") {
+    } else if (mode === "free" || mode === "arcade") {
       const city = el.city.value.trim() || "Niepruszewo";
       el.menuError.textContent = `Looking up: ${city}…`;
       const loc = await geocodeCity(city);
@@ -3474,7 +3555,7 @@ function beginFlight(lat, lon) {
   if (selectedPlane !== planeMesh?.userData?.key) loadPlane(selectedPlane);
   resetFlight(lat, lon);
   retryFailedTiles(true);
-  el.timerBox.classList.toggle("show", mode === "home" || mode === "guess");
+  el.timerBox.classList.toggle("show", mode === "home" || mode === "guess" || mode === "arcade");
   el.distBox.classList.remove("show");
   lastPlaceAt = 0;
   hidePlaceBadge();
@@ -3505,7 +3586,7 @@ function finishSnapStart() {
   }
   // Start with the full mode duration only after the terrain is ready, even
   // when this flight was restarted or entered through a different start path.
-  timeLeft = mode === "home" ? HOME_TIME : mode === "guess" ? GUESS_TIME : 0;
+  timeLeft = mode === "home" ? HOME_TIME : mode === "guess" ? GUESS_TIME : mode === "arcade" ? POINT_HUNT_SECONDS : 0;
   paused = false;
   hideBanner();
   if (el.menu.contains(document.activeElement)) document.activeElement.blur();
@@ -3520,7 +3601,8 @@ function finishSnapStart() {
   carousel.setActive(false);
   hideMpWait();
   el.start.disabled = false;
-  timerActive = mode === "guess" || mode === "home";
+  timerActive = mode === "guess" || mode === "home" || mode === "arcade";
+  flightPoints.start(currentPointFrame());
   clearError();
   updateMpPresence();
   if (mode === "free") {
@@ -3977,8 +4059,8 @@ function updateGuessScores() {
   renderGuessStats();
   if (!el.gmScoreLeft || !el.gmScoreRight) return;
   if (!mp.active) {
-    el.gmScoreLeft.textContent = "";
-    el.gmScoreRight.textContent = "";
+    el.gmScoreLeft.textContent = `${flightPoints.score} flight pts`;
+    el.gmScoreRight.textContent = `Record ${flightPoints.best}`;
     return;
   }
   el.gmScoreLeft.textContent = `You ${mp.myScore}`;
@@ -4013,6 +4095,7 @@ el.gmCanvas.addEventListener("click", (e) => {
   const errKm = distanceM(lat, lon, plane.latDeg, plane.lonDeg) / 1000;
   guessAnswered = true;
   recordSoloGuess(errKm);
+  flightPoints.award("guess", Math.round(3000 * Math.exp(-errKm / 250)), "Location bonus");
   drawGuessMap([
     {
       lat: plane.latDeg,
@@ -4023,7 +4106,8 @@ el.gmCanvas.addEventListener("click", (e) => {
     },
     { lat, lon, color: "#f3ead6", label: "Your guess" },
   ]);
-  el.gmResult.textContent = `Off by ${Math.round(errKm)} km`;
+  el.gmResult.textContent = `Off by ${Math.round(errKm)} km · ${flightPoints.summary()}`;
+  updateGuessScores();
   el.gmClose.style.display = "";
   el.gmRetry.style.display = "";
 });
@@ -4086,7 +4170,7 @@ window.addEventListener("keydown", (e) => {
   }
   if (k === "m" && !e.repeat && !menuOpen && !guessOpen && !paused) {
     e.preventDefault();
-    if (mode === "free") toggleFreeMap();
+    if (["free", "arcade", "landing"].includes(mode)) toggleFreeMap();
     else showMapUnavailable();
     return;
   }
@@ -4104,6 +4188,7 @@ window.addEventListener("keydown", (e) => {
     }
     if (k === "c") {
       e.preventDefault();
+      lunarSurfaceView = false; document.getElementById("lunar-camera").checked = false;
       flightCamera.cycle(camera);
       return;
     }
@@ -4116,7 +4201,7 @@ window.addEventListener("keydown", (e) => {
     if (k === "l" && plane?.isSailplane && !crashed && !finished) {
       e.preventDefault(); sailplaneTow.release(plane, landingSystem); return;
     }
-    if (k === "enter" && selectedPlane === "falcon9" && !crashed && !finished && !freeMap.open && !pendingSnap && !awaitingSnap) {
+    if (k === "enter" && isFalconVehicle(selectedPlane) && !crashed && !finished && !freeMap.open && !pendingSnap && !awaitingSnap) {
       e.preventDefault();
       falconStageInput.press(performance.now());
       return;
@@ -4167,7 +4252,7 @@ brakeButton?.addEventListener("pointerdown", e => { if (paused || crashed) retur
 for (const event of ["pointerup", "pointercancel", "lostpointercapture"]) brakeButton?.addEventListener(event, () => { landingBrake = false; });
 
 function deployBooster() {
-  if (selectedPlane !== "falcon9" || menuOpen || paused || guessOpen || leaveOpen || crashed || finished ||
+  if (!isFalconVehicle(selectedPlane) || menuOpen || paused || guessOpen || leaveOpen || crashed || finished ||
       freeMap.open || pendingSnap || awaitingSnap || !plane.isLunar || plane.height > 150000) return;
   const normal = WGS84_ELLIPSOID.getCartographicToNormal(plane.lat, plane.lon, new Vector3()).transformDirection(tiles.group.matrixWorld);
   const basis = frameAt(plane.lat, plane.lon, plane.height, 0, 0, 0);
@@ -4189,7 +4274,7 @@ function deployBooster() {
 document.getElementById("booster-release")?.addEventListener("click", () => { falconStageInput.reset(); deployBooster(); });
 
 function deployDragon() {
-  if (selectedPlane !== "falcon9" || menuOpen || paused || guessOpen || leaveOpen || crashed || finished || freeMap.open || pendingSnap || awaitingSnap) return;
+  if (!isFalconVehicle(selectedPlane) || menuOpen || paused || guessOpen || leaveOpen || crashed || finished || freeMap.open || pendingSnap || awaitingSnap) return;
   if (plane.isLunar && plane.height > 80000) return;
   // Controller stores east/north/up; the level flight frame is east/up/south.
   const v = plane.velocity;
@@ -4222,7 +4307,7 @@ document.getElementById("moon-guidance").addEventListener("click", () => {
     if (spaceScene.overviewMode === "body") spaceScene.setOverviewMode("body", id);
   }
 });
-document.getElementById("lunar-camera").addEventListener("change", e => { lunarSurfaceView = e.target.checked; });
+document.getElementById("lunar-camera").addEventListener("change", e => { lunarSurfaceView = e.target.checked; if (lunarSurfaceView) flightCamera.mouseOrbit = null; });
 document.getElementById("lunar-light").addEventListener("change", e => { spaceScene.surfaceLightEnabled = e.target.checked; });
 document.getElementById("space-destination").addEventListener("change", e => {
   spaceScene.focusBodyId = e.target.value;
@@ -4268,7 +4353,7 @@ function updateSpaceHud() {
   document.getElementById("space-manual").hidden = !plane.orbit;
   document.getElementById("space-travel-help").textContent = d?.status === "landed-moon"
     ? "Landed on lunar terrain. Surface camera shows the surrounding craters; C cycles flight views. Take off to explore the craters, or choose another planet."
-    : !d ? "Choose SpaceX Falcon 9 in the vehicle menu to travel to the planets and land on the Moon."
+    : !d ? "Choose SpaceX Falcon 9 or Falcon Heavy in the vehicle menu to travel to the planets and land on the Moon."
     : d?.guidancePhase === "cruise" ? "Cruise drive engaged. Stop guidance to return to manual flight."
     : d?.guidancePhase === "orbit" ? "Orbit reached. Use Space map → Selected destination to explore, or choose your next destination."
     : "Planetary cruise takes about a minute. Moon guidance lands automatically; set mission time to 1000× for the transfer.";
@@ -4508,7 +4593,7 @@ function syncTouchUi() {
   el.touch.classList.toggle("hidden", !show);
   el.touch.classList.toggle("show", show);
   el.touch.classList.toggle("talk", voiceEnabled());
-  el.touch.classList.toggle("free", mode === "free");
+  el.touch.classList.toggle("free", ["free", "arcade", "landing"].includes(mode));
   syncThrottleVis();
   if (!show) resetStick();
 }
@@ -4578,7 +4663,8 @@ window.__foeDebug = () => ({
   tileSlot: tilePool?.current?.slot || -1,
   tileMaxed: tile429Count,
   camPos: camera?.position?.toArray?.() || [],
-  cameraMode: FLIGHT_CAMERAS[flightCamera.mode].name,
+  cameraMode: flightCamera.mouseOrbit ? "Mouse orbit" : FLIGHT_CAMERAS[flightCamera.mode].name,
+  cameraOrbit: flightCamera.mouseOrbit ? { ...flightCamera.mouseOrbit } : null,
   traffic: liveTraffic?.debug(),
   spaceSky: sky?.uniforms.uSpace.value,
   daylight: localSun ? { ...localSun, utc: new Date(solar.utcMs).toISOString(), siderealAngle: solar.siderealAngle } : null,
@@ -4615,6 +4701,7 @@ window.addEventListener("unhandledrejection", (e) => {
   else if (el.menuError) el.menuError.textContent = msg;
 });
 window.addEventListener("pagehide", () => {
+  disposeCameraDrag?.();
   if (isMobile && awaitingSnap) markStarting();
 });
 
@@ -4635,7 +4722,9 @@ function tickFrame() {
   frameCount += 1;
   scene.updateMatrixWorld();
 
-  let flying = !menuOpen && !paused && !guessOpen && !crashed && !finished;
+  // The hunt clock pauses on either map, so its aircraft must pause too.
+  let flying = !menuOpen && !paused && !guessOpen && !crashed && !finished &&
+    !(mode === "arcade" && (freeMap.open || spaceScene.overview));
   if (flying && !leaveOpen && !freeMap.open && !pendingSnap && !awaitingSnap) falconStageInput.update(performance.now());
   else falconStageInput.reset();
 
@@ -4770,21 +4859,28 @@ function tickFrame() {
   updateBooster(planeMesh, dt, tiles.group, { active: !menuOpen && !paused && !guessOpen,
     visible: !menuOpen && !guessOpen, timeWarp: plane.effectiveTimeWarp ?? 1 });
   const boosterButton = document.getElementById("booster-release"), boosterStatus = document.getElementById("booster-status");
-  const falcon = selectedPlane === "falcon9" ? falconState(planeMesh) : null;
+  const falcon = isFalconVehicle(selectedPlane) ? falconState(planeMesh) : null;
   boosterButton.hidden = !verticalRocket || !flying || freeMap.open;
   boosterButton.disabled = !falcon || falcon.boosterReleased || pendingSnap || awaitingSnap || plane.height > 150000 || plane.height - groundAlt < 60;
-  boosterButton.textContent = falcon?.boosterReleased ? "Booster separated" : "Enter ×2 · Separate booster";
-  boosterStatus.hidden = !falcon?.recovery;
-  if (falcon?.recovery) {
-    const recovery = falcon.recovery;
+  boosterButton.textContent = falcon?.variant === "heavy"
+    ? falcon.boosterReleased ? "All cores separated" : falcon.sideBoostersReleased ? "Enter ×2 · Separate center core" : "Enter ×2 · Separate side boosters"
+    : falcon?.boosterReleased ? "Booster separated" : "Enter ×2 · Separate booster";
+  const recovering = falconBoosters(falcon).filter(stage => stage.recovery);
+  boosterStatus.hidden = recovering.length === 0;
+  if (recovering.length) {
     const labels = { separation: "SEPARATION", boostback: "BOOSTBACK BURN", entry: "RETURNING", "landing-burn": "LANDING BURN", landed: "BOOSTER LANDED", failed: "BOOSTER LOST" };
-    boosterStatus.textContent = `${labels[recovery.phase]} · ${Math.max(0, recovery.height).toFixed(0)} m · legs ${Math.round(recovery.legs * 100)}%`;
+    boosterStatus.textContent = recovering.map(stage => {
+      const recovery = stage.recovery, label = falcon.variant === "heavy" ? `${stage.id.toUpperCase()}: ` : "";
+      return `${label}${labels[recovery.phase]} · ${Math.max(0, recovery.height).toFixed(0)} m · legs ${Math.round(recovery.legs * 100)}%`;
+    }).join("\n");
   }
   if (el.dragonRelease) {
     el.dragonRelease.hidden = !verticalRocket || !flying || freeMap.open || plane.height > 80000;
     const released = !!falconState(planeMesh)?.released;
     el.dragonRelease.disabled = released || plane.height > 80000;
-    el.dragonRelease.textContent = released ? "Dragon released" : plane.height > 80000 ? "Dragon parachute · below 80 km" : "Enter · Release Dragon";
+    el.dragonRelease.textContent = falcon?.variant === "heavy"
+      ? released ? "Cabin released" : "Enter · Release cabin + fairing"
+      : released ? "Dragon released" : plane.height > 80000 ? "Dragon parachute · below 80 km" : "Enter · Release Dragon";
   }
   if (el.missileFire) {
     const status = fighterMissiles?.status(planeMesh);
@@ -4809,6 +4905,7 @@ function tickFrame() {
       mp.poseSeq += 1;
       mp.net?.send({
         t: "pose",
+        collectionScore: flightPoints.score,
         from: mp.myId,
         seq: mp.poseSeq,
         at: now,
@@ -4826,7 +4923,7 @@ function tickFrame() {
         airbrake: plane.airbrake ?? 0,
         tow: plane.isSailplane ? sailplaneTow.snapshot() : null,
         dragonReleased: !!falconState(planeMesh)?.released,
-        booster: selectedPlane === "falcon9" ? boosterSnapshot(planeMesh, tiles.group.matrixWorld) : null,
+        booster: isFalconVehicle(selectedPlane) ? boosterSnapshot(planeMesh, tiles.group.matrixWorld) : null,
       });
     }
   }
@@ -4886,7 +4983,7 @@ function tickFrame() {
       } else mate.towVisuals?.dispose();
       const mateVertical = PLANES[mate.key].vertical;
       if (mateVertical && to.booster) syncBooster(mate.mesh, scene, to.booster, tiles.group.matrixWorld, vehicleGroundShadows);
-      else if (mateVertical && falconState(mate.mesh)?.boosterReleased) resetFalcon9(mate.mesh);
+      else if (mateVertical && falconBoosters(falconState(mate.mesh)).some(stage => stage.boosterReleased)) resetFalcon9(mate.mesh);
       const mateThrottle = to.throttle ?? .6;
       updateRocketExhaust(mate.mesh, dt, mateVertical ? mateThrottle * 15000 : kmh, !paused && (!mateVertical || mateThrottle > .02));
       if (mateVertical && to.dragonReleased && !falconState(mate.mesh)?.released) {
@@ -4925,6 +5022,17 @@ function tickFrame() {
   camFrame.decompose(camFramePos, camFrameQuat, camFrameScale);
   if (plane.isLunar && plane.height > 100000) camFrameQuat.copy(planeQuat);
   flightCamera.update(camOffset, planePos, planeQuat, camFrameQuat);
+  if (plane.orbit && flightCamera.mode === 0 && !flightCamera.mouseOrbit) {
+    // Frame both the craft and its destination on arrival, instead of leaving
+    // the planet below the chase camera's field of view.
+    const target = inertialToECEF(bodyPositionInertial(plane.orbit.id, spaceTime), spaceTime).applyMatrix4(tiles.group.matrixWorld);
+    const outward = planePos.clone().sub(target).normalize();
+    const side = new Vector3(0, 1, 0).cross(outward);
+    if (side.lengthSq() < .01) side.set(1, 0, 0).cross(outward);
+    side.normalize(); const up = outward.clone().cross(side).normalize();
+    camPos.copy(planePos).addScaledVector(outward, 135).addScaledVector(side, 75).addScaledVector(up, 25);
+    camTarget.copy(target); flightCamera.up.copy(up);
+  }
   if (lunarSurfaceView && spaceScene.patch.visible) {
     camPos.set(380, 450, 650).applyQuaternion(spaceScene.patch.quaternion).add(planePos);
     camTarget.copy(planePos);
@@ -4961,6 +5069,7 @@ function tickFrame() {
   spaceSun.copy(solar.sunInertial);
   WGS84_ELLIPSOID.getCartographicToPosition(plane.lat, plane.lon, plane.height, spaceObserver);
   const farFromEarth = spaceObserver.length() > SPACE_CONSTANTS.MOON_DISTANCE * 2;
+  sky.uniforms.uPhysicalSun.value = farFromEarth ? 1 : 0;
   const sunECEF = farFromEarth
     ? inertialToECEF(bodyPositionInertial("sun", spaceTime), spaceTime).sub(spaceObserver).normalize()
     : solar.sunECEF;
@@ -5109,9 +5218,12 @@ function tickFrame() {
     beacon.visible = false;
   }
 
+  updateFlightPoints(dt);
+
   // tryby: timer + warunki wygranej
   if (
     timerActive &&
+    mode !== "arcade" &&
     !pendingSnap &&
     !awaitingSnap &&
     !menuOpen &&
@@ -5167,6 +5279,7 @@ function tickFrame() {
       homeTarget.lon
     );
     if (dist < HOME_CAPTURE_M) {
+      flightPoints.award("home", 2000, "Home found");
       finished = true;
       timerActive = false;
       beacon.visible = false;
@@ -5281,7 +5394,8 @@ function tickFrame() {
     music: musicDebug(),
     camDist: camera.position.distanceTo(planePos),
     camOffset,
-    cameraMode: FLIGHT_CAMERAS[flightCamera.mode].name,
+    cameraMode: flightCamera.mouseOrbit ? "Mouse orbit" : FLIGHT_CAMERAS[flightCamera.mode].name,
+  cameraOrbit: flightCamera.mouseOrbit ? { ...flightCamera.mouseOrbit } : null,
     mpActive: mp.active,
     inRound: mp.inRound,
     menuOpen,
@@ -5365,8 +5479,8 @@ function showBanner(title, sub = "") {
   if (!el.banner) return;
   el.banner.querySelector(".b-title").textContent = title;
   const subEl = el.banner.querySelector(".b-sub");
-  subEl.textContent = sub;
-  subEl.style.display = sub ? "" : "none";
+  subEl.textContent = [sub, flightPoints.started ? flightPoints.summary() : ""].filter(Boolean).join(" · ");
+  subEl.style.display = subEl.textContent ? "" : "none";
   if (!showHomeTrail()) {
     if (el.homeTrail) el.homeTrail.hidden = true;
     el.banner.classList.remove("trail");

@@ -13,7 +13,7 @@ const catalogue = parseAst(source).body.flatMap(node => node.declarations ?? [])
 function vehicle(key) {
   const value = catalogue.properties.find(node => node.key.name === key).value;
   const spec = vm.runInNewContext(`(${source.slice(value.start, value.end)})`, {
-    asset: path => path, prepareRocket() {}, createFalcon9() {},
+    asset: path => path, prepareRocket() {}, createFalcon9() {}, createFalconHeavy() {},
   });
   return createVehicleController(52, 21, 6000, 0, spec);
 }
@@ -56,4 +56,14 @@ test("SpaceX Falcon 9 retains lunar physics and assisted Moon flight", () => {
   assert(falcon.isLunar && falcon.vertical);
   assert.equal(falcon.startLunarGuidance(), true);
   assert.equal(falcon.guidanceActive, true);
+});
+
+test("Falcon Heavy is selectable as a vertical lunar vehicle with clearance for its 70 m model", () => {
+  const falcon = vehicle("falconHeavy");
+  assert(falcon instanceof LunarController);
+  assert(falcon.vertical);
+  assert.equal(falcon.surfaceClearance, 35);
+  assert.equal(falcon.startLunarGuidance(), true);
+  const order = parseAst(source).body.flatMap(node => node.declarations ?? []).find(node => node.id.name === "PLANE_ORDER").init;
+  assert(order.elements.some(node => node.value === "falconHeavy"));
 });

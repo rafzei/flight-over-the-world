@@ -148,6 +148,7 @@ export class SpaceScene {
     this.orbits.visible = active && this.overview && this.overviewMode === 'solar';
     this.orbits.position.copy(this.sunDisc.position);
     this.orbits.quaternion.copy(this.ecefOrientation).multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), -moonSiderealAngle));
+    this.sunDisc.visible = active && (this.overview || observerECEF.length() > SPACE_CONSTANTS.MOON_DISTANCE * 2);
     this.earth.visible = active && (this.overview || altitude > 120000);
     this.moon.visible = active && (this.overview || altitude > 20000);
     this.shipMarker.position.copy(this.shipWorld); this.shipMarker.visible = active && this.overview;

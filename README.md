@@ -34,11 +34,22 @@ Fly over photorealistic Earth – guess the region, find your way home, or just 
 - **Guess the region** – one minute of flight, then mark on the map where you are (Poland / Europe / World).
 - **Fly home** – start ~30 km from the address you enter, 10 minutes to get back.
 - **Free flight** – pick a city and fly. Land on paved runways across Poland without changing modes; the game detects the runway and approach direction automatically.
+- **Point hunt** – pick a city and any vehicle, then collect as many rings as possible in three minutes of active flight. The result shows points, collected rings, best series and your personal record. Try again starts a fresh round.
 - **Land** – choose an airport and runway direction from the Polish catalogue (64 airports, 68 runways). Start 6 km before the threshold, aligned with a 3° approach and landing gear down. Available for Piper, Q400, Citation, Boeing 737, Embraer E195LR, Airbus A321/A320 and Fighter. Choose a light aircraft for short or narrow strips.
+
+### Flight points in every mode
+
+All fourteen vehicles collect points in Point hunt, Free flight, Fly home and Guess the region; aircraft supported by Land also collect them on approach. Fly through a gold ring for **100 points**, or a mint ring for **200**. Consecutive pickups increase the multiplier every three rings, up to **×5**; every ten collected rings adds **500 points**. Missing a ring or waiting too long breaks the series. **New trail** places new rings ahead after a three-second cooldown, preserves points and resets the series.
+
+Rings stay in fixed world positions. Their spacing follows the vehicle's speed, with wind-aligned trails for balloons, descending trails for sailplanes and vertical trails for ascending Falcons. Land follows the runway's three-degree approach and leaves the last 300 m before the aiming point clear. Terrain available when generating a trail raises obstructed rings above the surface.
+
+The points panel shows the next ring's distance and relative altitude. **M** and the minimap show ring locations in Free flight, Point hunt and Land. Fly home and Guess the region keep their map restrictions; follow the visible rings and relative arrow. Collection pauses during menus, loading, pause, map views and after a crash or completed round. In Point hunt, map views also pause the timer and vehicle. Teleports rebase the trail without awarding points for the jump.
+
+Finding home adds **2,000 points**. A location guess adds up to **3,000**, decreasing with distance error. A successful touchdown adds **250–1,200**, depending on descent speed; a safe stop adds **250**. Each mission bonus is awarded once per flight. Records persist in this browser separately for each mode and vehicle; if storage is unavailable, records last for the session. Multiplayer rings are individual, and the **Tab** player list displays flight points separately from region wins.
 
 ## Vehicles
 
-Thirteen vehicles are available in single player and multiplayer:
+Fourteen vehicles are available in single player and multiplayer:
 
 | Vehicle | Cruise / max speed | Flight characteristics and features |
 | --- | --- | --- |
@@ -54,6 +65,7 @@ Thirteen vehicles are available in single player and multiplayer:
 | **Rocket** | ~790 / 5000 km/h | Fast aircraft with standard pitch, bank and throttle controls, four fin trails and high-speed engine exhaust. |
 | **Combat Drone** | 120 / 320 km/h | Armed quadrotor replacing Rocket 1, with four spinning rotors, two forward-firing rotary cannons, a camera and red lights. Independent lift and automatic braking; cutting throttle makes it descend under gravity. |
 | **SpaceX Falcon 9** | Thrust-controlled; no fixed speed cap | Two-stage game spacecraft with nine first-stage engines and assisted travel to every planet and lunar landing. Double-tap `Enter` during ascent to separate the returning booster; single `Enter` below 80 km releases Dragon. |
+| **SpaceX Falcon Heavy** | Thrust-controlled; no fixed speed cap | 70 m triple-core rocket with 27 Merlin engines, twelve legs and grid fins. Detach side boosters, then the center core; release a fictional cabin from inside the two-part payload fairing. |
 | **Red hot-air balloon** | Wind drift, typically 10–30 km/h | Original red fabric envelope, open wicker basket, suspension cables, propane tanks and animated twin burners. Heat controls lift; the wind carries the balloon. |
 
 Aircraft speeds are game settings, not real-world specifications. Aircraft can exceed their nominal maximum in a dive. Falcon 9 inherits Earth's eastward surface velocity and accelerates under thrust; the HUD uses speed relative to Earth near the launch site. In space, its flight panel identifies the distance and speed relative to the selected destination.
@@ -69,6 +81,8 @@ The drone uses `A` / `D` to turn, even at zero forward speed, and `W` / `S` to d
 For Falcon 9 staging, press `Enter` twice within 300 ms, or tap **Separate booster**, between 60 m above the ground and 150 km altitude. The upper stage continues with its inherited velocity while the first stage returns autonomously to the ground below the separation point. It brakes with its engines, deploys four grid fins, unfolds four hinged landing legs near the ground and settles upright with the engines off. The booster status reports its descent and touchdown; staging and recovery are visible in multiplayer. A single Enter waits for the double-press window before releasing Dragon. Pause or restart cancels a pending press.
 
 The first-stage arrangement follows [SpaceX's Falcon 9 overview](https://www.spacex.com/vehicles/falcon-9/): nine Merlin engines, four grid fins at the interstage and four legs stowed against the base until landing. Booster recovery is assisted gameplay with unlimited propellant, using integrated motion and terrain contact.
+
+**Falcon Heavy** is next to Falcon 9 in the vehicle menu and supports the same assisted space flight. Double-tap `Enter` to separate both side boosters; double-tap again to separate the center core. Each core returns independently, with separate landing targets and its own engines, fins and legs. Single `Enter` opens both fairing halves and releases a parachute-equipped cabin below 80 km. The cabin is a **fictional game variant** inside the real-style payload fairing. The on-screen buttons support touch; all three booster poses synchronize in multiplayer. See [Falcon Heavy research and sources](docs/falcon-heavy-research.md) for verified dimensions, inspected photographs and simulation limits.
 
 The **red hot-air balloon** starts airborne. Use the **HEAT** slider or mouse wheel to adjust its burner; approximately 50% maintains height below 2.5 km. Hold `S` / `Shift` to heat and climb, or `W` / `Ctrl` to cool and descend. The envelope warms and cools gradually, so vertical motion responds with a delay. `A` / `D` rotate the basket and camera without steering horizontal drift; change altitude to find a different wind layer. `C` cycles the camera views, including a level view from the basket. The touch stick also controls heating/cooling. Wind is a deterministic game model, not live weather. Terrain impacts retain the game's collision behavior; the balloon is not available in runway landing practice. Its burners, gentle sway and glowing red envelope appear in multiplayer and in the live day/night lighting.
 
@@ -130,11 +144,13 @@ Imagery: [Moon LROC colour map](https://svs.gsfc.nasa.gov/4720/) — NASA/GSFC/A
 | `B` (hold) | Wheel brakes during landing rollout |
 | `,` | Set minimum throttle |
 | `.` | Set maximum throttle |
+| Hold left mouse button + drag | Orbit the camera around the vehicle; release to keep the view, `C` to resume preset views |
 | `C` | Cycle camera: chase → 3× farther → 5× farther → nose view → fixed tracking → front |
-| `M` | Open / close the map in free flight |
+| `M` | Open / close the map in Free flight, Point hunt and Land |
+| **New trail** | Generate a fresh ring trail; keep points and reset the series |
 | Mouse wheel / `+` / `−` / pinch over the map | Zoom the map |
-| `Enter` | Drone: fire a cannon burst; Fighter: launch a missile; Falcon 9: release Dragon once per flight |
-| `Enter` twice quickly | Falcon 9: separate the booster for an automatic landing; continue flying the upper stage |
+| `Enter` | Drone: fire a cannon burst; Fighter: launch a missile; Falcon 9: release Dragon; Falcon Heavy: release cabin and fairing |
+| `Enter` twice quickly | Falcon 9: separate booster; Falcon Heavy: separate side boosters, then center core on the next double press |
 | `Tab` | Show multiplayer player list (hold) |
 | `T` | Talk (hold) |
 | `Esc` | Close map, pause single player, or open the multiplayer leave menu |

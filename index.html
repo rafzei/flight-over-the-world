@@ -145,6 +145,7 @@
             <span class="m-name">Free flight</span>
           </button>
           <button class="mode-card" data-mode="landing" type="button"><span class="m-name">Land</span></button>
+          <button class="mode-card" data-mode="arcade" type="button"><span class="m-name">Point hunt</span></button>
         </div>
         <p id="mode-desc"></p>
         <div id="landing-selectors" hidden>
@@ -236,6 +237,12 @@
     </div>
 
     <div id="hud">
+      <section id="flight-points" aria-label="Flight points" hidden>
+        <div class="points-top"><span data-points-title>FLIGHT POINTS</span><span data-points-best>Best 0</span></div>
+        <div class="points-total"><strong data-points-score>0</strong><span>pts</span><span data-points-series>0 in a row · ×1</span></div>
+        <div class="points-next"><span data-points-arrow aria-hidden="true">↑</span><span data-points-target>Fly through the gold rings</span></div>
+        <div class="points-bottom"><span data-points-notice>Gold 100 · mint 200</span><button id="points-new-trail" type="button" title="Place a new trail ahead; resets the series">New trail</button></div>
+      </section>
       <section id="flight-clock" aria-label="Time at aircraft position" hidden>
         <div class="flight-clock-face"><time>--:--:--</time><span data-clock-phase>Live</span></div>
         <div data-clock-zone></div>

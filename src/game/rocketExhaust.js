@@ -34,8 +34,20 @@ function glowTexture() {
 
 // Attach to a centered model, including a stage already placed on Earth.
 // Flight points toward -Z, so the engine plume extends along local +Z.
-export function attachRocketExhaust(root, { axis = "z", ignitionKmh = IGNITION_KMH } = {}) {
+export function attachRocketExhaust(root, { axis = "z", ignitionKmh = IGNITION_KMH, nozzle } = {}) {
   if (root.userData.rocketExhaust) return;
+  // Authored engine mounts let multi-core vehicles emit from every live core.
+  // A detached core owns its own exhaust; it is no longer traversed here.
+  const mounts = [];
+  if (!nozzle) root.traverse(node => { if (node.userData.rocketNozzle) mounts.push(node); });
+  if (mounts.length) {
+    for (const mount of mounts) attachRocketExhaust(mount, { axis: "y", ignitionKmh, nozzle: mount.userData.rocketNozzle });
+    root.userData.rocketExhaust = {
+      update(dt, kmh, active) { for (const mount of mounts) updateRocketExhaust(mount, dt, kmh, active && mount.userData.engineEnabled !== false); },
+      dispose() { for (const mount of mounts) disposeRocketExhaust(mount); delete root.userData.rocketExhaust; },
+    };
+    return;
+  }
   root.updateWorldMatrix(true, true);
   const inverse = root.matrixWorld.clone().invert(), box = new Box3();
   root.traverse(mesh => {
@@ -45,8 +57,8 @@ export function attachRocketExhaust(root, { axis = "z", ignitionKmh = IGNITION_K
   });
   const size = box.getSize(new Vector3());
   const center = box.getCenter(new Vector3());
-  const bodyLength = size[axis];
-  const nozzleRadius = Math.min(size.x, axis === "y" ? size.z : size.y) * (axis === "y" ? .3 : .12);
+  const bodyLength = nozzle?.length ?? size[axis];
+  const nozzleRadius = nozzle?.radius ?? Math.min(size.x, axis === "y" ? size.z : size.y) * (axis === "y" ? .3 : .12);
   const group = new Group();
   group.name = "rocket-exhaust";
   group.position.set(center.x, center.y, box.max.z - bodyLength * 0.025);
@@ -54,6 +66,7 @@ export function attachRocketExhaust(root, { axis = "z", ignitionKmh = IGNITION_K
     group.position.set(center.x, box.min.y + .15, center.z);
     group.rotation.x = Math.PI / 2;
   }
+  if (nozzle) group.position.set(0, 0, 0);
   group.visible = false;
   root.add(group);
 

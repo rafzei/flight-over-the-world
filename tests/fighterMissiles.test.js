@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { isFalconVehicle } from "../src/game/falcon9.js";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
@@ -130,6 +131,7 @@ test("Enter routes Fighter missiles, Drone cannons and Falcon Dragon, with input
   const droneFire = ast.body.find(node => node.type === "FunctionDeclaration" && node.id.name === "fireDroneCannons");
   let shots = 0, releases = 0, bursts = 0;
   const context = vm.createContext({
+    isFalconVehicle,
     selectedPlane: "jet", mp: { active: false }, menuOpen: false, paused: false, guessOpen: false, leaveOpen: false,
     crashed: false, finished: false, pendingSnap: false, awaitingSnap: false, freeMap: { open: false },
     keys: new Set(), Vector3, frameAt: () => new Matrix4(), plane: { lat: 0, lon: 0, height: 100, speed: 400 }, planeMesh: {},
@@ -149,7 +151,11 @@ test("Enter routes Fighter missiles, Drone cannons and Falcon Dragon, with input
   }
   context.freeMap.open = true; enter(); context.freeMap.open = false; assert.equal(shots, 1);
   context.selectedPlane = "falcon9"; enter(); assert.equal(releases, 1); assert.equal(shots, 1);
-  context.selectedPlane = "drone"; enter(); assert.equal(bursts, 1); assert.equal(releases, 1); assert.equal(shots, 1);
+  context.selectedPlane = "falconHeavy"; enter(); assert.equal(releases, 2); assert.equal(shots, 1);
+  for (const guard of ["menuOpen", "paused", "guessOpen", "leaveOpen", "crashed", "finished", "pendingSnap", "awaitingSnap"]) {
+    context[guard] = true; enter(); context[guard] = false; assert.equal(releases, 2, guard);
+  }
+  context.selectedPlane = "drone"; enter(); assert.equal(bursts, 1); assert.equal(releases, 2); assert.equal(shots, 1);
   enter({ repeat: true }); enter({ target: { tagName: "INPUT" } }); enter({ target: { isContentEditable: true } });
   enter({ ctrlKey: true }); enter({ metaKey: true }); enter({ altKey: true });
   assert.equal(bursts, 1);

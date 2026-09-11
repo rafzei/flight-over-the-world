@@ -10,7 +10,7 @@ import { BoosterRecovery } from "./boosterRecovery.js";
 import { attachRocketExhaust, disposeRocketExhaust, updateRocketExhaust } from "./rocketExhaust.js";
 import { raycastTerrain } from "./vehicleCollision.js";
 
-function mergeStatic(root) {
+export function mergeStatic(root) {
   root.updateWorldMatrix(true, true);
   const inverse = root.matrixWorld.clone().invert();
   const batches = new Map(), originals = new Set();
@@ -32,7 +32,7 @@ function mergeStatic(root) {
   }
 }
 
-function markingsTexture() {
+export function markingsTexture(designation = "9") {
   const canvas = document.createElement("canvas");
   canvas.width = 512; canvas.height = 2048;
   const ctx = canvas.getContext("2d");
@@ -42,7 +42,7 @@ function markingsTexture() {
   ctx.beginPath(); ctx.moveTo(110, 78); ctx.lineTo(305, 153); ctx.lineTo(395, 177);
   ctx.lineTo(318, 126); ctx.lineTo(224, 128); ctx.closePath(); ctx.fill();
   ctx.fillStyle = "#17212b"; ctx.font = "48px sans-serif"; ctx.fillText("F A L C O N", 256, 236);
-  ctx.font = "italic 104px serif"; ctx.fillText("9", 256, 338);
+  ctx.font = designation === "9" ? "italic 104px serif" : "bold 58px sans-serif"; ctx.fillText(designation, 256, 338);
   const flagX = 139, flagY = 436, flagW = 234, flagH = 126;
   ctx.fillStyle = "#fff"; ctx.fillRect(flagX, flagY, flagW, flagH);
   ctx.fillStyle = "#bf2445";
@@ -235,7 +235,12 @@ export function falconState(root) {
   return state;
 }
 
+export function isFalconVehicle(key) { return key === "falcon9" || key === "falconHeavy"; }
+
+export function falconBoosters(state) { return state ? [...(state.sideBoosters ?? []), state] : []; }
+
 export function setBoosterDeployment(state, legExtension, finExtension) {
+  if (state.setDeployment) return state.setDeployment(legExtension, finExtension);
   for (const { pivot, foot, rod } of state.legs) {
     pivot.rotation.x = legExtension * 2.05;
     foot.rotation.x = -pivot.rotation.x;
@@ -263,52 +268,77 @@ export function releaseBooster(root, scene, velocity, up, { target, shadows, rem
   const state = falconState(root);
   if (!state || state.boosterReleased || !target) return false;
   root.updateWorldMatrix(true, true);
-  state.modelPosition = state.parent.position.clone();
+  state.modelPosition ??= state.parent.position.clone();
   state.shadows = shadows;
-  scene.attach(state.booster);
-  const scale = state.booster.getWorldScale(new Vector3()).y;
-  // The foot soles sit below the engines when the four legs are fully open.
-  const clearance = (16.92 - 6.2 * Math.cos(2.05) + .06 * Math.sin(2.05) + .06) * scale;
-  state.recovery = new BoosterRecovery({
-    position: state.booster.position, velocity: velocity.clone().addScaledVector(up, -3),
-    orientation: state.booster.quaternion, up, target, clearance,
-  });
-  state.remote = remote;
-  state.boosterReleased = true;
-  attachRocketExhaust(state.booster, { axis: "y", ignitionKmh: 0 });
   disposeRocketExhaust(root);
+  const releasingSides = state.sideBoosters && !state.sideBoostersReleased;
+  const stages = releasingSides ? state.sideBoosters : [state];
+  const lateral = new Vector3(1, 0, 0).applyQuaternion(state.parent.getWorldQuaternion(new Quaternion()));
+  // Landing targets are separated on the local ground plane, even if the
+  // vehicle is banked at separation. Never give both boosters the same pad.
+  const groundLateral = lateral.clone().addScaledVector(up, -lateral.dot(up));
+  if (groundLateral.lengthSq() < .01) groundLateral.crossVectors(up, new Vector3(0, 0, 1));
+  if (groundLateral.lengthSq() < .01) groundLateral.crossVectors(up, new Vector3(1, 0, 0));
+  groundLateral.normalize();
+  for (const stage of stages) {
+    scene.attach(stage.booster);
+    const scale = stage.booster.getWorldScale(new Vector3()).y;
+    const clearance = (stage.clearance ?? (16.92 - 6.2 * Math.cos(2.05) + .06 * Math.sin(2.05) + .06)) * scale;
+    const sign = releasingSides ? Math.sign(stage.homePosition.x) : 0;
+    stage.recovery = new BoosterRecovery({ position: stage.booster.position,
+      velocity: velocity.clone().addScaledVector(up, -3).addScaledVector(lateral, sign * 9),
+      orientation: stage.booster.quaternion, up, target: target.clone().addScaledVector(groundLateral, sign * 65), clearance });
+    stage.remote = remote; stage.boosterReleased = true;
+    attachRocketExhaust(stage.booster, { axis: "y", ignitionKmh: 0 });
+    shadows?.addVehicle(stage.booster);
+  }
+  if (releasingSides) state.sideBoostersReleased = true;
+  else if (state.upperEngine) state.upperEngine.userData.engineEnabled = true;
   const bounds = localBounds(root), center = bounds.getCenter(new Vector3());
-  const worldCenter = root.localToWorld(center.clone());
-  state.parent.position.sub(center);
-  if (!remote) root.position.copy(root.parent.worldToLocal(worldCenter));
+  if (!releasingSides) {
+    const worldCenter = root.localToWorld(center.clone());
+    state.parent.position.sub(center);
+    if (!remote) root.position.copy(root.parent.worldToLocal(worldCenter));
+  }
   state.upperClearance = (bounds.max.y - bounds.min.y) / 2;
   attachRocketExhaust(root, { axis: "y", ignitionKmh: 0 });
-  shadows?.removeVehicle(root); shadows?.addVehicle(root); shadows?.addVehicle(state.booster);
+  shadows?.removeVehicle(root); shadows?.addVehicle(root);
   return true;
 }
 
 export function updateBooster(root, dt, terrain, { active = true, visible = true, timeWarp = 1 } = {}) {
-  const state = falconState(root), recovery = state?.recovery;
-  if (!recovery) return;
-  state.booster.visible = visible;
-  if (active && !state.remote) {
-    // Refresh the touchdown surface as detailed terrain arrives. The ray
-    // ignores shadow receivers, and samples the actual return target.
-    if (!recovery.landed && Math.floor(recovery.age * 4) !== state.groundProbeAt) {
-      state.groundProbeAt = Math.floor(recovery.age * 4);
-      const ray = new Raycaster(recovery.target.clone().addScaledVector(recovery.up, 3000), recovery.up.clone().negate(), 0, 6000);
-      const hit = terrain && raycastTerrain(ray, terrain)[0];
-      if (hit) recovery.target.copy(hit.point);
+  for (const state of falconBoosters(falconState(root))) {
+    const recovery = state.recovery;
+    if (!recovery) continue;
+    state.booster.visible = visible;
+    if (active && !state.remote) {
+      // Refresh the touchdown surface as detailed terrain arrives. The ray
+      // ignores shadow receivers, and samples the actual return target.
+      if (!recovery.landed && Math.floor(recovery.age * 4) !== state.groundProbeAt) {
+        state.groundProbeAt = Math.floor(recovery.age * 4);
+        const ray = new Raycaster(recovery.target.clone().addScaledVector(recovery.up, 3000), recovery.up.clone().negate(), 0, 6000);
+        const hit = terrain && raycastTerrain(ray, terrain)[0];
+        if (hit) recovery.target.copy(hit.point);
+      }
+      recovery.update(dt, timeWarp);
     }
-    recovery.update(dt, timeWarp);
+    state.booster.position.copy(recovery.position); state.booster.quaternion.copy(recovery.orientation);
+    setBoosterDeployment(state, recovery.legs, recovery.fins);
+    updateRocketExhaust(state.booster, active ? dt : 0, recovery.throttle * 15000, visible && recovery.throttle > .02 && !recovery.landed);
   }
-  state.booster.position.copy(recovery.position); state.booster.quaternion.copy(recovery.orientation);
-  setBoosterDeployment(state, recovery.legs, recovery.fins);
-  updateRocketExhaust(state.booster, active ? dt : 0, recovery.throttle * 15000, visible && recovery.throttle > .02 && !recovery.landed);
 }
 
 export function boosterSnapshot(root, mapMatrix) {
-  const state = falconState(root), recovery = state?.recovery;
+  const state = falconState(root);
+  if (state?.sideBoosters) {
+    if (!state.sideBoostersReleased) return null;
+    return { variant: "heavy", sides: state.sideBoosters.map(stage => stageSnapshot(stage, mapMatrix)), center: stageSnapshot(state, mapMatrix) };
+  }
+  return stageSnapshot(state, mapMatrix);
+}
+
+function stageSnapshot(state, mapMatrix) {
+  const recovery = state?.recovery;
   if (!recovery) return null;
   const inverse = mapMatrix.clone().invert();
   return { position: recovery.position.clone().applyMatrix4(inverse).toArray(),
@@ -317,6 +347,16 @@ export function boosterSnapshot(root, mapMatrix) {
 }
 
 export function parseBoosterSnapshot(value) {
+  if (value?.variant === "heavy") {
+    if (!Array.isArray(value.sides) || value.sides.length !== 2) return null;
+    const sides = value.sides.map(parseStageSnapshot), center = value.center === null ? null : parseStageSnapshot(value.center);
+    if (sides.some(stage => !stage) || (value.center !== null && !center)) return null;
+    return { variant: "heavy", sides, center };
+  }
+  return parseStageSnapshot(value);
+}
+
+function parseStageSnapshot(value) {
   if (!value || !Array.isArray(value.position) || value.position.length !== 3 || !value.position.every(n => Number.isFinite(n) && Math.abs(n) < 1e9) ||
       !Array.isArray(value.orientation) || value.orientation.length !== 4 || !value.orientation.every(Number.isFinite) ||
       ![value.legs, value.fins, value.throttle].every(n => Number.isFinite(n) && n >= 0 && n <= 1) ||
@@ -329,9 +369,23 @@ export function parseBoosterSnapshot(value) {
 export function syncBooster(root, scene, snapshot, mapMatrix, shadows) {
   const state = falconState(root);
   if (!state || !snapshot) return;
+  if (state.sideBoosters) {
+    if (snapshot.variant !== "heavy") return;
+    if (state.boosterReleased && !snapshot.center) resetFalcon9(root);
+    if (!state.sideBoostersReleased) releaseBooster(root, scene, new Vector3(), new Vector3(0, 1, 0), { target: new Vector3(), shadows, remote: true });
+    if (snapshot.center && !state.boosterReleased) releaseBooster(root, scene, new Vector3(), new Vector3(0, 1, 0), { target: new Vector3(), shadows, remote: true });
+    state.sideBoosters.forEach((stage, i) => syncStage(stage, snapshot.sides[i], mapMatrix));
+    if (snapshot.center) syncStage(state, snapshot.center, mapMatrix);
+    return;
+  }
+  if (snapshot.variant === "heavy") return;
+  if (!state.boosterReleased) releaseBooster(root, scene, new Vector3(), new Vector3(0, 1, 0), { target: new Vector3(), shadows, remote: true });
+  syncStage(state, snapshot, mapMatrix);
+}
+
+function syncStage(state, snapshot, mapMatrix) {
   const position = new Vector3().fromArray(snapshot.position).applyMatrix4(mapMatrix);
   const orientation = new Quaternion().setFromRotationMatrix(mapMatrix).multiply(new Quaternion().fromArray(snapshot.orientation).normalize());
-  if (!state.boosterReleased) releaseBooster(root, scene, new Vector3(), new Vector3(0, 1, 0).applyQuaternion(orientation), { target: position, shadows, remote: true });
   const recovery = state.recovery;
   recovery.position.copy(position); recovery.orientation.copy(orientation);
   recovery.legs = snapshot.legs; recovery.fins = snapshot.fins; recovery.throttle = snapshot.throttle;
@@ -343,6 +397,12 @@ export function releaseDragon(root, scene, velocity, up, shadows) {
   if (!state || state.released) return false;
   root.updateWorldMatrix(true, true);
   const axis = new Vector3(0, 1, 0).applyQuaternion(state.dragon.getWorldQuaternion(new Quaternion()));
+  for (const fairing of state.fairings ?? []) {
+    const lateral = new Vector3(fairing.sign, 0, 0).applyQuaternion(fairing.object.getWorldQuaternion(new Quaternion()));
+    scene.attach(fairing.object);
+    fairing.velocity = velocity.clone().addScaledVector(lateral, 12).addScaledVector(axis, 4);
+    fairing.age = 0;
+  }
   scene.attach(state.dragon);
   const chute = parachute(); chute.scale.setScalar(.001); state.dragon.add(chute);
   state.flight = {
@@ -361,6 +421,14 @@ export function updateDragon(root, dt, terrain, active, visible = true) {
   if (!flight) return;
   const dragon = state.dragon;
   dragon.visible = visible;
+  for (const fairing of state.fairings ?? []) {
+    fairing.object.visible = visible && fairing.age < 20;
+    if (!active || fairing.age >= 20) continue;
+    fairing.age += dt;
+    fairing.velocity.addScaledVector(flight.up, -9.81 * dt);
+    fairing.object.position.addScaledVector(fairing.velocity, dt);
+    fairing.object.rotateZ(-fairing.sign * dt * .28);
+  }
   if (!active || flight.landed) return;
   flight.age += dt;
   const open = MathUtils.smoothstep(flight.age, 1.3, 3.8);
@@ -398,20 +466,30 @@ export function resetDragon(root) {
   state.parent.add(state.dragon);
   state.dragon.position.copy(state.position); state.dragon.quaternion.identity(); state.dragon.scale.setScalar(1);
   state.dragon.visible = true; state.flight = null; state.released = false;
+  for (const fairing of state.fairings ?? []) {
+    state.parent.add(fairing.object); fairing.object.position.copy(fairing.homePosition);
+    fairing.object.quaternion.identity(); fairing.object.scale.setScalar(1); fairing.object.visible = true;
+    fairing.velocity = null; fairing.age = 0;
+  }
 }
 
 export function resetFalcon9(root, { restoreEffects = true } = {}) {
   resetDragon(root);
   const state = falconState(root);
-  if (!state?.boosterReleased) return;
-  state.shadows?.removeVehicle(state.booster);
-  disposeRocketExhaust(state.booster);
+  if (!state || !falconBoosters(state).some(stage => stage.boosterReleased)) return;
   disposeRocketExhaust(root);
-  state.parent.add(state.booster);
-  state.booster.position.set(0, 0, 0); state.booster.quaternion.identity(); state.booster.scale.setScalar(1);
-  state.booster.visible = true; state.parent.position.copy(state.modelPosition);
-  state.boosterReleased = false; state.recovery = null; state.groundProbeAt = undefined; state.remote = false;
-  setBoosterDeployment(state, 0, 0);
+  for (const stage of falconBoosters(state)) {
+    state.shadows?.removeVehicle(stage.booster);
+    disposeRocketExhaust(stage.booster);
+    state.parent.add(stage.booster);
+    stage.booster.position.copy(stage.homePosition ?? new Vector3()); stage.booster.quaternion.identity(); stage.booster.scale.setScalar(1);
+    stage.booster.visible = true;
+    stage.boosterReleased = false; stage.recovery = null; stage.groundProbeAt = undefined; stage.remote = false;
+    setBoosterDeployment(stage, 0, 0);
+  }
+  state.parent.position.copy(state.modelPosition); state.modelPosition = null;
+  if (state.sideBoosters) state.sideBoostersReleased = false;
+  if (state.upperEngine) state.upperEngine.userData.engineEnabled = false;
   if (restoreEffects) {
     attachRocketExhaust(root, { axis: "y", ignitionKmh: 0 });
     state.shadows?.removeVehicle(root); state.shadows?.addVehicle(root);

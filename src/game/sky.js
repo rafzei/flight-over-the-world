@@ -32,6 +32,7 @@ export function createSky(fogColorHex, { simple = false, physicalBodies = false,
     uDaylight: { value: 1 },
     uTwilight: { value: 0 },
     uSunVisibility: { value: 1 },
+    uPhysicalSun: { value: 0 },
   };
 
   const mat = new ShaderMaterial({
@@ -60,13 +61,14 @@ export function createSky(fogColorHex, { simple = false, physicalBodies = false,
       uniform float uDaylight;
       uniform float uTwilight;
       uniform float uSunVisibility;
+      uniform float uPhysicalSun;
 
       vec3 spaceSky(vec3 d) {
         vec3 col = vec3(0.0005, 0.001, 0.003);
         col += uHorizon * pow(1.0 - abs(d.y), 36.0) * 0.035 * uAirglow;
         float sunAngle = acos(clamp(dot(d, uSunDir), -1.0, 1.0));
         float aa = max(fwidth(sunAngle), 0.0003);
-        col += uSunColor * (18.0 * (1.0 - smoothstep(0.012, 0.012 + aa, sunAngle)) + 0.6 * exp(-sunAngle * 48.0));
+        col += uSunColor * (18.0 * (1.0 - smoothstep(0.012, 0.012 + aa, sunAngle)) + 0.6 * exp(-sunAngle * 48.0)) * (1.0 - uPhysicalSun);
         // Artistic Moon direction, with a shaded surface and dark maria.
         vec3 right = normalize(cross(vec3(0.0, 1.0, 0.0), uMoonDir));
         vec3 up = cross(uMoonDir, right);

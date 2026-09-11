@@ -102,6 +102,8 @@ export function advanceAirMotion(controller, dt, north, east, up, weather) {
   controller.weatherVertical = weather?.up ?? 0;
   controller.verticalSpeed = up+controller.weatherVertical;
   controller.groundSpeed = Math.hypot(north,east);
+  controller.groundNorthSpeed = north;
+  controller.groundEastSpeed = east;
   Object.assign(controller,moveGeo(controller.lat,controller.lon,north*dt,east*dt));
   controller.height += controller.verticalSpeed*dt;
 }

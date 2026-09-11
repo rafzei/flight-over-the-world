@@ -218,6 +218,7 @@ button, .mode-card, .scope-btn {
 #space-panel details { margin-top: 10px; }
 #space-panel details label { display: block; margin-top: 8px; }
 #space-panel p { color: var(--muted); line-height: 1.5; }
+#booster-status { white-space: pre-line; font-size: 11px; }
 .space-destination { display: flex; align-items: center; gap: 8px; width: 100%; }
 .space-destination select { flex: 1; min-width: 0; }
 #space-view-control { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
@@ -1202,7 +1203,7 @@ kbd {
   gap: 12px;
   margin-bottom: 20px;
 }
-#menu .modes { grid-template-columns: repeat(4, 1fr); }
+#menu .modes { grid-template-columns: repeat(5, 1fr); }
 @media (max-width: 760px) { #menu .modes { grid-template-columns: repeat(2, 1fr); } }
 
 .mode-card {
@@ -2088,4 +2089,34 @@ kbd {
     width: 100%;
     height: min(420px, 52vh);
   }
+}
+
+#game-canvas.camera-dragging { cursor: grabbing; }
+
+/* Points share the existing flight instruments' paper/gold palette. */
+#flight-points { position: absolute; top: 22px; left: 22px; width: 270px; padding: 11px 13px; border: 1px solid #f3ead640; border-radius: 6px; background: #120e0ae6; pointer-events: auto; color: var(--paper); font-variant-numeric: tabular-nums; }
+#flight-points[hidden] { display: none; }
+.points-top, .points-total, .points-next, .points-bottom { display: flex; align-items: center; gap: 8px; }
+.points-top { justify-content: space-between; font: 10px/1.4 sans-serif; letter-spacing: .05em; }
+.points-top [data-points-best] { color: var(--muted); letter-spacing: 0; }
+.points-total { margin: 3px 0; }
+.points-total strong { color: #ffd075; font-size: 30px; line-height: 1.1; }
+.points-total > span { font-size: 11px; }
+.points-total [data-points-series] { margin-left: auto; color: #70f5d3; }
+.points-next { font-size: 12px; min-height: 23px; }
+[data-points-arrow] { display: inline-block; width: 18px; text-align: center; color: #ffd075; font: 20px/1 sans-serif; }
+.points-bottom { justify-content: space-between; margin-top: 5px; font-size: 10px; color: var(--muted); }
+#points-new-trail { flex-shrink: 0; color: var(--paper); background: #ffffff0c; border: 1px solid #ffffff35; border-radius: 3px; padding: 6px 8px; font: inherit; cursor: pointer; }
+#points-new-trail:disabled { opacity: .4; cursor: default; }
+#points-new-trail:focus-visible { outline: 2px solid #ffd075; outline-offset: 2px; }
+@media (max-width: 760px), (pointer: coarse) {
+  #flight-points { top: max(80px, calc(env(safe-area-inset-top) + 72px)); left: 10px; width: calc(100vw - 20px); padding: 9px 12px; }
+  .points-total strong { font-size: 25px; }
+  .points-bottom { margin-top: 2px; }
+  #hud:has(#flight-points:not([hidden])) #f-center { display: none; }
+  #hud:has(#flight-points:not([hidden])) #space-panel,
+  #hud:has(#flight-points:not([hidden])) #landing-panel { top: max(215px, calc(env(safe-area-inset-top) + 207px)); max-height: max(120px, calc(100dvh - 435px)); overflow: auto; }
+  #hud:has(#flight-points:not([hidden])):has(#landing-panel:not([hidden])) #traffic-panel { display: none; }
+  #hud:has(#flight-points:not([hidden])) #f-guess-stats { top: auto; bottom: 230px; }
+  #menu .mode-card[data-mode="arcade"] { grid-column: 1 / -1; }
 }

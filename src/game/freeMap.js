@@ -74,6 +74,17 @@ function paintOsm(canvas, pose, markerScale = 1, clipCircle = false, zoom = ZOOM
     }
   }
 
+  // Gold/mint gate markers use the same geographic projection as the map.
+  // Wrap longitude relative to the aircraft at the international date line.
+  for (const gate of pose.collectibles ?? []) {
+    let dx = (lon2x(gate.lon, tileZoom) - cx) * tileSize;
+    const world = 2 ** tileZoom * tileSize;
+    dx = ((dx + world / 2) % world + world) % world - world / 2;
+    const x = w / 2 + dx, y = lat2y(gate.lat, tileZoom) * tileSize - originY;
+    if (x < -12 || x > w + 12 || y < -12 || y > h + 12) continue;
+    marker(ctx, x, y, gate.value === 200 ? "#70f5d3" : "#ffc54a", clipCircle ? "" : `${gate.value} · ${Math.round(gate.height)} m`);
+  }
+
   const px = w / 2;
   const py = h / 2;
   const s = markerScale;
@@ -309,8 +320,8 @@ export function createFreeMap({ root, canvas, place, close, zoomIn, zoomOut, onC
     toggle() {
       setOpen(!open);
     },
-    update(lat, lon, headingDeg, name) {
-      pose = { lat, lon, heading: headingDeg, name: name || "" };
+    update(lat, lon, headingDeg, name, collectibles = []) {
+      pose = { lat, lon, heading: headingDeg, name: name || "", collectibles };
       if (place) place.textContent = pose.name || `${lat.toFixed(3)}°, ${lon.toFixed(3)}°`;
       if (open) paint();
     },
@@ -353,8 +364,8 @@ export function createMiniMap({ root, canvas, onOpen }) {
     hide() {
       setVisible(false);
     },
-    update(lat, lon, headingDeg) {
-      pose = { lat, lon, heading: headingDeg };
+    update(lat, lon, headingDeg, collectibles = []) {
+      pose = { lat, lon, heading: headingDeg, collectibles };
       if (visible) paint();
     },
   };
