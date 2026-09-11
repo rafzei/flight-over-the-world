@@ -1,4 +1,6 @@
-import { BackSide, BufferGeometry, Color, Float32BufferAttribute, Mesh, Points, PointsMaterial, ShaderMaterial, SphereGeometry, Vector3 } from "three";
+import { BackSide, Color, Mesh, ShaderMaterial, SphereGeometry, Vector3 } from "three";
+
+import { createStarfield } from "./starfield.js";
 
 // Defaults for standalone previews; flight supplies the live solar direction.
 export const SUN_DIR = new Vector3(-0.52, 0.62, 0.26).normalize();
@@ -148,32 +150,9 @@ export function createSky(fogColorHex, { simple = false, physicalBodies = false,
   const mesh = new Mesh(new SphereGeometry(5e6, simple ? 16 : 48, simple ? 12 : 24), mat);
   mesh.frustumCulled = false;
   mesh.renderOrder = -100;
-  // Uniform directions on a sphere avoid equirectangular star streaks at the poles.
-  let seed = 737320;
-  const random = () => { seed = (Math.imul(1664525, seed) + 1013904223) >>> 0; return seed / 4294967296; };
-  const positions = [], colors = [], direction = new Vector3(), starColor = new Color();
-  for (let i = 0; i < (simple ? 2800 : 6000); i++) {
-    const y = random() * 2 - 1, phi = random() * Math.PI * 2, r = Math.sqrt(1 - y * y);
-    direction.set(r * Math.cos(phi), y, r * Math.sin(phi));
-    if (direction.dot(SUN_DIR) > .9995 || direction.dot(MOON_DIR) > .9995) continue;
-    positions.push(...direction.multiplyScalar(4.9e6).toArray());
-    starColor.setHex(random() > .8 ? 0xffe1af : random() > .4 ? 0xffffff : 0xb6d0ff).multiplyScalar(.3 + random() * .7);
-    colors.push(starColor.r, starColor.g, starColor.b);
-  }
-  const starGeometry = new BufferGeometry();
-  starGeometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
-  starGeometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
-  const starMaterial = new PointsMaterial({ size: 1.6, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0, depthTest: true, depthWrite: false, fog: false, toneMapped: false });
-  const starUp = { value: new Vector3(0, 1, 0) };
-  starMaterial.onBeforeCompile = shader => {
-    shader.uniforms.starUp = starUp;
-    shader.uniforms.uSpace = uniforms.uSpace;
-    shader.vertexShader = 'uniform vec3 starUp;\nvarying float vStarHeight;\n' + shader.vertexShader;
-    shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvStarHeight = dot(normalize(mat3(modelMatrix) * position), starUp);');
-    shader.fragmentShader = 'uniform float uSpace;\nvarying float vStarHeight;\n' + shader.fragmentShader;
-    shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', 'diffuseColor.a *= mix(smoothstep(0.0, 0.08, vStarHeight), 1.0, uSpace);\n#include <opaque_fragment>');
-  };
-  const stars = new Points(starGeometry, starMaterial); stars.name = "space-stars"; stars.frustumCulled = false; stars.visible = false; stars.renderOrder = -99; stars.raycast = () => {}; mesh.add(stars);
+  const stars = createStarfield({ count: simple ? 2800 : 6000 });
+  stars.visible = false; mesh.add(stars);
+  const starUp = new Vector3();
   return { mesh, uniforms,
     update(altitudeM, elapsedSeconds, fog, solar) {
       const blend = spaceSkyBlend(Number.isFinite(altitudeM) ? altitudeM : 0);
@@ -187,15 +166,14 @@ export function createSky(fogColorHex, { simple = false, physicalBodies = false,
       uniforms.uSunColor.value.copy(sunsetSun).lerp(daySun, Math.max(0, Math.min(1, (solar?.elevation ?? 30) / 25)));
       uniforms.uSpace.value = blend;
       uniforms.uAirglow.value = Math.max(0, Math.min(1, (120000 - altitudeM) / 100000));
-      starMaterial.opacity = Math.max(blend, solar?.stars ?? 0);
-      stars.visible = starMaterial.opacity > 0;
-      starUp.value.set(0, 1, 0).applyQuaternion(mesh.quaternion);
+      starUp.set(0, 1, 0).applyQuaternion(mesh.quaternion);
+      stars.userData.update(elapsedSeconds, Math.max(blend, solar?.stars ?? 0), blend, starUp);
       uniforms.uTime.value = elapsedSeconds;
       if (fog?.isFogExp2) {
         fog.density = 0.00007 * (1 - blend) + 0.00000015 * blend;
         fog.color.copy(uniforms.uHorizon.value).lerp(SPACE_FOG_COLOR, blend);
       }
     },
-    dispose() { mesh.removeFromParent(); mesh.geometry.dispose(); mat.dispose(); starGeometry.dispose(); starMaterial.dispose(); },
+    dispose() { mesh.removeFromParent(); mesh.geometry.dispose(); mat.dispose(); stars.geometry.dispose(); stars.material.dispose(); },
   };
 }

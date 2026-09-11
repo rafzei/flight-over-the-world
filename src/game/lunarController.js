@@ -6,6 +6,10 @@ import {
   moonPositionInertial, moonVelocityInertial, surfaceVelocityInertial,
 } from "./spacePhysics.js";
 
+import { lunarAltitude, lunarSurfaceHeight, lunarSurfaceNormal, LUNAR_MAX_RELIEF } from "./lunarTerrain.js";
+import { SOLAR_BODIES, SOLAR_BODY_BY_ID, bodyPositionInertial, bodyVelocityInertial, solarGravityAcceleration } from "./solarSystem.js";
+import { planSolarTransfer, advanceSolarTransfer, orbitState } from "./solarTransfer.js";
+
 const Z = new Vector3(0, 0, 1), X = new Vector3(1, 0, 0), Y = new Vector3(0, 1, 0);
 const WARP_LEVELS = Object.freeze([1, 10, 100, 1000]);
 export { WARP_LEVELS };
@@ -21,6 +25,32 @@ function firstSphereContact(a, b, radius) {
   if (aa === 0 || discriminant < 0) return null;
   const fraction = (-bb - Math.sqrt(discriminant)) / (2 * aa);
   return fraction >= 0 && fraction <= 1 ? fraction : null;
+}
+
+function firstTerrainContact(a, b, startTime, step, clearance) {
+  const bound = firstSphereContact(a, b, C.MOON_RADIUS + LUNAR_MAX_RELIEF + clearance);
+  if (bound === null) return null;
+  const sample = t => lunarAltitude(a.clone().lerp(b, t), startTime + step * t, clearance);
+  if (sample(0) <= 0) return 0;
+  const length = a.distanceTo(b), interval = Math.min(1, 20 / Math.max(length, 1));
+  let previous = bound;
+  // Sample the complete segment inside the relief shell, including grazing
+  // passes that stay near the limb for many kilometres before hitting a rim.
+  const delta = b.clone().sub(a), aa = delta.lengthSq(), bb = 2 * a.dot(delta);
+  const cc = a.lengthSq() - (C.MOON_RADIUS + LUNAR_MAX_RELIEF + clearance) ** 2;
+  const exit = aa ? (-bb + Math.sqrt(Math.max(0, bb * bb - 4 * aa * cc))) / (2 * aa) : 1;
+  const limit = Math.min(1, exit);
+  for (let t = bound; t <= limit + interval; t += interval) {
+    const current = Math.min(t, 1);
+    if (sample(current) <= 0) {
+      let lo = previous, hi = current;
+      for (let i = 0; i < 24; i++) { const mid = (lo + hi) / 2; if (sample(mid) > 0) lo = mid; else hi = mid; }
+      return (lo + hi) / 2;
+    }
+    previous = current;
+    if (current === 1) break;
+  }
+  return null;
 }
 
 // Continuous thrust with unlimited propellant is an explicitly assisted game
@@ -50,12 +80,16 @@ export class LunarController extends PlaneController {
     this._lastPose = null;
     this._surfaceNormal = null;
     this._guidanceTarget = null;
+    this.destinationId = "moon";
+    this.solarTransfer = null;
+    this.orbit = null;
     this.rebaseFromGeodetic();
   }
 
   rebaseFromGeodetic({ preserveVelocity = false } = {}) {
     if (this._lastPose && !preserveVelocity) {
       this.guidanceActive = false;
+      this.solarTransfer = null; this.orbit = null;
       this.guidancePhase = "manual";
       this.timeWarp = this.effectiveTimeWarp = 1;
     }
@@ -81,9 +115,35 @@ export class LunarController extends PlaneController {
     return this.timeWarp;
   }
 
+  startDestinationGuidance(id = "moon") {
+    if (!SOLAR_BODY_BY_ID[id] || this.crashed) return false;
+    if (this._needsRebase()) this.rebaseFromGeodetic();
+    this.destinationId = id;
+    const nearEarth = this.positionInertial.length() < C.MOON_DISTANCE * 2;
+    if (id === "moon" && nearEarth && !this.orbit && this.spaceStatus !== "landed-moon") return this.startLunarGuidance();
+    this.orbit = null;
+    this.solarTransfer = planSolarTransfer(this.positionInertial, id, this.simulationTime);
+    this.spaceStatus = "flight"; this.guidanceActive = true; this.guidancePhase = "cruise";
+    this.timeWarp = this.effectiveTimeWarp = 1;
+    this.touchdownSpeedMps = null;
+    return true;
+  }
+
+  launchFromMoon() {
+    if (this.spaceStatus !== "landed-moon") return false;
+    this.spaceStatus = "flight"; this.guidancePhase = "manual";
+    this.guidanceActive = false; this._pointThrust(this._surfaceNormal);
+    this.positionInertial.addScaledVector(this._surfaceNormal, .1);
+    this.velocityInertial.addScaledVector(this._surfaceNormal, 2);
+    this.throttle = this.cruiseT = .2; this._publishPose();
+    return true;
+  }
+
   startLunarGuidance() {
     if (this._needsRebase()) this.rebaseFromGeodetic();
     if (this.spaceStatus !== "flight" || this.crashed) return false;
+    this.destinationId = "moon";
+    this.solarTransfer = null; this.orbit = null;
     this.guidanceActive = true;
     const altitude = this.positionInertial.length() - C.EARTH_EQUATORIAL_RADIUS;
     this.guidancePhase = altitude < 390000 ? "ascent" : "transfer";
@@ -91,9 +151,15 @@ export class LunarController extends PlaneController {
   }
 
   stopLunarGuidance() {
+    // Disengaging cruise drops to a controllable local drift, not its visual
+    // interplanetary transit speed. This speed change is part of the game drive.
+    if (this.solarTransfer) this.velocityInertial.copy(bodyVelocityInertial(this.destinationId, this.simulationTime));
+    this.solarTransfer = null; this.orbit = null;
+    if (this.spaceStatus.startsWith("orbit-")) this.spaceStatus = "flight";
     this.guidanceActive = false;
     this.guidancePhase = "manual";
     this.timeWarp = 1;
+    this._publishPose();
   }
 
   _needsRebase() {
@@ -140,7 +206,7 @@ export class LunarController extends PlaneController {
     const moon = moonPositionInertial(time), lunarDirection = moon.clone().normalize();
     const target = new Vector3(), targetVelocity = new Vector3();
     const earthAltitude = position.length() - C.EARTH_EQUATORIAL_RADIUS;
-    const moonAltitude = position.distanceTo(moon) - C.MOON_RADIUS - this.surfaceClearance;
+    const moonAltitude = lunarAltitude(position.clone().sub(moon), time, this.surfaceClearance);
     let speedLimit = 12000, brakingAcceleration = 8;
     if (this.guidancePhase === "ascent" && earthAltitude >= 390000) this.guidancePhase = "dogleg";
     if (this.guidancePhase === "transfer" && radial.dot(lunarDirection) < .45 && earthAltitude < 2000000) this.guidancePhase = "dogleg";
@@ -159,7 +225,7 @@ export class LunarController extends PlaneController {
     } else {
       // Tidally locked near-side target follows the Moon's orbit and spin.
       const normal = lunarDirection.negate();
-      const offset = normal.multiplyScalar(C.MOON_RADIUS + this.surfaceClearance - .05);
+      const offset = normal.multiplyScalar(C.MOON_RADIUS + lunarSurfaceHeight(normal, time) + this.surfaceClearance - .05);
       target.copy(moon).add(offset);
       targetVelocity.copy(moonVelocityInertial(time)).add(new Vector3().crossVectors(MOON_ORBIT_NORMAL, offset).multiplyScalar(lunarOmega));
       if (this.guidancePhase === "lunar-descent") {
@@ -181,6 +247,7 @@ export class LunarController extends PlaneController {
 
   _acceleration(time, thrust) {
     const acceleration = gravityAcceleration(this.positionInertial, time).add(thrust);
+    if (this.positionInertial.length() > C.MOON_DISTANCE * 2) acceleration.add(solarGravityAcceleration(this.positionInertial, time));
     const altitude = ecefToGeodetic(this.positionInertial).height;
     if (altitude < 150000) {
       const airVelocity = this.velocityInertial.clone().sub(surfaceVelocityInertial(this.positionInertial));
@@ -204,7 +271,7 @@ export class LunarController extends PlaneController {
     // frame. Re-evaluate after every substep, not once for a warped frame.
     const lookAhead = Math.max(0, descent) * Math.min(10, realSeconds * this.timeWarp);
     if (descent > 1 && altitude - lookAhead < 150000) return 1;
-    const moonAltitude = this.positionInertial.distanceTo(moonPositionInertial(this.simulationTime)) - C.MOON_RADIUS - this.surfaceClearance;
+    const moonAltitude = lunarAltitude(this.positionInertial.clone().sub(moonPositionInertial(this.simulationTime)), this.simulationTime, this.surfaceClearance);
     const nearest = Math.min(altitude, moonAltitude);
     return Math.min(this.timeWarp, nearest < 1000 ? 1 : nearest < 20000 ? 10 : nearest < 150000 ? 100 : 1000);
   }
@@ -212,10 +279,10 @@ export class LunarController extends PlaneController {
   _landedUpdate(dt) {
     this._surfaceNormal.applyAxisAngle(MOON_ORBIT_NORMAL, dt * lunarOmega);
     this.simulationTime += dt;
-    const offset = this._surfaceNormal.clone().multiplyScalar(C.MOON_RADIUS + this.surfaceClearance);
+    const offset = this._surfaceNormal.clone().multiplyScalar(C.MOON_RADIUS + lunarSurfaceHeight(this._surfaceNormal, this.simulationTime) + this.surfaceClearance);
     this.positionInertial.copy(moonPositionInertial(this.simulationTime)).add(offset);
     this.velocityInertial.copy(moonVelocityInertial(this.simulationTime)).add(new Vector3().crossVectors(MOON_ORBIT_NORMAL, offset).multiplyScalar(lunarOmega));
-    this._pointThrust(this._surfaceNormal);
+    this._pointThrust(lunarSurfaceNormal(this._surfaceNormal, this.simulationTime));
   }
 
   update(dt, ctrl = {}) {
@@ -227,6 +294,34 @@ export class LunarController extends PlaneController {
     if (this.crashed || this.spaceStatus.startsWith("impact")) return;
     if (Number.isFinite(ctrl.timeWarp)) this.setTimeWarp(ctrl.timeWarp);
     let remaining = dt;
+    if (this.solarTransfer) {
+      const transfer = this.solarTransfer;
+      const state = advanceSolarTransfer(transfer, dt);
+      this.simulationTime = transfer.startTime + transfer.elapsed;
+      this.effectiveTimeWarp = 1;
+      this.positionInertial.copy(state.position); this.velocityInertial.copy(state.velocity);
+      if (state.velocity.lengthSq() > 1) this._pointThrust(state.velocity);
+      this.throttle = .65;
+      if (state.finished) {
+        this.solarTransfer = null; this.throttle = 0;
+        if (this.destinationId === "moon") {
+          this.velocityInertial.copy(bodyVelocityInertial("moon", this.simulationTime));
+          this.guidancePhase = "lunar-descent";
+        } else {
+          this.orbit = { id: this.destinationId, startTime: this.simulationTime };
+          this.guidanceActive = false; this.guidancePhase = "orbit"; this.spaceStatus = `orbit-${this.destinationId}`;
+          const arrival = orbitState(this.destinationId, this.simulationTime, this.simulationTime);
+          this.positionInertial.copy(arrival.position); this.velocityInertial.copy(arrival.velocity); this._pointThrust(arrival.normal);
+        }
+      }
+      this._publishPose(); return;
+    }
+    if (this.orbit) {
+      this.effectiveTimeWarp = this.timeWarp; this.simulationTime += dt * this.timeWarp;
+      const state = orbitState(this.orbit.id, this.orbit.startTime, this.simulationTime);
+      this.positionInertial.copy(state.position); this.velocityInertial.copy(state.velocity); this._pointThrust(state.normal);
+      this.throttle = 0; this._publishPose(); return;
+    }
     if (this.spaceStatus === "landed-moon") {
       this.effectiveTimeWarp = this.timeWarp;
       this._landedUpdate(dt * this.timeWarp); this._publishPose(); return;
@@ -243,7 +338,7 @@ export class LunarController extends PlaneController {
     while (remaining > 1e-9 && this.spaceStatus === "flight") {
       this.effectiveTimeWarp = this._safeTimeWarp(remaining);
       const moonStart = moonPositionInertial(this.simulationTime);
-      const lunarHeight = this.positionInertial.distanceTo(moonStart) - C.MOON_RADIUS - this.surfaceClearance;
+      const lunarHeight = lunarAltitude(this.positionInertial.clone().sub(moonStart), this.simulationTime, this.surfaceClearance);
       const earthHeight = ecefToGeodetic(this.positionInertial).height;
       const closest = Math.min(lunarHeight, earthHeight);
       const airSpeed = this.velocityInertial.clone().sub(surfaceVelocityInertial(this.positionInertial)).length();
@@ -259,16 +354,16 @@ export class LunarController extends PlaneController {
       this.velocityInertial.addScaledVector(this._acceleration(this.simulationTime, thrust), .5 * step);
       const moonEnd = moonPositionInertial(this.simulationTime);
       const relativeStart = before.clone().sub(moonStart), relativeEnd = this.positionInertial.clone().sub(moonEnd);
-      const contact = firstSphereContact(relativeStart, relativeEnd, C.MOON_RADIUS + this.surfaceClearance);
+      const contact = firstTerrainContact(relativeStart, relativeEnd, this.simulationTime - step, step, this.surfaceClearance);
       if (contact !== null) {
         this.simulationTime -= step * (1 - contact);
         const normal = relativeStart.lerp(relativeEnd, contact).normalize();
         this._surfaceNormal = normal;
         this.velocityInertial.lerpVectors(oldVelocity, this.velocityInertial, contact);
-        const offset = normal.clone().multiplyScalar(C.MOON_RADIUS + this.surfaceClearance);
+        const offset = normal.clone().multiplyScalar(C.MOON_RADIUS + lunarSurfaceHeight(normal, this.simulationTime) + this.surfaceClearance);
         const surfaceVelocity = moonVelocityInertial(this.simulationTime).add(new Vector3().crossVectors(MOON_ORBIT_NORMAL, offset).multiplyScalar(lunarOmega));
         const contactSpeed = this.velocityInertial.clone().sub(surfaceVelocity).length();
-        const tilt = Math.acos(MathUtils.clamp(this.thrustDirectionInertial.dot(normal), -1, 1));
+        const tilt = Math.acos(MathUtils.clamp(this.thrustDirectionInertial.dot(lunarSurfaceNormal(normal, this.simulationTime)), -1, 1));
         this.touchdownSpeedMps = contactSpeed;
         this.spaceStatus = contactSpeed <= 4 && tilt <= Math.PI / 6 ? "landed-moon" : "impact-moon";
         this.crashed = this.spaceStatus === "impact-moon";
@@ -295,6 +390,20 @@ export class LunarController extends PlaneController {
           this.timeWarp = this.effectiveTimeWarp = 1;
         }
       }
+      if (this.spaceStatus === "flight" && this.positionInertial.length() > C.MOON_DISTANCE * 2) {
+        for (const body of SOLAR_BODIES) {
+          if (body.id === "earth" || body.id === "moon") continue;
+          const start = before.clone().sub(bodyPositionInertial(body.id, this.simulationTime - step));
+          const end = this.positionInertial.clone().sub(bodyPositionInertial(body.id, this.simulationTime));
+          const hit = firstSphereContact(start, end, body.radius + this.surfaceClearance);
+          if (hit === null) continue;
+          this.positionInertial.lerpVectors(before, this.positionInertial, hit);
+          this.simulationTime -= step * (1 - hit);
+          this.spaceStatus = `impact-${body.id}`; this.crashed = true; this.throttle = 0;
+          this.guidanceActive = false; this.guidancePhase = "impact"; this.timeWarp = this.effectiveTimeWarp = 1;
+          break;
+        }
+      }
       remaining -= realStep;
     }
     this._publishPose();
@@ -303,15 +412,24 @@ export class LunarController extends PlaneController {
   diagnostics() {
     const moon = moonPositionInertial(this.simulationTime);
     const moonDistanceM = this.positionInertial.distanceTo(moon);
+    const moonAltitudeM = lunarAltitude(this.positionInertial.clone().sub(moon), this.simulationTime, this.surfaceClearance);
+    const target = SOLAR_BODY_BY_ID[this.destinationId];
+    const targetDistanceM = this.positionInertial.distanceTo(bodyPositionInertial(this.destinationId, this.simulationTime));
     const normal = this.positionInertial.clone().sub(moon).normalize();
-    const surfaceVelocity = moonVelocityInertial(this.simulationTime).add(new Vector3().crossVectors(MOON_ORBIT_NORMAL, normal).multiplyScalar(lunarOmega * (C.MOON_RADIUS + this.surfaceClearance)));
+    const surfaceVelocity = moonVelocityInertial(this.simulationTime).add(new Vector3().crossVectors(MOON_ORBIT_NORMAL, normal).multiplyScalar(lunarOmega * (C.MOON_RADIUS + lunarSurfaceHeight(normal, this.simulationTime) + this.surfaceClearance)));
     return {
       simulationTime: this.simulationTime,
+      destinationId: this.destinationId, destinationName: target.name,
+      targetDistanceM, targetAltitudeM: this.destinationId === "moon" ? moonAltitudeM : targetDistanceM - target.radius,
+      relativeTargetSpeedMps: this.velocityInertial.clone().sub(bodyVelocityInertial(this.destinationId, this.simulationTime)).length(),
+      cruiseProgress: this.solarTransfer ? this.solarTransfer.elapsed / this.solarTransfer.duration : null,
+      cruiseSecondsRemaining: this.solarTransfer ? this.solarTransfer.duration - this.solarTransfer.elapsed : null,
+      terrainHeightM: lunarSurfaceHeight(normal, this.simulationTime),
       status: this.spaceStatus, guidanceActive: this.guidanceActive,
       guidancePhase: this.guidancePhase, timeWarp: this.timeWarp,
       effectiveTimeWarp: this.effectiveTimeWarp,
-      moonDistanceM, moonAltitudeM: moonDistanceM - C.MOON_RADIUS - this.surfaceClearance,
-      remainingDistanceM: Math.max(0, moonDistanceM - C.MOON_RADIUS - this.surfaceClearance),
+      moonDistanceM, moonAltitudeM,
+      remainingDistanceM: Math.max(0, moonAltitudeM),
       relativeMoonSpeedMps: this.velocityInertial.clone().sub(surfaceVelocity).length(),
       speedMps: this.velocityInertial.length(), earthAltitudeM: this.height,
       surfaceClearance: this.surfaceClearance, touchdownSpeedMps: this.touchdownSpeedMps ?? null,

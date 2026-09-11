@@ -247,17 +247,26 @@
         </details>
       </section>
       <section id="space-panel" aria-label="Space flight" hidden>
-        <strong id="space-status">Earth–Moon flight</strong>
+        <strong id="space-status">Solar system flight</strong>
         <pre id="space-details"></pre>
         <div class="space-actions">
+          <label class="space-destination">Destination <select id="space-destination">
+            <option value="moon">Moon · land</option><option value="mercury">Mercury</option><option value="venus">Venus</option><option value="earth">Earth · orbit</option><option value="mars">Mars</option><option value="jupiter">Jupiter</option><option value="saturn">Saturn</option><option value="uranus">Uranus</option><option value="neptune">Neptune</option><option value="sun">Sun · observation orbit</option>
+          </select></label>
           <button id="moon-guidance" type="button">Fly to Moon</button>
           <label>Mission time <select id="space-warp"><option value="1">1×</option><option value="10">10×</option><option value="100">100×</option><option value="1000">1000×</option></select></label>
+          <label id="lunar-light-control" hidden><input id="lunar-light" type="checkbox" checked /> Surface light</label>
+          <label id="lunar-camera-control" hidden><input id="lunar-camera" type="checkbox" /> Surface camera</label>
+          <button id="moon-launch" type="button" hidden>Take off from Moon</button>
+          <button id="space-manual" type="button" hidden>Leave orbit · manual flight</button>
           <button id="space-map-toggle" type="button" aria-pressed="false">Space map</button>
           <button id="dragon-release" type="button" hidden>Enter · Release Dragon</button>
           <button id="booster-release" type="button" hidden>Enter ×2 · Separate booster</button>
         </div>
         <p id="booster-status" role="status" hidden></p>
-        <p id="space-map-help" hidden>Drag to orbit · scroll to zoom · Esc returns to flight</p>
+        <label id="space-view-control" hidden>Map view <select id="space-view"><option value="earth-moon">Earth &amp; Moon</option><option value="solar">Entire solar system</option><option value="body">Selected destination</option></select></label>
+        <p id="space-map-help" hidden>Drag to orbit · scroll to zoom · Esc returns to flight. Planet markers are enlarged in the full system view.</p>
+        <p id="space-travel-help">Choose a destination and fly. Planetary cruise takes about a minute; Moon guidance uses the mission time control and lands automatically.</p>
         <details id="space-science">
           <summary>Magnetosphere &amp; flight model</summary>
           <label><input id="magnetosphere-toggle" type="checkbox" /> Show magnetosphere</label>
@@ -265,9 +274,9 @@
           <p id="space-environment"></p>
           <p>Plasmasphere · Inner / Outer Van Allen belts · Magnetopause · Magnetosheath · Bow shock · Magnetotail · Solar wind / IMF</p>
           <p>The boundaries move with solar wind. Earth's magnetic field has no sharp end. Distances use 1 Rₑ = 6,371 km.</p>
-          <p>Lunar guidance uses assisted steering and unlimited game propulsion. This is not a real Falcon 9 mission profile.</p>
-          <p>Mission speed controls the spacecraft and Moon. Sunlight and Earth's rotation stay synchronized with real UTC.</p>
-          <small>Moon imagery: NASA / GSFC / Arizona State University · Earth: NASA Blue Marble</small>
+          <p>Planetary cruise is a fictional accelerated drive; arrival holds an observation orbit. Gas giants have no solid landing surface. Lunar guidance uses assisted steering and unlimited propulsion.</p>
+          <p>Mean orbital distances and radii use metres. Planet phases and circular orbits are illustrative. Mission speed controls local flight; cruise runs in real time.</p>
+          <small>Moon imagery: NASA / GSFC / Arizona State University · Earth: NASA Blue Marble · Moon relief and other planet maps: procedural</small>
         </details>
       </section>
       <div id="space-labels" aria-hidden="true"></div>

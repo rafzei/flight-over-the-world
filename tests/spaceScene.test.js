@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { Matrix4, PerspectiveCamera, Raycaster, Scene, Vector3 } from 'three';
 import { SpaceScene, SPACE_RENDER_SCALE as SCALE } from '../src/game/spaceScene.js';
 import { SPACE_CONSTANTS as C, MOON_ORBIT_NORMAL, moonPositionECEF, inertialToECEF, sunDirectionInertial } from '../src/game/spacePhysics.js';
+import { lunarTerrainHeight } from '../src/game/lunarTerrain.js';
+import { SOLAR_BODY_BY_ID, bodyPositionInertial } from '../src/game/solarSystem.js';
 import { solarPosition } from '../src/game/dayNight.js';
 
 // No WebGL or network is needed to check the actual scene geometry/transforms.
@@ -70,7 +72,7 @@ test('live sunlight illuminates the same geographic point in flight and globe vi
   }
 });
 
-test('lunar contact patch has outward faces, continuous seam UVs and sub-metre spherical accuracy', t => {
+test('lunar contact patch has outward faces, continuous seam UVs and matches the physical relief', t => {
   const {space,mapMatrix,update}=sceneFixture(t);
   for(const sign of [-1,1]) {
     const time=34200,moon=moonPositionECEF(time),up=moon.clone().normalize().multiplyScalar(sign);
@@ -85,11 +87,44 @@ test('lunar contact patch has outward faces, continuous seam UVs and sub-metre s
     assert(hits.length>0);
     assert(Math.abs(hits[0].distance-19)<.15);
     const {position,uv}=space.patch.geometry.attributes;
-    for(let row=0;row<=64;row++)for(let col=0;col<64;col++){
-      const a=row*65+col;
+    const count = space.patch.geometry.userData.gridCount;
+    let minHeight = Infinity, maxHeight = -Infinity;
+    for(let row=0;row<=count;row++)for(let col=0;col<count;col++){
+      const a=row*(count+1)+col;
       assert(Math.abs(uv.getX(a)-uv.getX(a+1))<.01,'no wraparound interpolation across the lunar map');
-      const point=new Vector3().fromBufferAttribute(position,a);point.y+=C.MOON_RADIUS;
-      assert(Math.abs(point.length()-C.MOON_RADIUS)<.002);
+      const point=new Vector3().fromBufferAttribute(position,a).applyQuaternion(space.patchBasis).add(space.patchAnchor);
+      const height = point.length() - C.MOON_RADIUS;
+      assert(Math.abs(height - lunarTerrainHeight(point)) < .03, 'drawn vertices agree with collision surface');
+      minHeight = Math.min(minHeight, height); maxHeight = Math.max(maxHeight, height);
     }
   }
+});
+
+
+test('all planets render at their physical position and the full system and body views can frame them', t => {
+  const { space, update } = sceneFixture(t);
+  const observer = new Vector3(C.EARTH_EQUATORIAL_RADIUS + 1e6, 0, 0);
+  update(0, observer, true);
+  assert.equal(space.bodies.size, 10);
+  assert(space.bodies.get('saturn').getObjectByName('saturn-rings'));
+  for (const id of ['mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'sun']) {
+    const mesh = space.bodies.get(id);
+    const expected = bodyPositionInertial(id, 0).applyQuaternion(space.ecefOrientation).multiplyScalar(SCALE);
+    assert(mesh.position.distanceTo(expected) < 1e-8);
+    space.setOverviewMode('body', id); update(0, observer, true);
+    assert(mesh.position.distanceTo(space.controls.target) < 1e-8);
+    assert(space.camera.position.distanceTo(mesh.position) > mesh.userData.radius);
+    const projected = mesh.position.clone().project(space.camera);
+    assert(Math.abs(projected.x) < .6 && Math.abs(projected.y) < .6 && projected.z < 1);
+  }
+  space.setOverviewMode('solar'); update(0, observer, true);
+  assert(space.orbits.visible);
+  for (const id of ['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune']) {
+    const mesh = space.bodies.get(id), projected = mesh.position.clone().project(space.camera);
+    assert(Math.abs(projected.x) < 1 && Math.abs(projected.y) < 1 && projected.z < 1, `${id} lies in the full-system view`);
+    assert(mesh.scale.x >= 1);
+  }
+  update(0, observer, false);
+  assert.equal(space.bodies.get('neptune').scale.x, 1, 'flight restores physical radii');
+  assert.equal(space.orbits.visible, false);
 });

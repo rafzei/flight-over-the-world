@@ -1,4 +1,4 @@
-# Earth, the Moon and the magnetosphere
+# The solar system, lunar terrain and the magnetosphere
 
 The space view uses metres in an Earth-centred equatorial inertial frame, with **+Z toward the north rotation pole**. Rendering may rescale that frame; physical distances do not change. One mean Earth radius, **Rₑ = 6,371 km**, supplies the common scale for the teaching overlay. The detailed surface map still uses the WGS84 ellipsoid.
 
@@ -52,3 +52,18 @@ Read and checked for this implementation:
 - [NASA — Earth Facts](https://science.nasa.gov/earth/facts/): axial tilt, Earth and Moon scale and context.
 
 The attachment supplies the representative belt ranges and numerical rotation constants. These are deliberately presented as approximate engineering reference values. This implementation is an interactive scientific illustration and a game, not a geomagnetic field solver, flight navigation product, radiation forecast or validated lunar mission design.
+
+
+## Solar-system extension
+
+`solarSystem.js` supplies the Sun, all eight planets and the Moon. Planet radii, gravitational parameters, mean orbital distances and periods use SI units. Mean circular heliocentric positions are rotated by the obliquity into equatorial coordinates and translated by Earth's heliocentric position. Orbital phases are authored for exploration, not current ephemerides. Close planetary manual flight includes planetary and solar gravity with the Earth-origin indirect term. Solid-body or cloud-top impacts end manual flight; gas giants do not have landable terrain.
+
+`solarTransfer.js` implements an explicitly fictional cruise drive. Its continuous eased path takes roughly 55 real seconds and uses radial departure plus sphere-avoidance waypoints. It greatly exceeds physical spacecraft speeds; it is not an interplanetary trajectory or propulsion simulation. Arrival switches to an assisted circular observation orbit. Cancelling cruise drops to a local drift. Earth–Moon landing guidance retains its integrated thrust and gravity model; return from a planet hands over to that guidance 30 km above the Moon.
+
+The full-system overview enlarges planet markers for readability, with a visible UI note. The selected-body and flight views use physical radii. Each body's separate depth pass preserves precision across interplanetary distances. Saturn and Uranus rings and planet colour maps are procedural illustrations. The star field uses per-star phase, frequency and brightness; twinkling in vacuum is an artistic effect requested for this game.
+
+## Lunar surface
+
+`lunarTerrain.js` defines a deterministic height field in the Moon's tidally locked body frame. Three crater scales (6 km, 1.2 km and 180 m grid spacing) add bowls and rims to broad rolling relief. A small flat mare around the guided arrival site allows safe touchdown. Close rendering uses a nonuniform curved mesh with sub-metre spacing at the observer and skirts at the distant edge. Broad albedo comes from the bundled NASA LROC map, with procedural grain for regolith. The optional surface light is an artificial survey aid; turn it off to inspect the natural night side. The surface camera widens the view around the landing site.
+
+Altimetry, guidance, swept contact and the rendered vertices use the same height function. The contact solver intersects the relief shell and refines the first crossing; safe touchdown requires low relative surface speed and an upright attitude. A landed craft follows lunar translation and rotation. This surface is visually detailed game terrain, not a NASA elevation dataset or a surveyed landing site.

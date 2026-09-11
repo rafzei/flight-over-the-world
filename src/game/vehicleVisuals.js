@@ -11,6 +11,7 @@ import {
   Vector3,
 } from "three";
 import { prepareFighterDetails, updateFighterLights } from "./fighterDetails.js";
+import { updateF35 } from "./f35.js";
 import { disposeCombatDrone } from "./combatDrone.js";
 import { disposeFalcon9 } from "./falcon9.js";
 import { markContrailEmitters } from "./contrails.js";
@@ -145,8 +146,9 @@ export function prepareFighterSurfaces(model) {
   model.userData.fighterResources = resources;
 }
 
-export function updateFighterSurfaces(root, dt, roll, pitch) {
+export function updateFighterSurfaces(root, dt, roll, pitch, throttle = .4) {
   if (!root) return;
+  updateF35(root, dt, throttle);
   if (!root.userData.flightSurfaces) {
     const surfaces = [];
     const lights = [];
@@ -160,7 +162,7 @@ export function updateFighterSurfaces(root, dt, roll, pitch) {
   for (const lights of root.userData.flightLights ?? []) updateFighterLights(lights, dt);
   const blend = 1 - Math.exp(-12 * dt);
   for (const surface of root.userData.flightSurfaces) {
-    const target = MathUtils.clamp(pitch * 0.48 - surface.side * roll * 0.5, -0.7, 0.7);
+    const target = MathUtils.clamp(pitch * (surface.pitchWeight ?? .48) - surface.side * roll * (surface.rollWeight ?? .5), -0.7, 0.7);
     surface.angle += (target - surface.angle) * blend;
     surface.hinge.quaternion.setFromAxisAngle(surface.axis, surface.angle);
   }

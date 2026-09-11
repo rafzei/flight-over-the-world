@@ -1,3 +1,4 @@
+import { openF35WeaponBay } from "./f35.js";
 import {
   AdditiveBlending, BufferGeometry, ConeGeometry, DynamicDrawUsage,
   Float32BufferAttribute, Line, LineBasicMaterial, Matrix4, Mesh,
@@ -72,7 +73,8 @@ export function createFighterMissiles(scene, { onImpact = () => {} } = {}) {
     mesh.traverse(node => { node.castShadow = false; });
     const direction = new Vector3(0, 0, 1).applyQuaternion(mesh.quaternion).normalize();
     const localUp = up.clone().normalize();
-    mesh.position.addScaledVector(localUp, -.2);
+    mesh.position.addScaledVector(localUp, -(mount.userData.ejectDrop ?? .2));
+    if (mount.userData.weaponBay !== undefined) openF35WeaponBay(root, mount.userData.weaponBay);
     scene.add(mesh);
 
     const flame = new Mesh(new ConeGeometry(.18, 1.8, 10), new MeshBasicMaterial({

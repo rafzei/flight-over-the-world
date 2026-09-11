@@ -204,7 +204,7 @@ button, .mode-card, .scope-btn {
 #tow-status { color: var(--gold); }
 #sailplane-actions button { margin: 3px 4px 0 0; }
 #space-panel { position: absolute; pointer-events: auto; top: 22px; right: 22px; width: min(370px, calc(100vw - 44px)); max-height: calc(100dvh - 190px); overflow: auto; padding: 12px; border: 1px solid #ffffff30; border-radius: 6px; background: #120e0aeb; font-size: 12px; }
-#space-panel[hidden], #space-map-help[hidden] { display: none; }
+#space-panel[hidden], #space-map-help[hidden], #space-view-control[hidden] { display: none; }
 #space-panel { z-index: 5; }
 #space-panel #dragon-release { position: static; }
 #space-labels { pointer-events: none; }
@@ -218,8 +218,13 @@ button, .mode-card, .scope-btn {
 #space-panel details { margin-top: 10px; }
 #space-panel details label { display: block; margin-top: 8px; }
 #space-panel p { color: var(--muted); line-height: 1.5; }
+.space-destination { display: flex; align-items: center; gap: 8px; width: 100%; }
+.space-destination select { flex: 1; min-width: 0; }
+#space-view-control { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+#space-travel-help { margin: 10px 0 0; font-size: 11px; }
 .space-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .space-body-label { position: absolute; transform: translate(-50%, 14px); padding: 3px 6px; color: #ffdf9c; background: #090d17b3; border-radius: 3px; font: 12px monospace; }
+.space-body-label::before { content: ""; position: absolute; left: 50%; bottom: 100%; width: 1px; height: var(--leader-length, 0px); background: #ffdf9c50; }
 .space-body-label[hidden] { display: none; }
 @media (max-width: 760px), (pointer: coarse) {
   #space-panel { top: 80px; left: 10px; right: auto; width: min(350px, calc(100vw - 20px)); max-height: calc(100dvh - 300px); }
