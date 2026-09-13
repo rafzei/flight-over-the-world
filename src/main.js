@@ -45,8 +45,9 @@ import { createDroneCannons } from "./game/droneCannons.js";
 import { setLoader, hideLoader } from "./game/hud.js";
 import { createPlaneMesh } from "./game/plane.js";
 import { createVehicleController } from "./game/vehicleControllers.js";
-import { FlightPoints, PointRecords, POINT_HUNT_SECONDS, validPointScore } from "./game/flightPoints.js";
+import { FlightPoints, PointRecords, POINT_HUNT_SECONDS, POINT_MODES, validPointScore } from "./game/flightPoints.js";
 import { PointVisuals, createPointHud } from "./game/pointVisuals.js";
+import { DodgeTraffic, DodgeTrafficVisuals, DODGE_SECONDS } from "./game/dodgeTraffic.js";
 import { pointFlightFrame, pointMapMarkers as mapPointGates } from "./game/pointFlightFrame.js";
 import { SAILPLANE_SPEC, updateSailplane } from "./game/sailplane.js";
 import { BALLOON_SPEC, updateBalloon } from "./game/balloon.js";
@@ -372,6 +373,8 @@ let pointStorage;
 try { pointStorage = localStorage; } catch { /* private mode */ }
 const flightPoints = new FlightPoints({ records: new PointRecords(pointStorage), onCollect: gate => pointVisuals?.collect(gate) });
 const pointHud = createPointHud(document.getElementById("flight-points"));
+const dodgeTraffic = new DodgeTraffic({ storage: pointStorage });
+let dodgeVisuals;
 const falconStageInput = new FalconStageInput({ single: deployDragon, double: deployBooster });
 let missileShotSeq = 0;
 const lastMissileShotSeq = new Map();
@@ -773,6 +776,7 @@ const mp = {
 if (import.meta.env.DEV) window.__foeMp = mp;
 
 const ctrl = { roll: 0, pitch: 0, throttle: 0.4 };
+let controllingTow = false;
 let throttleLever = 0.4;
 let throttleShown = 0.4;
 const THROTTLE_RATE = 0.7;
@@ -914,7 +918,7 @@ const miniMap = createMiniMap({
 
 function canOpenFreeMap() {
   return (
-    ["free", "arcade", "landing"].includes(mode) &&
+    ["free", "arcade", "landing", "dodge"].includes(mode) &&
     plane?.height < 100000 &&
     !menuOpen &&
     !paused &&
@@ -930,10 +934,31 @@ function currentPointFrame() {
     clearance: Math.max(3, ...(landingSystem.gear?.points() ?? []).map(wheel => -wheel.point.y)), ground: probeSurface, weather });
 }
 
-function pointMapMarkers() { return tiles ? mapPointGates(flightPoints.gates, tiles.group.matrixWorld) : []; }
+function currentDodgeFrame() {
+  const frame = currentPointFrame(), spec = PLANES[selectedPlane];
+  frame.radius = plane.collisionRadius ?? spec.collisionRadius ?? (spec.vertical ? 18 : 4.5);
+  frame.hull = [{ offset: new Vector3(), radius: frame.radius }];
+  if (!spec.vertical && !plane.isBalloon) {
+    for (const side of [-1, 1]) frame.hull.push({ offset: frame.right.clone().multiplyScalar(side * spec.wingspan * .35), radius: Math.max(2, spec.wingspan * .1) });
+  }
+  return frame;
+}
+
+function updateDodgeHud() {
+  const panel = document.getElementById("dodge-panel");
+  panel.hidden = mode !== "dodge" || !dodgeTraffic.started || menuOpen || paused || guessOpen || leaveOpen || freeMap.open || crashed || finished || spaceScene?.overview;
+  if (panel.hidden) return;
+  const close = dodgeTraffic.nearest < 100;
+  document.getElementById("dodge-nearest").textContent = `${Math.round(dodgeTraffic.nearest)} m`;
+  document.getElementById("dodge-warning").textContent = close ? "Aircraft close · change course!" : "Watch crossing traffic · bank or change altitude";
+  panel.classList.toggle("danger", close);
+  document.getElementById("dodge-best").textContent = `Best ${dodgeTraffic.best.toFixed(1)} s · survive 90 s`;
+}
+
+function pointMapMarkers() { return tiles && flightPoints.enabled ? mapPointGates(flightPoints.gates, tiles.group.matrixWorld) : []; }
 
 function canCollectPoints() {
-  return !menuOpen && !paused && !leaveOpen && !guessOpen && !crashed && !finished && !pendingSnap && !awaitingSnap && !freeMap.open && !spaceScene?.overview;
+  return flightPoints.enabled && !menuOpen && !paused && !leaveOpen && !guessOpen && !crashed && !finished && !pendingSnap && !awaitingSnap && !freeMap.open && !spaceScene?.overview;
 }
 
 document.getElementById("points-new-trail").addEventListener("click", () => {
@@ -1061,8 +1086,8 @@ function selectPlane(i, dir, silent = false) {
   for (const hint of flightHints) {
     hint.node.innerHTML = selectedPlane === "sailplane"
       ? hint.node.classList.contains("hint-touch")
-        ? "Drag the stick to glide · nose down gains speed, nose up trades speed for height · slide AIRBRK to descend faster"
-        : "<kbd>W</kbd> nose down / gain speed · <kbd>S</kbd> nose up / slow down · <kbd>A</kbd><kbd>D</kbd> bank · scroll or drag AIRBRK · <kbd>Ctrl</kbd> airbrakes · <kbd>Shift</kbd> retract airbrakes · <kbd>,</kbd> / <kbd>.</kbd> retract / extend · <kbd>B</kbd> wheel brake · <kbd>C</kbd> camera · <kbd>M</kbd> map · <kbd>Esc</kbd> pause"
+        ? "Drag the stick to glide · slide AIRBRK to descend faster · on tow, the stick and THR control Cessna · release the rope to glide again"
+        : "<kbd>W</kbd> nose down / gain speed · <kbd>S</kbd> nose up / slow down · <kbd>A</kbd><kbd>D</kbd> bank · scroll or drag AIRBRK · <kbd>Ctrl</kbd> airbrakes · <kbd>Shift</kbd> retract airbrakes · <kbd>,</kbd> / <kbd>.</kbd> retract / extend · on tow, fly Cessna with W/S, A/D and THR (Shift power / Ctrl idle) · <kbd>L</kbd> release tow · <kbd>B</kbd> wheel brake · <kbd>C</kbd> camera · <kbd>M</kbd> map · <kbd>Esc</kbd> pause"
       : selectedPlane === "balloon"
         ? hint.node.classList.contains("hint-touch")
           ? "Red hot-air balloon · slide HEAT to warm or cool the envelope · pull the stick to heat, push to cool · wind carries the balloon · C cycles cameras, including basket view"
@@ -1112,6 +1137,7 @@ runwaySelect.addEventListener("change", () => { selectedApproach = runwaySelect.
 syncLandingSelection(true);
 
 const MODE_PLACEHOLDERS = {
+  dodge: "Starting city… e.g. Paris",
   arcade: "Starting city… e.g. Paris",
   landing: "Choose an airport and runway",
   free: "Starting city… e.g. Paris",
@@ -1119,6 +1145,7 @@ const MODE_PLACEHOLDERS = {
   guess: "",
 };
 const MODE_DESCS = {
+  dodge: "Survive 90 seconds among 50 nearby aircraft. Traffic crosses your path: bank, climb or descend to avoid a collision. Aircraft keep approaching throughout the round. M opens the map and pauses the challenge.",
   arcade: "Three minutes to collect as many rings as you can. Gold: 100 pts, mint: 200 pts. Keep a series for up to ×5; every 10 rings adds 500. Works with every vehicle. M shows rings on the map.",
   landing: "Choose a paved runway in Poland. G: landing gear. Reduce throttle, flare gently with S, then hold B to brake. Landing also works during Free flight.",
   free: "Pick a starting city and fly with no time limit. Land on paved runways across Poland: extend gear with G, touch down on the main wheels and hold B to brake.",
@@ -1132,7 +1159,7 @@ function selectMode(m) {
   document
     .querySelectorAll("#menu .mode-card")
     .forEach((b) => b.classList.toggle("selected", b.dataset.mode === m));
-  el.modeDesc.textContent = MODE_DESCS[m] + (m === "arcade" ? "" : " Collect gold and mint rings along the way for flight points and a personal record.");
+  el.modeDesc.textContent = MODE_DESCS[m] + (POINT_MODES.includes(m) && m !== "arcade" ? " Collect gold and mint rings along the way for flight points and a personal record." : "");
   el.city.placeholder = MODE_PLACEHOLDERS[m];
   el.city.style.display = m === "guess" || m === "landing" ? "none" : "";
   document.getElementById("landing-selectors").hidden = m !== "landing";
@@ -2436,8 +2463,8 @@ function tryReleaseGo() {
   applyGo();
 }
 
-function snapAgl() {
-  return mode === "guess" ? 350 : 320;
+function snapAgl(vehicle = selectedPlane) {
+  return PLANES[vehicle]?.spawnAgl ?? (mode === "guess" ? 350 : 320);
 }
 
 function spawnHoldAlt() {
@@ -2449,7 +2476,7 @@ function isTerrainSnap(s) {
   if (!s || !Number.isFinite(s.h) || !Number.isFinite(s.gh)) return false;
   if (s.probed === false) return false;
   if (Math.abs(s.h - s.gh - snapAgl()) > 100) return false;
-  if (Math.abs(s.h - spawnHoldAlt()) < 300) return false;
+  if (s.probed !== true && Math.abs(s.h - spawnHoldAlt()) < 300) return false;
   return true;
 }
 
@@ -2458,7 +2485,7 @@ function buildGoPayload() {
   if (!snaps.length) return null;
   const ghs = snaps.map((s) => s.gh).sort((a, b) => a - b);
   const gh = ghs[Math.floor(ghs.length / 2)];
-  return { h: gh + snapAgl(), gh, heading: 0 };
+  return { h: gh + snapAgl(null), gh, heading: 0 };
 }
 
 function applyGo(msg) {
@@ -2468,7 +2495,7 @@ function applyGo(msg) {
           h: Number(msg.h),
           gh: Number.isFinite(Number(msg.gh))
             ? Number(msg.gh)
-            : Number(msg.h) - snapAgl(),
+            : Number(msg.h) - snapAgl(null),
           heading: msg.heading ?? 0,
         }
       : null;
@@ -2481,17 +2508,24 @@ function applyGo(msg) {
   mp.waitingGo = false;
   mp.lastGo = payload;
   if (mp.host && !alreadySent) mp.net?.send({ t: "go", ...payload });
+  const balloonSurface = snapBestGh ?? snapLastGh;
+  if (plane?.isBalloon && (pendingSnap || !Number.isFinite(balloonSurface))) {
+    // A peer's terrain height cannot place a balloon over its own spawn site.
+    pendingSnap = awaitingSnap = true;
+    showMpWait("Loading local terrain… balloon starts 300 m above the surface");
+    return;
+  }
   pendingSnap = false;
   awaitingSnap = false;
   armCrashGrace();
   if (plane && payload.h != null) {
-    plane.height = payload.h;
+    plane.height = plane.isBalloon ? balloonSurface + snapAgl() : payload.h;
     plane.heading = payload.heading ?? 0;
     plane.pitch = 0;
     plane.roll = 0;
     ctrl.roll = 0;
     ctrl.pitch = 0;
-    groundAlt = payload.gh ?? payload.h - snapAgl();
+    groundAlt = plane.isBalloon ? balloonSurface : payload.gh ?? payload.h - snapAgl();
   }
   camInit = false;
   mp.goAt = performance.now();
@@ -3110,8 +3144,9 @@ function loadMate(id, key) {
 function resetFlight(latDeg, lonDeg) {
   flightPoints.reset({ mode, vehicle: selectedPlane });
   pointVisuals?.reset();
+  dodgeTraffic.reset(); dodgeVisuals?.dispose(); dodgeVisuals = null;
   falconStageInput.reset();
-  sailplaneTow.reset(); grassLanding.reset();
+  sailplaneTow.reset(); controllingTow = false; grassLanding.reset();
   toggleSpaceMap(false);
   spaceTime = 0;
   lunarSurfaceView = false; document.getElementById("lunar-camera").checked = false;
@@ -3133,7 +3168,7 @@ function resetFlight(latDeg, lonDeg) {
   lastMissileShotSeq.clear();
   for (const explosion of explosions) explosion.dispose();
   explosions.length = 0;
-  timeLeft = mode === "home" ? HOME_TIME : mode === "guess" ? GUESS_TIME : mode === "arcade" ? POINT_HUNT_SECONDS : 0;
+  timeLeft = mode === "home" ? HOME_TIME : mode === "guess" ? GUESS_TIME : mode === "arcade" ? POINT_HUNT_SECONDS : mode === "dodge" ? DODGE_SECONDS : 0;
   timerActive = false;
   startLat = latDeg;
   startLon = lonDeg;
@@ -3338,9 +3373,10 @@ function updateFlightPhysics(dt) {
   let left = dt;
   while (left > 0) {
     const step = Math.min(1 / 60, left);
+    syncTowControls();
     if (canCrash && landingSystem?.gear && landingSystem.grounded) {
       if (landingSystem.runway.isGrass && grassLanding.reason) { flightPosition(planePos); crash(planePos); return; }
-      const result = plane.isSailplane && sailplaneTow.attached ? sailplaneTow.step(step, plane, landingSystem) : landingSystem.roll(plane, step, ctrl);
+      const result = plane.isSailplane && sailplaneTow.attached ? sailplaneTow.step(step, plane, landingSystem, ctrl) : landingSystem.roll(plane, step, ctrl);
       plane.weatherVertical = 0;
       left -= step;
       if (result.crash) { flightPosition(planePos); crash(planePos); return; }
@@ -3348,7 +3384,7 @@ function updateFlightPhysics(dt) {
     }
     const before = landingSystem?.gear ? flightPose(plane) : null;
     if (canCrash) flightPosition(_flightFrom);
-    if (plane.isSailplane && sailplaneTow.attached) { sailplaneTow.step(step, plane, landingSystem); plane.weatherVertical = 0; }
+    if (plane.isSailplane && sailplaneTow.attached) { sailplaneTow.step(step, plane, landingSystem, ctrl); plane.weatherVertical = 0; }
     else plane.update(step, ctrl);
     left -= step;
     if (canCrash) {
@@ -3392,6 +3428,7 @@ function updateFlightPhysics(dt) {
 function crash(point = planePos) {
   if (crashed) return;
   crashed = true;
+  if (mode === "dodge") dodgeTraffic.finish(true);
   sailplaneTow.reset();
   const up = WGS84_ELLIPSOID.getCartographicToNormal(plane.lat, plane.lon, new Vector3())
     .transformDirection(tiles.group.matrixWorld);
@@ -3403,7 +3440,10 @@ function crash(point = planePos) {
     homePath.push({ lat: plane.latDeg, lon: plane.lonDeg });
   if (mp.active && mode === "guess") return; // runda trwa — po minucie i tak zgadujecie
   timerActive = false;
-  setTimeout(() => showBanner("YOU CRASHED"), 900);
+  const crashedPlane = plane;
+  setTimeout(() => {
+    if (crashed && plane === crashedPlane) showBanner("YOU CRASHED", mode === "dodge" ? dodgeTraffic.summary() : "");
+  }, 900);
 }
 
 async function geocodeCity(name) {
@@ -3509,7 +3549,7 @@ async function startGame() {
       const runway = airportRunways.get(selectedApproach);
       const p = runway.pose(0, runway.definition.threshold - 6000, 340);
       beginFlight(p.lat * 180 / Math.PI, p.lon * 180 / Math.PI);
-    } else if (mode === "free" || mode === "arcade") {
+    } else if (["free", "arcade", "dodge"].includes(mode)) {
       const city = el.city.value.trim() || "Niepruszewo";
       el.menuError.textContent = `Looking up: ${city}…`;
       const loc = await geocodeCity(city);
@@ -3555,7 +3595,7 @@ function beginFlight(lat, lon) {
   if (selectedPlane !== planeMesh?.userData?.key) loadPlane(selectedPlane);
   resetFlight(lat, lon);
   retryFailedTiles(true);
-  el.timerBox.classList.toggle("show", mode === "home" || mode === "guess" || mode === "arcade");
+  el.timerBox.classList.toggle("show", ["home", "guess", "arcade", "dodge"].includes(mode));
   el.distBox.classList.remove("show");
   lastPlaceAt = 0;
   hidePlaceBadge();
@@ -3586,7 +3626,7 @@ function finishSnapStart() {
   }
   // Start with the full mode duration only after the terrain is ready, even
   // when this flight was restarted or entered through a different start path.
-  timeLeft = mode === "home" ? HOME_TIME : mode === "guess" ? GUESS_TIME : mode === "arcade" ? POINT_HUNT_SECONDS : 0;
+  timeLeft = mode === "home" ? HOME_TIME : mode === "guess" ? GUESS_TIME : mode === "arcade" ? POINT_HUNT_SECONDS : mode === "dodge" ? DODGE_SECONDS : 0;
   paused = false;
   hideBanner();
   if (el.menu.contains(document.activeElement)) document.activeElement.blur();
@@ -3601,8 +3641,12 @@ function finishSnapStart() {
   carousel.setActive(false);
   hideMpWait();
   el.start.disabled = false;
-  timerActive = mode === "guess" || mode === "home" || mode === "arcade";
-  flightPoints.start(currentPointFrame());
+  timerActive = ["guess", "home", "arcade", "dodge"].includes(mode);
+  if (flightPoints.enabled) flightPoints.start(currentPointFrame());
+  if (mode === "dodge") {
+    dodgeTraffic.start(currentDodgeFrame(), selectedPlane);
+    dodgeVisuals = new DodgeTrafficVisuals(scene);
+  }
   clearError();
   updateMpPresence();
   if (mode === "free") {
@@ -4170,7 +4214,7 @@ window.addEventListener("keydown", (e) => {
   }
   if (k === "m" && !e.repeat && !menuOpen && !guessOpen && !paused) {
     e.preventDefault();
-    if (["free", "arcade", "landing"].includes(mode)) toggleFreeMap();
+    if (["free", "arcade", "landing", "dodge"].includes(mode)) toggleFreeMap();
     else showMapUnavailable();
     return;
   }
@@ -4431,8 +4475,7 @@ function setThrottleLever(v) {
 }
 
 function throttleTarget() {
-  if (sailplaneTow.attached) return 0;
-  if (plane?.isSailplane) {
+  if (plane?.isSailplane && !sailplaneTow.attached) {
     if (keys.has("control")) return 1;
     if (keys.has("shift")) return 0;
     return throttleLever;
@@ -4453,7 +4496,7 @@ function tickThrottle(dt) {
 }
 
 function syncThrottleUi() {
-  const gliding = !!plane?.isSailplane;
+  const gliding = !!plane?.isSailplane && !sailplaneTow.attached;
   const label = el.throttle?.querySelector("span");
   if (label) label.textContent = gliding ? "AIRBRK" : plane?.isBalloon ? "HEAT" : "THR";
   el.throttleRail?.setAttribute("aria-label", gliding ? "Airbrakes" : plane?.isBalloon ? "Balloon burner heat" : "Throttle");
@@ -4464,6 +4507,18 @@ function syncThrottleUi() {
     "aria-valuenow",
     String(Math.round(throttleShown * 100))
   );
+}
+
+function syncTowControls() {
+  if (!plane?.isSailplane) { controllingTow = false; return; }
+  if (controllingTow === sailplaneTow.attached) return;
+  controllingTow = sailplaneTow.attached;
+  // The shared slider changes from glider airbrakes to tow-plane power. Never
+  // carry a high power setting back into airbrakes when the cable releases.
+  throttleLever = throttleShown = controllingTow ? 1 : 0;
+  ctrl.throttle = throttleShown;
+  ctrl.airbrake = 0;
+  syncThrottleUi();
 }
 
 function syncThrottleVis() {
@@ -4593,7 +4648,7 @@ function syncTouchUi() {
   el.touch.classList.toggle("hidden", !show);
   el.touch.classList.toggle("show", show);
   el.touch.classList.toggle("talk", voiceEnabled());
-  el.touch.classList.toggle("free", ["free", "arcade", "landing"].includes(mode));
+  el.touch.classList.toggle("free", ["free", "arcade", "landing", "dodge"].includes(mode));
   syncThrottleVis();
   if (!show) resetStick();
 }
@@ -4666,6 +4721,7 @@ window.__foeDebug = () => ({
   cameraMode: flightCamera.mouseOrbit ? "Mouse orbit" : FLIGHT_CAMERAS[flightCamera.mode].name,
   cameraOrbit: flightCamera.mouseOrbit ? { ...flightCamera.mouseOrbit } : null,
   traffic: liveTraffic?.debug(),
+  dodge: mode === "dodge" ? dodgeTraffic.diagnostics() : null,
   spaceSky: sky?.uniforms.uSpace.value,
   daylight: localSun ? { ...localSun, utc: new Date(solar.utcMs).toISOString(), siderealAngle: solar.siderealAngle } : null,
   flightClock: flightClock.diagnostics(),
@@ -4724,7 +4780,8 @@ function tickFrame() {
 
   // The hunt clock pauses on either map, so its aircraft must pause too.
   let flying = !menuOpen && !paused && !guessOpen && !crashed && !finished &&
-    !(mode === "arcade" && (freeMap.open || spaceScene.overview));
+    !(["arcade", "dodge"].includes(mode) && (freeMap.open || spaceScene.overview)) &&
+    !(mode === "dodge" && (leaveOpen || pendingSnap || awaitingSnap));
   if (flying && !leaveOpen && !freeMap.open && !pendingSnap && !awaitingSnap) falconStageInput.update(performance.now());
   else falconStageInput.reset();
 
@@ -4740,6 +4797,7 @@ function tickFrame() {
   const controlBlend = 1 - Math.exp(-6 * dt);
   ctrl.roll += (rollIn - ctrl.roll) * controlBlend;
   ctrl.pitch += (pitchIn - ctrl.pitch) * controlBlend;
+  syncTowControls();
   if (flying && plane.isLunar && (plane.guidanceActive || plane.orbit || plane.spaceStatus === "landed-moon")) {
     throttleShown = plane.throttle;
     syncThrottleUi();
@@ -4748,8 +4806,9 @@ function tickFrame() {
     throttleShown = throttleLever;
     syncThrottleUi();
   }
-  ctrl.throttle = plane.isSailplane ? 0 : throttleShown;
-  ctrl.airbrake = plane.isSailplane ? throttleShown : 0;
+  const gliding = plane.isSailplane && !sailplaneTow.attached;
+  ctrl.throttle = gliding ? 0 : throttleShown;
+  ctrl.airbrake = gliding ? throttleShown : 0;
   landingSystem.gear = planeMesh?.userData.landingGear || null;
   if (flying && landingSystem.gear) {
     if (plane.isSailplane && frameCount % 120 === 0 && plane.height - groundAlt < 700) void grassFields.update(plane);
@@ -4782,7 +4841,17 @@ function tickFrame() {
     if (sailplaneTow.attached && landingSystem.grounded && ctrl.wheelBrake) sailplaneTow.release(plane, landingSystem);
     sailplaneTow.update(dt, plane, landingSystem);
     updateFlightPhysics(dt);
-    flying = !crashed;
+    syncTowControls();
+    if (mode === "dodge" && !crashed) {
+      const hit = dodgeTraffic.update(dt, currentDodgeFrame());
+      timeLeft = dodgeTraffic.remaining;
+      if (hit) stopAtImpact(hit);
+      else if (dodgeTraffic.finished) {
+        finished = true; timerActive = false;
+        showBanner("AIRSPACE CLEARED!", dodgeTraffic.summary());
+      }
+    }
+    flying = !crashed && !finished;
   }
   if (plane.isLunar) spaceTime = plane.simulationTime;
   else if (flying) spaceTime += dt;
@@ -4818,8 +4887,8 @@ function tickFrame() {
         document.getElementById("tow-release").hidden = !sailplaneTow.busy;
         document.getElementById("tow-release").textContent = sailplaneTow.attached ? "L · Release tow rope" : "L · Cancel tow";
         if (sailplaneTow.attached) {
-          document.getElementById("landing-status").textContent = d.grounded ? "AEROTOW · accelerating behind Cessna" : "AEROTOW · climbing behind Cessna";
-          document.getElementById("landing-details").textContent = `${Math.round(plane.kmh)} km/h · climb ${Math.max(0, plane.verticalSpeed).toFixed(1)} m/s\n${Math.max(0, Math.round(plane.height - sailplaneTow.groundHeight))} m above departure field · auto release at 350 m`;
+          document.getElementById("landing-status").textContent = d.grounded ? "PILOTING CESSNA · tow takeoff" : "PILOTING CESSNA · glider following";
+          document.getElementById("landing-details").textContent = `${Math.round(plane.kmh)} km/h · climb ${plane.verticalSpeed.toFixed(1)} m/s · power ${Math.round(sailplaneTow.throttle * 100)}%\n${Math.max(0, Math.round(plane.height - sailplaneTow.groundHeight))} m above departure field · auto release at 350 m`;
         }
       }
     }
@@ -4828,7 +4897,7 @@ function tickFrame() {
   // dźwięk silnika — obroty z przepustnicy i prędkości, opływ z prędkości
   const speed01 = plane.speed / plane.boost;
   const rpm01 = plane.isBalloon ? plane.throttle : Math.min(1, Math.max(0.15, 0.22 + plane.throttle * 0.78));
-  updateEngineSound(flying, sailplaneTow.busy ? .75 : rpm01, speed01, sailplaneTow.busy ? "plane" : PLANES[selectedPlane].sound);
+  updateEngineSound(flying, sailplaneTow.busy ? .22 + .78 * sailplaneTow.throttle : rpm01, speed01, sailplaneTow.busy ? "plane" : PLANES[selectedPlane].sound);
   if (plane.isSailplane) updateSailplane(planeMesh, plane.airbrake);
   updateMusic();
 
@@ -4846,6 +4915,8 @@ function tickFrame() {
   planeMesh.position.copy(planePos);
   planeMesh.quaternion.copy(planeQuat);
   sailplaneTow.render(scene, frameAt, planeMesh, flying ? dt : 0, !menuOpen && !guessOpen && !crashed);
+  dodgeVisuals?.update(dodgeTraffic, planePos, mode === "dodge" && !menuOpen && !guessOpen && !freeMap.open && !spaceScene.overview);
+  if (frameCount % 8 === 0) updateDodgeHud();
   if (planeMesh.userData.prop) {
     planeMesh.userData.prop.rotation.z += plane.speed * dt * 1.6;
   }
@@ -4978,7 +5049,10 @@ function tickFrame() {
       if (mate.key === "sailplane" && to.tow) {
         mate.towVisuals ??= new TowVisuals();
         const tow = { ...to.tow };
-        if (from.tow) for (const key of ["lat", "lon", "height", "heading", "pitch"]) tow[key] = from.tow[key] + (to.tow[key] - from.tow[key]) * u;
+        if (from.tow) {
+          for (const key of ["lat", "lon", "height", "pitch", "roll", "throttle"]) tow[key] = from.tow[key] + (to.tow[key] - from.tow[key]) * u;
+          tow.heading = lerpAngle(from.tow.heading, to.tow.heading, u);
+        }
         mate.towVisuals.update(scene, frameAt, mate.mesh, tow, paused ? 0 : dt);
       } else mate.towVisuals?.dispose();
       const mateVertical = PLANES[mate.key].vertical;
@@ -5149,7 +5223,9 @@ function tickFrame() {
       adoptGround(gh);
     }
     if (pendingSnap && surf !== null) {
-      snapBestGh = snapBestGh == null ? surf : Math.max(snapBestGh, surf);
+      // Balloons use the current terrain level, including refined tiles that
+      // replace an earlier, higher estimate, to keep the start at 300 m AGL.
+      snapBestGh = plane.isBalloon || snapBestGh == null ? surf : Math.max(snapBestGh, surf);
       plane.height = snapBestGh + snapAgl();
       if (!snapFirstAt) snapFirstAt = performance.now();
       if (snapLastGh !== null && Math.abs(surf - snapLastGh) < 30) {
@@ -5173,20 +5249,27 @@ function tickFrame() {
     }
   }
   if (awaitingSnap && performance.now() - awaitingSnapSince > 20000) {
-    awaitingSnap = false;
-    pendingSnap = false;
-    armCrashGrace();
     const gh = Number.isFinite(snapBestGh)
       ? snapBestGh
       : Number.isFinite(snapLastGh)
       ? snapLastGh
       : null;
-    if (gh !== null) {
-      plane.height = gh + snapAgl();
-      groundAlt = gh;
+    if (plane.isBalloon && gh === null) {
+      // Never expose the temporary 6 km loading position as a balloon start.
+      awaitingSnapSince = performance.now();
+      el.menuError.textContent = "Loading terrain… balloon starts 300 m above the surface";
+      retryFailedTiles(true);
+    } else {
+      awaitingSnap = false;
+      pendingSnap = false;
+      armCrashGrace();
+      if (gh !== null) {
+        plane.height = gh + snapAgl();
+        groundAlt = gh;
+      }
+      if (mp.active && mp.inRound) reportSnapped();
+      else finishSnapStart();
     }
-    if (mp.active && mp.inRound) reportSnapped();
-    else finishSnapStart();
   }
   const agl = plane.height - groundAlt;
   // aktywne wybuchy
@@ -5223,7 +5306,7 @@ function tickFrame() {
   // tryby: timer + warunki wygranej
   if (
     timerActive &&
-    mode !== "arcade" &&
+    mode !== "arcade" && mode !== "dodge" &&
     !pendingSnap &&
     !awaitingSnap &&
     !menuOpen &&
@@ -5335,7 +5418,7 @@ function tickFrame() {
     active: !menuOpen && !pendingSnap && !awaitingSnap && plane.height < 100000 && localSun.sunlight > .05,
   });
   liveTraffic?.update({
-    active: !menuOpen && !paused && !guessOpen && !leaveOpen && !crashed && !finished && !pendingSnap && !awaitingSnap && !freeMap.open && !window.__ctxLost && plane.height < 100000,
+    active: mode !== "dodge" && !menuOpen && !paused && !guessOpen && !leaveOpen && !crashed && !finished && !pendingSnap && !awaitingSnap && !freeMap.open && !window.__ctxLost && plane.height < 100000,
     speedMps: plane.speed,
     viewportHeight: innerHeight,
   });

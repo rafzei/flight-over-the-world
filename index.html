@@ -146,6 +146,7 @@
           </button>
           <button class="mode-card" data-mode="landing" type="button"><span class="m-name">Land</span></button>
           <button class="mode-card" data-mode="arcade" type="button"><span class="m-name">Point hunt</span></button>
+          <button class="mode-card" data-mode="dodge" type="button"><span class="m-name">Traffic dodge</span></button>
         </div>
         <p id="mode-desc"></p>
         <div id="landing-selectors" hidden>
@@ -237,6 +238,12 @@
     </div>
 
     <div id="hud">
+      <section id="dodge-panel" aria-label="Traffic dodge" hidden>
+        <strong>TRAFFIC DODGE · 50 AIRCRAFT</strong>
+        <p>Nearest aircraft <b id="dodge-nearest">—</b></p>
+        <p id="dodge-warning" role="status">Watch crossing traffic · bank or change altitude</p>
+        <small id="dodge-best">Survive 90 seconds</small>
+      </section>
       <section id="flight-points" aria-label="Flight points" hidden>
         <div class="points-top"><span data-points-title>FLIGHT POINTS</span><span data-points-best>Best 0</span></div>
         <div class="points-total"><strong data-points-score>0</strong><span>pts</span><span data-points-series>0 in a row · ×1</span></div>

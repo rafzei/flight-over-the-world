@@ -76,7 +76,7 @@ test("shadow overlays are not solid; visible parent tiles remain solid during LO
 const source = await readFile(new URL("../src/main.js", import.meta.url), "utf8");
 const ast = parseAst(source);
 const physicsFunctions = ["collectProbeHits", "hitEllipsoidHeight", "probeColumn", "adoptGround",
-  "armCrashGrace", "flightPosition", "stopAtImpact", "updateFlightPhysics"];
+  "armCrashGrace", "flightPosition", "stopAtImpact", "syncTowControls", "updateFlightPhysics"];
 function flight({ groundHeight = 0, height = 40, vertical = false, lat = .9, lon = .3, terrainSize = 10000 } = {}) {
   const group = new Group();
   group.rotation.x = -Math.PI / 2;
@@ -91,7 +91,7 @@ function flight({ groundHeight = 0, height = 40, vertical = false, lat = .9, lon
   const context = vm.createContext({
     WGS84_ELLIPSOID, earthPosition, raycastTerrain, landingSystem: null, tiles: { group }, raycaster: new Raycaster(),
     plane: { lat, lon, height, update(dt) { this.height -= 2400 * dt; } },
-    planePos: new Vector3(), ctrl: {}, PLANES: { vehicle: { vertical } }, selectedPlane: "vehicle",
+    planePos: new Vector3(), ctrl: {}, controllingTow: false, PLANES: { vehicle: { vertical } }, selectedPlane: "vehicle",
     pendingSnap: false, awaitingSnap: false, crashGraceUntil: 0, groundAlt: 120, crashed: false,
     performance: { now: () => now }, vehicleCollision: createVehicleCollisionDetector(),
     _probeOrigin: new Vector3(), _probeDir: new Vector3(), _probePoint: new Vector3(),

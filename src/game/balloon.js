@@ -11,6 +11,7 @@ export const BALLOON_SPEC = Object.freeze({
   create: createBalloon, wingspan: 24, cruise: 6, boost: 14, brake: 0,
   cam: [0, 4, 46], name: 'Red hot-air balloon', flightModel: 'balloon',
   previewVertical: true, collisionRadius: 12, noContrails: true, sound: 'balloon',
+  spawnAgl: 300,
   desc: 'Red envelope · wicker basket · heat to climb, cool to descend · wind drift',
 });
 

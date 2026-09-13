@@ -1,7 +1,7 @@
 import { Vector3 } from "three";
 
 export const POINT_HUNT_SECONDS = 180;
-export const POINT_MODES = Object.freeze(["arcade", "free", "home", "guess", "landing"]);
+export const POINT_MODES = Object.freeze(["arcade", "home", "guess"]);
 const LIMIT = 999999999;
 const finiteVector = v => v?.isVector3 && [v.x, v.y, v.z].every(Number.isFinite);
 export const validPointScore = n => Number.isSafeInteger(n) && n >= 0 && n <= LIMIT ? n : 0;
@@ -44,7 +44,7 @@ export class FlightPoints {
     this.reset();
   }
   reset({ mode = "free", vehicle = "pa28" } = {}) {
-    this.mode = POINT_MODES.includes(mode) ? mode : "free"; this.vehicle = vehicle;
+    this.mode = mode; this.vehicle = vehicle;
     this.score = 0; this.collected = 0; this.combo = 0; this.bestCombo = 0;
     this.elapsed = 0; this.lastCollect = -Infinity; this.nextId = 1;
     this.best = this.records.read(this.mode, vehicle); this.startBest = this.best;
@@ -52,14 +52,16 @@ export class FlightPoints {
     this.awards = new Set(); this.message = "Fly through the gold rings"; this.messageUntil = 5;
     this.trailAt = -Infinity; this.version = (this.version ?? 0) + 1;
   }
+  get enabled() { return POINT_MODES.includes(this.mode); }
   get remaining() { return Math.max(0, POINT_HUNT_SECONDS - this.elapsed); }
   get multiplier() { return Math.min(5, 1 + Math.floor(Math.max(0, this.combo - 1) / 3)); }
   get nextGate() { return this.gates[0] ?? null; }
   start(frame) {
-    if (!finiteVector(frame?.position)) return;
+    if (!this.enabled || !finiteVector(frame?.position)) return;
     this.started = true; this.previous = frame.position.clone(); this.makeTrail(frame);
   }
   add(points, label) {
+    if (!this.enabled || !this.started) return;
     this.score = Math.min(LIMIT, this.score + points);
     this.best = this.records.save(this.mode, this.vehicle, this.score);
     this.message = `${label} +${points}`; this.messageUntil = this.elapsed + 2.5;
@@ -69,7 +71,7 @@ export class FlightPoints {
     this.awards.add(id); this.add(points, label); return true;
   }
   makeTrail(frame) {
-    if (!finiteVector(frame?.position) || !finiteVector(frame.forward) || !finiteVector(frame.up)) return;
+    if (!this.enabled || !finiteVector(frame?.position) || !finiteVector(frame.forward) || !finiteVector(frame.up)) return;
     const forward = frame.forward.clone().normalize(), up = frame.up.clone().normalize();
     if (forward.lengthSq() < .5 || up.lengthSq() < .5) return;
     let right = new Vector3().crossVectors(forward, up);

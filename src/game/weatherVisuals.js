@@ -66,7 +66,7 @@ export function createWeatherHud(element) {
       vario.textContent=`Vario ${signed(climb)} m/s`;
       vario.dataset.lift=climb>.1?'up':climb<-.1?'down':'level';
       const nearest=weather.nearest;
-      details.textContent=`Simulated weather\nAir ${signed(weather.up)} m/s · gust ${weather.gust.toFixed(1)} m/s\nGround ${Math.round((grounded?plane.speed:plane.groundSpeed??plane.speed)*3.6)} km/h\nCloud base ${Math.round(weather.cloudBase)} m AMSL\n${towing?'Tow pilot compensates for wind':nearest?`Thermal ${Math.round(nearest.bearing)}° · ${(nearest.distance/1000).toFixed(1)} km`:'No active thermals nearby'}${plane.isBalloon?'\nChange altitude to find another wind direction.':''}`;
+      details.textContent=`Simulated weather\nAir ${signed(weather.up)} m/s · gust ${weather.gust.toFixed(1)} m/s\nGround ${Math.round((grounded?plane.speed:plane.groundSpeed??plane.speed)*3.6)} km/h\nCloud base ${Math.round(weather.cloudBase)} m AMSL\n${towing?'Tow assistance compensates for wind':nearest?`Thermal ${Math.round(nearest.bearing)}° · ${(nearest.distance/1000).toFixed(1)} km`:'No active thermals nearby'}${plane.isBalloon?'\nChange altitude to find another wind direction.':''}`;
     },
   };
 }

@@ -1203,7 +1203,7 @@ kbd {
   gap: 12px;
   margin-bottom: 20px;
 }
-#menu .modes { grid-template-columns: repeat(5, 1fr); }
+#menu .modes { grid-template-columns: repeat(3, 1fr); }
 @media (max-width: 760px) { #menu .modes { grid-template-columns: repeat(2, 1fr); } }
 
 .mode-card {
@@ -2118,5 +2118,18 @@ kbd {
   #hud:has(#flight-points:not([hidden])) #landing-panel { top: max(215px, calc(env(safe-area-inset-top) + 207px)); max-height: max(120px, calc(100dvh - 435px)); overflow: auto; }
   #hud:has(#flight-points:not([hidden])):has(#landing-panel:not([hidden])) #traffic-panel { display: none; }
   #hud:has(#flight-points:not([hidden])) #f-guess-stats { top: auto; bottom: 230px; }
-  #menu .mode-card[data-mode="arcade"] { grid-column: 1 / -1; }
+}
+
+#dodge-panel { position: absolute; top: 22px; left: 22px; width: 275px; padding: 12px 14px; border: 1px solid #f3ead640; border-radius: 6px; background: #120e0ae6; color: var(--paper); font-size: 12px; font-variant-numeric: tabular-nums; }
+#dodge-panel[hidden] { display: none; }
+#dodge-panel strong { color: #ffd986; font-size: 12px; }
+#dodge-panel p { margin: 8px 0; }
+#dodge-panel b { float: right; font-size: 18px; }
+#dodge-panel small { color: var(--muted); }
+#dodge-panel.danger { border-color: #ff946c; }
+#dodge-panel.danger #dodge-warning, #dodge-panel.danger b { color: #ffad85; }
+@media (max-width: 760px), (pointer: coarse) {
+  #dodge-panel { top: max(80px, calc(env(safe-area-inset-top) + 72px)); left: 10px; width: min(310px, calc(100vw - 20px)); padding: 9px 12px; }
+  #hud:has(#dodge-panel:not([hidden])) #landing-panel,
+  #hud:has(#dodge-panel:not([hidden])) #space-panel { top: 225px; max-height: max(100px, calc(100dvh - 440px)); overflow: auto; }
 }

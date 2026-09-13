@@ -37,6 +37,24 @@ function rig(dt = 1 / 60) {
   return { p, model, wrapper, landing, fields, ground, tow, dispose() { tow.reset(); landing.gear.dispose(); disposeModelResources(model); } };
 }
 
+function attach(r) {
+  assert(r.tow.call(r.p, r.landing, () => null));
+  r.tow.update(12, r.p, r.landing); r.tow.update(2, r.p, r.landing);
+}
+
+function flyTow(r, seconds, ctrl = {}, dt = 1 / 60) {
+  for (let i = 0; i < Math.round(seconds / dt); i++) {
+    r.tow.update(dt, r.p, r.landing);
+    assert(!r.tow.step(dt, r.p, r.landing, ctrl)?.crash);
+    assert.equal(r.p.throttle, 0);
+    assert.equal(r.p.airbrake, 0);
+  }
+}
+
+function separation(a, b) {
+  return Math.hypot((a.lat - b.lat) * 6378137, Math.atan2(Math.sin(a.lon - b.lon), Math.cos(a.lon - b.lon)) * 6378137 * Math.cos(b.lat), a.height - b.height);
+}
+
 test("only mapped grass qualifies; buildings, water and relation holes stay excluded", () => {
   const fields = grass(); assert(fields.at(52 * DEG, 21 * DEG)); assert(!fields.at(53 * DEG, 21 * DEG));
   fields.cache.unshift(parseGrassFields({ elements: [{ type: "way", id: 2, tags: { building: "yes" }, geometry: ring(51.999, 20.999, 52.001, 21.001) }] }));
@@ -114,6 +132,82 @@ test("Cessna tows a stopped glider off grass, climbs and releases at 350 m at mu
   }
 });
 
+test("tow pilot steers the ground run and can reduce power or cancel with the wheel brake", () => {
+  for (const direction of [-1, 1]) {
+    const r = rig();
+    try {
+      attach(r); const heading = r.p.heading;
+      flyTow(r, 5, { roll: direction * .4, throttle: 1 });
+      assert(r.landing.grounded); assert.equal(r.tow.phase, "rolling");
+      assert((r.tow.snapshot().heading - heading) * direction > .1);
+      assert(Math.abs(r.p.heading - r.tow.snapshot().heading) < 1e-6);
+      const speed = r.p.speed;
+      flyTow(r, 4, { throttle: 0 });
+      assert(r.p.speed < speed); assert(r.tow.throttle < .01);
+      assert.equal(r.tow.phase, "rolling");
+      r.tow.step(1 / 60, r.p, r.landing, { wheelBrake: true });
+      assert(!r.tow.attached); assert(r.landing.grounded);
+    } finally { r.dispose(); }
+  }
+});
+
+test("Cessna leads turns, the glider follows on a bounded cable, and steering is stable across frame rates", () => {
+  for (const direction of [-1, 1]) {
+    const flights = [];
+    for (const dt of [1 / 30, 1 / 60, 1 / 120]) {
+      const r = rig(dt);
+      try {
+        attach(r); flyTow(r, 22, {}, dt);
+        assert.equal(r.tow.phase, "climbing");
+        const heading = r.p.heading;
+        flyTow(r, 2, { roll: direction, throttle: 1 }, dt);
+        const tug = r.tow.snapshot();
+        assert((tug.heading - heading) * direction > .2);
+        assert((r.p.heading - heading) * direction > .05);
+        assert((tug.heading - r.p.heading) * direction > .05, "the glider turns after the Cessna");
+        assert(tug.roll * direction < -.3); assert(r.p.roll * direction < -.1);
+        for (let i = 0; i < Math.round(16 / dt); i++) {
+          flyTow(r, dt, { roll: direction, pitch: -.4, throttle: 1 }, dt);
+          assert(Math.abs(separation(r.tow.snapshot(), r.p) - 45) < .02);
+          assert(r.p.speed > 20 && r.p.speed < 40);
+        }
+        flights.push(flightPose(r.p));
+      } finally { r.dispose(); }
+    }
+    assert(separation(flights[0], flights[2]) < 1.5);
+    assert(Math.abs(flights[0].heading - flights[2].heading) < .02);
+  }
+});
+
+test("pitch and throttle control the Cessna, and release preserves free-gliding motion", () => {
+  const results = [];
+  for (const ctrl of [{ pitch: -1 }, { pitch: 0 }, { pitch: 1 }, { throttle: 0 }]) {
+    const r = rig();
+    try {
+      attach(r); flyTow(r, 30);
+      flyTow(r, 8, ctrl);
+      results.push({ climb: r.p.verticalSpeed, speed: r.p.speed, tug: r.tow.snapshot() });
+      const before = flightPose(r.p), speed = r.p.speed, climb = r.p.verticalSpeed;
+      const tug = r.tow.snapshot();
+      r.tow.update(0, r.p, r.landing); r.tow.step(0, r.p, r.landing, { roll: 1, pitch: 1, throttle: 0 });
+      r.tow.step(Number.EPSILON, r.p, r.landing, { roll: 1, pitch: 1, throttle: 0 });
+      assert.deepEqual(r.tow.snapshot(), tug); assert.deepEqual(flightPose(r.p), before);
+      assert.equal(r.p.speed, speed);
+      assert(r.tow.release(r.p, r.landing));
+      assert.deepEqual(flightPose(r.p), before); assert.equal(r.p.speed, speed); assert.equal(r.p.verticalSpeed, climb);
+      assert.equal(r.tow.step(1, r.p, r.landing, { pitch: 1 }), null);
+      const heading = r.p.heading;
+      for (let i = 0; i < 120; i++) r.p.update(1 / 60, { roll: -1, pitch: 0, throttle: 1, airbrake: 0 });
+      assert(r.p.heading < heading); assert.equal(r.p.throttle, 0);
+    } finally { r.dispose(); }
+  }
+  assert(results[0].climb < -2);
+  assert(results[1].climb > 2);
+  assert(results[2].climb > results[1].climb + 3);
+  assert(results[3].speed < results[1].speed - 5);
+  assert(results[3].tug.throttle < .01);
+});
+
 test("tow cancellation, pause, remote state and visible cable retain bounded finite geometry", () => {
   const r = rig(), scene = new Scene(), remote = new TowVisuals(); scene.add(r.wrapper);
   const frame = (lat, lon, h, heading, pitch, roll) => WGS84_ELLIPSOID.getObjectFrame(lat, lon, h, heading, pitch, roll, new Matrix4(), CAMERA_FRAME);
@@ -130,6 +224,16 @@ test("tow cancellation, pause, remote state and visible cable retain bounded fin
     const length = new Vector3().fromBufferAttribute(positions, 0).distanceTo(new Vector3().fromBufferAttribute(positions, positions.count - 1));
     assert(length > 30 && length < 50);
     assert.equal(parseTowSnapshot({ ...before, lat: Infinity }), null);
+    assert.equal(parseTowSnapshot({ ...before, roll: NaN }), null);
+    assert.equal(parseTowSnapshot({ ...before, throttle: Infinity }), null);
+    const legacy = { ...before }; delete legacy.roll; delete legacy.throttle;
+    assert.equal(parseTowSnapshot(legacy).roll, 0); assert.equal(parseTowSnapshot(legacy).throttle, 1);
+    flyTow(r, 2, { roll: 1, throttle: .8 });
+    const banked = parseTowSnapshot(r.tow.snapshot());
+    remote.update(scene, frame, r.wrapper, banked, 0);
+    const expected = new Group();
+    frame(banked.lat, banked.lon, banked.height, banked.heading, banked.pitch, -banked.roll).decompose(expected.position, expected.quaternion, expected.scale);
+    assert(remote.aircraft.quaternion.angleTo(expected.quaternion) < 1e-6);
     assert(r.tow.release(r.p, r.landing)); assert.equal(r.p.throttle, 0); assert(!r.tow.attached);
     r.tow.render(scene, frame, r.wrapper, 0); assert(!r.tow.visuals.rope.visible);
     r.tow.reset(); assert.equal(r.tow.phase, "idle"); assert.equal(r.tow.visuals.aircraft, null);
